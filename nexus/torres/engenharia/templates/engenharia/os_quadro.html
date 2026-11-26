@@ -12,7 +12,7 @@
    à direita o que ela LÊ (a nota da OS, a resposta do técnico nas filhas, os comentários). O "Solicitar OS" fica no
    lugar do "Abrir a OS". #}
 {% from "_explica.html" import explica %}
-{% from "engenharia/_chamado.html" import esquerda as ch_esq, direita as ch_dir %}
+{% from "engenharia/_chamado.html" import esquerda as ch_esq, direita as ch_dir, nova_demanda as ch_nova %}
 {% macro tag(texto, cor) %}<span class="eg-tag eg-tag--{{ cor }}">{{ texto }}</span>{% endmacro %}
 {# a seta do PDF de cada OS da cadeia, a mesma da cadeia do chamado da Garantia (o PDF que o Fracttal junta, com as fotos) #}
 {% macro seta_pdf(folio, wid='') -%}
@@ -49,7 +49,7 @@
       <p class="eg-ac-titulo"><a class="eg-ac-num" href="{{ ('/os/os/' ~ o.wid)|na_raiz }}" data-os-card data-wid="{{ o.wid }}" data-folio="{{ o.os }}" data-status="{{ o.status or '' }}" title="Abrir o card da OS {{ o.os }}">OS {{ o.os }}</a> <span>{{ (o.ativos|length ~ ' ativos') if o.ativos|length > 1 else (o.ativo or o.codigo) }}</span></p>
       <p class="eg-ac-sub">{{ topo.local }}{% if o.tipo %} · <b>{{ o.tipo }}</b>{% endif %}{% if o.status %} · {{ o.status }} no Fracttal{% endif %}</p>
     </div>
-    <div class="eg-ac-acoes">{% if ch_ok and chamado.aberto %}<button type="button" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--perigo" data-ch-finalizar title="Encerra a atividade e conclui a OS {{ o.os }} no Fracttal">Finalizar chamado</button>{% endif %}<a class="eg-ac-btn eg-ac-btn--o" href="{{ solicitar_url|na_raiz }}" title="A Nova solicitação com o ativo desta OS e ela como OS pai">Solicitar OS</a><a class="eg-ac-btn eg-ac-btn--o" href="{{ criar_url|na_raiz }}" title="O Criar OS do zero com o ativo desta OS, ela como OS pai e as subtarefas Descreva a atividade realizada e Ficou alguma pendência">Criar OS</a></div>
+    <div class="eg-ac-acoes">{% if ch_ok and chamado.demandas and not chamado.demandas.falta and not chamado.demandas.erro %}<button type="button" class="eg-ac-btn eg-ac-btn--o" data-dm-ch-abrir{% if not chamado.demandas.tem_login %} disabled title="Para pedir, entre com a sua conta da Grid"{% endif %}>Nova demanda</button>{% endif %}{% if ch_ok and chamado.aberto %}<button type="button" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--perigo" data-ch-finalizar title="Encerra a atividade e conclui a OS {{ o.os }} no Fracttal">Finalizar chamado</button>{% endif %}<a class="eg-ac-btn eg-ac-btn--o" href="{{ solicitar_url|na_raiz }}" title="A Nova solicitação com o ativo desta OS e ela como OS pai">Solicitar OS</a><a class="eg-ac-btn eg-ac-btn--o" href="{{ criar_url|na_raiz }}" title="O Criar OS do zero com o ativo desta OS, ela como OS pai e as subtarefas Descreva a atividade realizada e Ficou alguma pendência">Criar OS</a></div>
   </div>
   {% if ch_ok %}<p class="eg-os-msg" data-ch-msg-topo role="status" hidden></p>{% endif %}
   {% if msg_ok %}<p class="eg-os-aviso eg-os-aviso--ok" role="status">{{ msg_ok }}</p>{% endif %}
@@ -77,10 +77,10 @@
          diagnóstico e o status pós-OS num formulário; a etiqueta, o acompanhamento e o finalizado um botão cada #}
       {% set m = etm.marcas %}
       <section class="eg-bloco">
-        <div class="eg-bloco-h"><h2>Marcações da Engenharia</h2></div>
+        <div class="eg-bloco-h"><h2>Marcações da Performance</h2></div>
         {% if etm.erro_marcas %}<p class="eg-dica">Não consegui ler as marcações ({{ etm.erro_marcas }}); recarregue em instantes. Nada se grava sem elas.</p>
         {% elif pode %}
-        <form class="eg-ac-form" method="post" action="{{ url_for('torre_engenharia.etm_os_marcar', folio=o.os) }}">
+        <form class="eg-ac-form" method="post" action="{{ url_for('torre_performance.etm_os_marcar', folio=o.os) }}">
           <label><span class="eg-ac-lbl">Diagnóstico</span>
             <select class="eg-ac-campo" name="diagnostico"><option value="0">— sem diagnóstico —</option>
               {% for i, n in etm.diagnosticos %}<option value="{{ i }}"{% if i == m.diagnostico_id %} selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
@@ -90,18 +90,25 @@
           <button type="submit" class="eg-ac-btn eg-ac-btn--g">Salvar</button>
         </form>
         <div class="etm-marcas"><span class="eg-ac-lbl">Etiquetas</span>
-          <div class="etm-chips">{% for i, n in etm.etiquetas %}{% set on = i in m.etiquetas %}<form method="post" action="{{ url_for('torre_engenharia.etm_os_marcar', folio=o.os) }}"><input type="hidden" name="evento" value="etiqueta"><input type="hidden" name="valor" value="{{ i }}"><input type="hidden" name="ligado" value="{{ 'não' if on else 'sim' }}"><button type="submit" class="etm-chip" aria-pressed="{{ 'true' if on else 'false' }}">{{ n }}</button></form>{% endfor %}</div></div>
+          <div class="etm-chips">{% for i, n in etm.etiquetas %}{% set on = i in m.etiquetas %}<form method="post" action="{{ url_for('torre_performance.etm_os_marcar', folio=o.os) }}"><input type="hidden" name="evento" value="etiqueta"><input type="hidden" name="valor" value="{{ i }}"><input type="hidden" name="ligado" value="{{ 'não' if on else 'sim' }}"><button type="submit" class="etm-chip" aria-pressed="{{ 'true' if on else 'false' }}">{{ n }}</button></form>{% endfor %}</div></div>
         <div class="etm-botoes">
-          <form method="post" action="{{ url_for('torre_engenharia.etm_os_marcar', folio=o.os) }}"><input type="hidden" name="evento" value="acompanhamento"><input type="hidden" name="ligado" value="{{ 'não' if m.acompanhamento else 'sim' }}"><button type="submit" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p">{{ 'Tirar do acompanhamento' if m.acompanhamento else 'Pôr em acompanhamento' }}</button></form>
-          <form method="post" action="{{ url_for('torre_engenharia.etm_os_marcar', folio=o.os) }}"><input type="hidden" name="evento" value="finalizado"><input type="hidden" name="ligado" value="{{ 'não' if m.finalizado else 'sim' }}"><button type="submit" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p">{{ 'Reabrir para a Engenharia' if m.finalizado else 'Finalizar pela Engenharia' }}</button></form>
+          <form method="post" action="{{ url_for('torre_performance.etm_os_marcar', folio=o.os) }}"><input type="hidden" name="evento" value="acompanhamento"><input type="hidden" name="ligado" value="{{ 'não' if m.acompanhamento else 'sim' }}"><button type="submit" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p">{{ 'Tirar do acompanhamento' if m.acompanhamento else 'Pôr em acompanhamento' }}</button></form>
+          {# o Finalizar pede o comentário (25/11/2026, Levi: "deve ser obrigatório, eu coloco um comentário"): ele fica na
+             linha do tempo da OS e da usina, com quem finalizou; reabrir não pede #}
+          {% if m.finalizado %}<form method="post" action="{{ url_for('torre_performance.etm_os_marcar', folio=o.os) }}"><input type="hidden" name="evento" value="finalizado"><input type="hidden" name="ligado" value="não"><button type="submit" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p">Reabrir para a Performance</button></form>
+          {% else %}<details class="etm-fim-os"><summary class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p">Finalizar pela Performance</summary>
+            <form method="post" action="{{ url_for('torre_performance.etm_os_marcar', folio=o.os) }}" class="etm-fim-form"><input type="hidden" name="evento" value="finalizado"><input type="hidden" name="ligado" value="sim">
+              <span class="eg-dica">Encerra o acompanhamento da Performance; nada muda no Fracttal (nem o status{% if o.status %}, hoje {{ o.status }}{% endif %}, nem a data fim).</span>
+              <textarea class="eg-tl-obs" name="comentario" rows="3" maxlength="2000" required aria-label="Comentário do Finalizar (obrigatório)" placeholder="Comentário obrigatório: o que foi feito ou visto na ETM"></textarea>
+              <button type="submit" class="eg-ac-btn eg-ac-btn--g">Finalizar</button></form></details>{% endif %}
         </div>
-        <p class="eg-dica">Fica no Nexus com o seu nome, a data e a hora, e entra na linha do tempo. A OS sai das abertas para a Engenharia com o diagnóstico ou o finalizado.</p>
+        <p class="eg-dica">Fica no Nexus com o seu nome, a data e a hora, e entra na linha do tempo. A OS sai das abertas para a Performance com o diagnóstico ou o finalizado.</p>
         {% else %}
         <dl class="eg-ac-dados"><dt>Diagnóstico</dt><dd>{{ etm.nome(etm.diagnosticos, m.diagnostico_id) or '—' }}</dd>
           <dt>Status pós-OS</dt><dd>{{ etm.nome(etm.status_pos, m.status_pos_id) or '—' }}</dd>
           <dt>Etiquetas</dt><dd>{% for i, n in etm.etiquetas if i in m.etiquetas %}{{ n }}{{ ', ' if not loop.last }}{% else %}—{% endfor %}</dd>
           <dt>Acompanhamento</dt><dd>{{ 'Sim' if m.acompanhamento else 'Não' }}</dd>
-          <dt>Finalizado pela Engenharia</dt><dd>{{ 'Sim' if m.finalizado else 'Não' }}</dd></dl>
+          <dt>Finalizado pela Performance</dt><dd>{{ 'Sim' if m.finalizado else 'Não' }}</dd></dl>
         {% endif %}
       </section>
       {% elif ch_ok %}
@@ -319,6 +326,8 @@
 </div>
 {% if o %}{% include "oscreator/card_os_abrir.html" %}
 <script src="{{ url_for('static', filename='engenharia-os.js') }}"></script>
+{% if chamado and not chamado.erro and chamado.demandas %}{{ ch_nova(chamado, o) }}
+<script src="{{ url_for('static', filename='lista-sugestoes.js') }}"></script>{% endif %}
 {% if chamado and not chamado.erro %}<div hidden data-ch-raiz data-folio="{{ o.os }}" data-wid="{{ o.wid }}" data-ativo="{{ chamado.c.code }}" data-base="{{ ('/os/api/acomp/' ~ o.os)|na_raiz }}" data-login="{{ login_fracttal }}"></div>
 <script src="{{ url_for('static', filename='engenharia-chamado.js') }}"></script>{% endif %}
 <script>

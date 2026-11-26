@@ -14,7 +14,6 @@ from clima_mapa_mundo import REF, instalar_leituras, mundo_completo
 from clima_mundo import mundo_usina  # noqa: F401 (a fixture da página da usina, com a NASA de mentira)
 from clima_mundo import mundo  # noqa: F401 (a fixture da lista, com o INMET e o INPE de mentira)
 from clima_mundo import pagina as pagina_lista, texto
-from test_torre_performance_mapa import nova_app
 
 RAIZ = Path(__file__).resolve().parent.parent
 NOMES = {"inmet": "Instituto Nacional de Meteorologia", "inpe": "Instituto Nacional de Pesquisas Espaciais",
@@ -54,21 +53,7 @@ def leituras(monkeypatch):
     return instalar_leituras(monkeypatch)
 
 
-@pytest.mark.parametrize("consulta", [{}, {"fundo": "risco"}, {"fundo": "densidade"}, {"tv": "1"}])
-def test_o_mapa_e_o_modo_tv_escrevem_o_nome_por_extenso_antes_de_qualquer_sigla(tmp_path, monkeypatch, leituras, consulta):
-    _, c = nova_app(tmp_path)
-    monkeypatch.setattr(V, "agora", lambda: REF)
-    mundo_completo(leituras)
-    html = c.get("/t/performance/clima/mapa", query_string=consulta).get_data(as_text=True)
-    t = texto(html)
-    for org, sigla in (("inmet", "INMET"), ("inpe", "INPE")):
-        assert F.extenso(org) in t, (org, consulta)
-        assert _primeira_sigla_vem_com_o_nome(t, sigla, F.nome_de(org)), (sigla, consulta, t[max(0, t.find(sigla) - 80):t.find(sigla) + 20])
-    if not consulta.get("tv"):
-        assert F.extenso("ibge") in t                                            # o contorno dos estados, no rodapé
-    linhas = re.findall(r'<span class="cl-fonte-texto">([^<]*)', html)
-    assert len(linhas) == 4 and linhas[0].startswith(F.extenso("inmet")) and linhas[1].startswith(F.extenso("inpe"))
-    assert linhas[2].startswith(F.extenso("inpe")) and linhas[3].startswith(F.extenso("nasa_firms"))
+# o Mapa de risco saiu em 24/11/2026 (o mapa das usinas é o do Mapa de equipe); a dica do mapa segue abaixo
 
 
 def test_a_lista_do_clima_e_risco_escreve_o_nome_por_extenso(mundo):  # noqa: F811
@@ -82,7 +67,7 @@ def test_a_lista_do_clima_e_risco_escreve_o_nome_por_extenso(mundo):  # noqa: F8
 
 def test_a_pagina_da_usina_escreve_o_nome_da_nasa_power_por_extenso(mundo_usina):  # noqa: F811
     c = mundo_usina[0]
-    t = texto(pagina_lista(c, "/t/performance/clima/usina/1"))
+    t = texto(pagina_lista(c, "/t/campo/clima/usina/1"))
     assert F.extenso("nasa_power") in t and F.extenso("inmet") in t and F.extenso("inpe") in t
     assert _primeira_sigla_vem_com_o_nome(t, "NASA POWER", F.nome_de("nasa_power"))
     assert "NASA LaRC POWER" in t                                                 # a citação que a NASA pede continua no rodapé

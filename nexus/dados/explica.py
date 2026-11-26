@@ -77,6 +77,11 @@ RESUMO = {
     "decisao_backoffice_pcm": "Quem é do backoffice: as OS dessas pessoas ficam fora da programação",
     "decisao_atribuicao_pcm": "Quem cobre cada usina: os técnicos que o PCM põe e tira",
     "decisao_admin_app": "Quem administra o App de Campo, escolhido no Nexus",
+    "envio_email_app": "Cada e-mail automático que o App mandou, para quem e se saiu",
+    "regra_email_app": "Cada mudança feita no Nexus nos e-mails automáticos do App",
+    "envio_email_nexus": "Cada e-mail que o próprio Nexus mandou, para quem e se saiu",
+    "regra_email_nexus": "Cada mudança na regra de um e-mail que o Nexus manda",
+    "modelo_email_nexus": "Cada e-mail criado ou mudado na tela de E-mails automáticos",
     "decisao_almox_usina": "Cada marcação do PCM sobre o almoxarifado de uma usina",
     "declaracao_almox_usina_app": "O que o técnico disse no App sobre o almoxarifado da usina",
     "saldo_almox": "O saldo de cada peça em cada almoxarifado, a cada varredura diária",
@@ -318,6 +323,20 @@ PARA_QUE = {
     "declaracao_almox_usina_app": "Guarda cada vez que um técnico diz no App de Campo que a usina não tem almoxarifado ou "
                                   "que usa o de outra usina do mesmo cliente. Não muda nada sozinha: aparece para o PCM "
                                   "no Inventário, que confirma ou marca a usina como tendo o próprio.",
+    "envio_email_app": "Guarda, para cada e-mail automático do App de Campo (o aviso de PT, as luvas, a auditoria, o "
+                       "semanal da Segurança, o relato, o encaminhamento), cada destinatário, quando saiu e se saiu, "
+                       "falhou, foi barrado por estar desligado ou foi de teste. A pessoa vai só como código; os últimos "
+                       "30 dias.",
+    "regra_email_app": "Guarda cada mudança que um administrador faz em Base › E-mails automáticos: ligar e desligar, o "
+                       "modo teste e os destinatários a mais, com o motivo e quem mudou. O App lê de 5 em 5 minutos e "
+                       "aplica a mais nova de cada tipo; a lista de e-mails vai cifrada.",
+    "envio_email_nexus": "Guarda, para cada e-mail que o próprio Nexus mandou (o de teste, os criados na tela e os avisos que "
+                         "o App de Campo entrega ao Nexus), cada destinatário, quando saiu e se saiu, falhou, foi barrado "
+                         "por estar desligado ou foi de teste. A pessoa vai só como código; os últimos 35 dias.",
+    "regra_email_nexus": "Guarda cada mudança que um administrador faz na regra de um e-mail do Nexus: ligar e desligar, o "
+                         "modo teste e os destinatários a mais, com o motivo e quem mudou. A lista de e-mails vai cifrada.",
+    "modelo_email_nexus": "Guarda cada versão de um e-mail criado em Base › E-mails automáticos: o nome, o assunto, o texto, o "
+                          "que ele traz, para quem e quando sai. Vai inteiro cifrado.",
     "decisao_admin_app": "Guarda cada vez que um administrador do Nexus põe ou tira alguém dos administradores do App de "
                          "Campo, na aba de Base → Acessos: uma ficha do cadastro, uma pessoa de Pessoas e setores ou um "
                          "e-mail da Grid digitado (o avulso). O App lê esta lista de 5 em 5 minutos e reconhece a pessoa "

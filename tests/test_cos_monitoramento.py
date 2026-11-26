@@ -157,7 +157,7 @@ def test_a_tela_e_o_corpo_que_se_atualiza(tela):
     html = r.get_data(as_text=True)
     assert r.status_code == 200 and "Usina Exemplo Um" in html and "812 kW" in html and "1,1 MW" in html
     assert 'class="cos-curva"' in html and 'data-kw="10|50||120"' in html and "máx. 120 kW às 05:45" in html
-    assert "sem curva: o SunOP não guarda a série" in html and "SunOP: 1 de 10 plantas sem leitura" in html
+    assert "sem curva: a Ronda COS ainda não gravou esta usina" in html and "SunOP: 1 de 10 plantas sem leitura" in html
     # o nome leva à ficha da usina; o corpo se atualiza pelo static/cos/monitoramento.js
     assert '/t/cos/usina/EX-UM100"' in html and "cos/monitoramento.js" in html
     r = tela.get("/t/cos/monitoramento?parcial=1&cliente=Cliente%20A")
@@ -281,6 +281,49 @@ def test_o_historico_das_entradas_e_o_dia_que_passou_pelo_servidor_do_nexus(liga
     assert logado.get(base + "entradas/EXA01").status_code == 404
     assert logado.get(base + "entradas/../auth/2").status_code == 404
     assert logado.get(base + "entradas/EXA01/2?dia=ontem").status_code == 400
+
+
+def test_os_inversores_do_sunop_pelo_servidor_do_nexus(ligada, logado, monkeypatch):
+    """25/11/2026, o print do dono da aba Athon: a janela de uma usina do SunOP não mostrava gráfico nenhum. Os inversores
+    dela vêm do Andamento (`/api/nexus/geracao/sunop`), com 15 s de cópia (o portal é lido uma vez por minuto na Ronda
+    COS), e a curva de cada um pelo caminho de sempre, com o id da série gravada (`SUNOP-<código>`)."""
+    sunop = {"versao": 1, "fonte": {"configurado": True, "ok": True}, "cartoes": [
+        {"pid": "sunop-exa100", "fonte": "SUNOP", "usina_id": "SUNOP-EXA100", "usina_ids": ["SUNOP-EXA100"],
+         "inversores_online": 14, "inversores_total": 14, "inversores": [{"id": "SUNOP-EXA100:1", "modbus_id": 1, "pac": 180}]}]}
+    curva = {"versao": 1, "dia": "2026-11-09", "usina_ids": ["SUNOP-EXA100"],
+             "inversores": [{"usina_id": "SUNOP-EXA100", "modbus_id": 1, "pontos": []}]}
+    pedidos = _servir(monkeypatch, {"/api/nexus/geracao/sunop": sunop, "/api/nexus/geracao/scada-curva": curva})
+    relogio = [1000.0]
+    monkeypatch.setattr(AND.time, "monotonic", lambda: relogio[0])
+    r = logado.get("/t/cos/monitoramento/ronda-api/sunop/monitoramento")
+    assert r.status_code == 200 and r.get_json()["cartoes"][0]["inversores_online"] == 14
+    assert r.headers["Cache-Control"] == "private, no-store"
+    relogio[0] += 10                                     # dentro dos 15 s: a mesma leitura
+    logado.get("/t/cos/monitoramento/ronda-api/sunop/monitoramento")
+    assert [p[0] for p in pedidos] == ["/api/nexus/geracao/sunop"]
+    relogio[0] += 10                                     # passou dos 15 s: lê de novo
+    logado.get("/t/cos/monitoramento/ronda-api/sunop/monitoramento")
+    assert [p[0] for p in pedidos] == ["/api/nexus/geracao/sunop"] * 2
+    r = logado.get("/t/cos/monitoramento/ronda-api/scada/curva/SUNOP-EXA100")
+    assert r.status_code == 200 and pedidos[-1][0] == "/api/nexus/geracao/scada-curva?ids=SUNOP-EXA100"
+    assert logado.get("/t/cos/monitoramento/ronda-api/sunop/curva").status_code == 404
+
+
+def test_o_seletor_curva_ou_barras_so_com_o_ao_vivo_e_comeca_na_curva(tela):
+    """25/11/2026, o pedido do cliente: escolher entre a curva de hoje e as barras por inversor, para comparar os
+    inversores. O seletor nasce escondido e na curva (quem nunca escolheu não muda nada); o JavaScript mostra e aplica a
+    escolha guardada. Sem o ao vivo dos inversores (sem a fonte do Andamento), não há barras a desenhar: não há seletor."""
+    html = tela.get("/t/cos/monitoramento").get_data(as_text=True)
+    assert html.count("data-cos-vista-sel") == 1 and 'data-vista="curva" aria-pressed="true"' in html
+    assert 'data-vista="barras" aria-pressed="false"' in html and "Barras por inversor" in html
+    assert 'class="det cos-curva-det"' in html        # a linha do máximo some junto com a curva nas barras
+    assert "Curva ou barras." in html                 # a explicação no "!" da tela
+    corpo = tela.get("/t/cos/monitoramento?parcial=1").get_json()["html"]
+    assert "data-cos-vista-sel" not in corpo          # o seletor fica fora do corpo trocado a cada 30 s
+
+
+def test_sem_a_fonte_nao_ha_seletor_de_barras(logado):
+    assert "data-cos-vista-sel" not in logado.get("/t/cos/monitoramento").get_data(as_text=True)
 
 
 def test_o_andamento_fora_e_503_com_o_motivo(ligada, logado, monkeypatch):

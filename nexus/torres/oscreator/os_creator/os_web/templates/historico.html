@@ -52,6 +52,10 @@
         <button type="button" data-modo="criadas" class="{% if modo == 'criadas' %}on{% endif %}" aria-pressed="{{ 'true' if modo == 'criadas' else 'false' }}">Histórico Geral</button>
         <button type="button" data-modo="atribuidas" class="{% if modo == 'atribuidas' %}on{% endif %}" aria-pressed="{{ 'true' if modo == 'atribuidas' else 'false' }}">Atribuídas a mim</button>
         <button type="button" data-modo="cos" class="{% if modo == 'cos' %}on{% endif %}" aria-pressed="{{ 'true' if modo == 'cos' else 'false' }}" title="Corretivas, emergenciais e religamentos — com programação, equipe e gatilho, como no Power BI">Visão COS</button>
+        {# o Histórico de solicitações pelo mesmo caminho (Levi, 25/11/2026: "faz na parte do histórico ter o mesmo caminho [...]
+           o histórico de solicitação, que eu acho que tá meio escondido para os supervisores"): ele é aberto a todos (a
+           Área do Solicitante), e até aqui só se chegava a ele pela barra do PCM #}
+        <a href="/os/solicitacao/historico" title="Quem pediu, o ativo, a descrição, quando foi pedida, a OS gerada e quando ela foi criada">Solicitações</a>
       </div>
       <label class="fl-campo fl-busca" title="Filtra as OS carregadas por nº, cliente, usina, ativo, descrição, status, tipo de tarefa e etiqueta  [Ctrl+F]"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-busca"/></svg><input type="search" name="busca" id="busca_no" value="{{ busca }}" placeholder="Filtrar por nº, cliente, usina, ativo, descrição…" aria-label="Filtrar as OS carregadas"></label>
       <label class="fl-campo fl-busca-os" title="Buscar OS pelo nº: digite o número e tecle Enter — abre a OS direto, mesmo fora do período e dos filtros"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-hash"/></svg><input type="text" id="busca_os" placeholder="Nº da OS" inputmode="numeric" aria-label="Buscar OS pelo número"></label>

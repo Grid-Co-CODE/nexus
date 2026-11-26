@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block titulo %}OS fora do App · PCM{% endblock %}
+{% block conteudo %}
+{% from "_explica.html" import explica %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+{# PCM → OS fora do App (24/11/2026; o Levi: "Eu quero uma lista de todos os técnicos que estão fazendo OS pelo computador").
+   `d` vem de `nexus/pcm/fora_do_app.montar`: a medição semanal do App de Campo (v381), lida na rota dele, e o filtro dos
+   técnicos de campo pelos Técnicos por usina. Tabela que vira cartões abaixo de 640 px (o data-r é o rótulo). #}
+<div class="pg alm inv">
+<p class="gc-eyebrow">PCM · Acompanhamento</p>
+<div class="gc-titulo-explica"><h1 class="titulo-pagina">OS fora do App</h1>
+{% call explica('Entenda esta tela') %}<p><b>Para que serve.</b> Ver que técnico fecha OS direto no Fracttal, sem o App de
+  Campo, e se isso melhorou desde a semana passada.</p>
+<p><b>De onde vem.</b> A medição é do App de Campo, uma vez por dia, de madrugada. <b>Concluída</b> é a OS com tarefa em
+  verificação ou concluída no Fracttal na semana. <b>Pelo App</b> é a OS de que o App fechou alguma tarefa, ou a de ronda.
+  <b>Fora do App</b> é o resto: fechada no computador ou no app do próprio Fracttal (o dado não separa os dois).</p>
+<p><b>Quem aparece.</b> Os técnicos de campo: quem tem usina hoje em Técnicos por usina. "Mostrar todos" traz também o COS,
+  o escritório e quem não tem usina (o COS registra os Desligamentos no escritório, e isso é o esperado).</p>
+<p><b>Como ler.</b> A semana vai de segunda a domingo. A coluna da semana anterior mostra se a conversa com o técnico fez
+  efeito. Uma OS criada há muito tempo e concluída agora pode ficar de fora da conta.</p>{% endcall %}</div>
+
+{% if not d.ligado %}
+<div class="cn-erro cn-aviso" role="status">A medição do App de Campo ainda não chega aqui: falta a chave do App neste Nexus.</div>
+{% elif d.erro %}
+<div class="cn-erro cn-aviso" role="status">Não consegui ler a medição do App agora ({{ d.erro }}).{% if d.semanas %} Abaixo, a última leitura boa.{% endif %}</div>
+{% endif %}
+{% if d.sem_tecnicos %}<p class="alm-det">Os Técnicos por usina não foram lidos agora: a lista mostra todos.</p>{% endif %}
+
+{% if d.ligado and not d.semanas and not d.erro %}
+<p class="mudo">O App ainda não mediu nenhuma semana: a primeira medição sai de madrugada.</p>
+{% elif d.semana %}
+<form class="cn-filtros fa-filtros" method="get" action="{{ raiz }}/t/pcm/os-fora-do-app">
+  <label class="gc-rotulo" for="fa-semana">Semana</label>
+  <select id="fa-semana" name="semana" class="gc-campo" onchange="this.form.submit()">
+    {% for s in d.semanas %}<option value="{{ s.semana }}"{% if s.semana == d.semana.semana %} selected{% endif %}>{{ s.semana }} · {{ s.inicio[8:10] }}/{{ s.inicio[5:7] }} a {{ s.fim[8:10] }}/{{ s.fim[5:7] }}</option>{% endfor %}
+  </select>
+  <label class="gc-rotulo fa-todos"><input type="checkbox" name="todos" value="1"{% if d.todos %} checked{% endif %} onchange="this.form.submit()"> Mostrar todos{% if d.fora_da_lista %} ({{ d.fora_da_lista }} fora dos técnicos de campo){% endif %}</label>
+  <noscript><button type="submit" class="gc-btn gc-btn--ui gc-btn--contorno">Ver</button></noscript>
+</form>
+
+<div class="inv-tiles" aria-label="Resumo da semana">
+  <div class="inv-tile inv-tile--critico"><b class="inv-tile-v">{{ d.totais.os_fora }}</b><span class="inv-tile-r">OS fora do App</span></div>
+  <div class="inv-tile"><b class="inv-tile-v">{{ d.totais.os_concluidas }}</b><span class="inv-tile-r">OS concluídas</span></div>
+  <div class="inv-tile inv-tile--alerta"><b class="inv-tile-v">{{ d.totais.pct_fora if d.totais.pct_fora is not none else '—' }}{% if d.totais.pct_fora is not none %}%{% endif %}</b><span class="inv-tile-r">dos técnicos de campo, fora do App</span></div>
+</div>
+
+<section class="inv-card" aria-label="Técnicos">
+  <div class="inv-card-cab"><h3>{{ d.semana.semana }}: quem fecha fora do App</h3>
+    <span class="inv-card-nota">{% if d.anterior %}Ao lado, a semana anterior ({{ d.anterior.semana }}).{% else %}Sem a semana anterior na medição.{% endif %}{% if d.cobertura and not d.cobertura.completo %} A leitura do App parou antes do fim: pode faltar OS.{% endif %}</span></div>
+  {% if d.linhas %}
+  <div class="inv-tw"><table class="alm-t inv-t fa-t">
+    <thead><tr><th>Técnico</th><th class="num">Fora do App</th><th class="num">Concluídas</th><th class="num">% fora</th><th class="num">Semana anterior</th></tr></thead>
+    <tbody>
+    {% for l in d.linhas %}
+    <tr>
+      <td data-r="Técnico"><span class="alm-v">{{ l.nome }}{% if not l.tecnico %}<span class="alm-det">fora dos técnicos de campo</span>{% endif %}
+        {% if l.os_fora_lista %}<details class="fa-os"><summary>Ver as {{ l.os_fora_lista|length }} OS</summary><ul>
+          {% for o in l.os_fora_lista %}<li><a href="{{ raiz }}/os/_nexus/card/folio/{{ o.os }}">OS {{ o.os }}</a> <span class="alm-det">{{ o.descricao }}</span></li>{% endfor %}
+        </ul></details>{% endif %}</span></td>
+      <td data-r="Fora do App" class="num"><span class="alm-v"><b>{{ l.os_fora }}</b>{% if l.tipos_fora %}<span class="alm-det">{% for t, n in l.tipos_fora.items() %}{{ t }}: {{ n }}{% if not loop.last %} · {% endif %}{% endfor %}</span>{% endif %}</span></td>
+      <td data-r="Concluídas" class="num"><span class="alm-v">{{ l.os_concluidas }}<span class="alm-det">{{ l.os_pelo_app }} pelo App</span></span></td>
+      <td data-r="% fora" class="num"><span class="alm-v"><span class="inv-selo inv-selo--{{ 'critico' if (l.pct_fora or 0) >= 50 else 'alerta' if (l.pct_fora or 0) >= 20 else 'ok' }}">{{ l.pct_fora if l.pct_fora is not none else '—' }}{% if l.pct_fora is not none %}%{% endif %}</span></span></td>
+      <td data-r="Semana anterior" class="num"><span class="alm-v">{% if l.antes %}{{ l.antes.os_fora }} de {{ l.antes.os_concluidas }} ({{ l.antes.pct_fora }}%){% else %}—{% endif %}</span></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="mudo inv-card-corpo">Nenhum técnico de campo fechou OS nesta semana.</p>{% endif %}
+</section>
+{% endif %}
+</div>
+{% endblock %}

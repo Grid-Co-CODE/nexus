@@ -20,7 +20,7 @@
   <span><span class="gc-rotulo">Paradas ou sem comunicação</span><span class="v gc-num{% if r.paradas %} ruim{% endif %}">{{ r.paradas }}</span>
     <span class="d">pela situação do cartão da Ronda COS</span></span>
   <span id="cos-mon-inv" hidden><span class="gc-rotulo">Inversores fora agora</span><span class="v gc-num" data-inv="fora">—</span>
-    <span class="d"><span data-inv="semcom">—</span> sem comunicação · ao vivo, pelo SCADA</span></span>
+    <span class="d"><span data-inv="semcom">—</span> sem comunicação · ao vivo, pelo SCADA e pelo SunOP</span></span>
   <span><span class="gc-rotulo">Sem leitura nova</span><span class="v gc-num{% if r.velhas %} ruim{% endif %}">{{ r.velhas }}</span>
     <span class="d">o número delas pode estar parado</span></span>
 </div>
@@ -67,8 +67,8 @@
     <path class="cos-curva-linha" d="{{ c.linha }}"></path>
     <line class="cos-curva-mira" x1="0" y1="0" x2="0" y2="{{ altura }}" hidden></line>
   </svg>
-  <span class="det">máx. {{ kw_txt(c.maximo) }} às {{ c.maximo_em }}</span>
-  {% elif not x.tem_curva %}<span class="cos-mon-semcurva det">sem curva: o SunOP não guarda a série</span>
+  <span class="det cos-curva-det">máx. {{ kw_txt(c.maximo) }} às {{ c.maximo_em }}</span>
+  {% elif not x.tem_curva %}<span class="cos-mon-semcurva det">sem curva: a Ronda COS ainda não gravou esta usina</span>
   {% else %}<span class="cos-mon-semcurva det">sem amostra hoje</span>{% endif %}
   <div class="cos-mon-u-pe"><span class="det">{{ x.fonte }}{% if x.lido %} · lido {{ x.lido }}{% endif %}</span>
     {% if x.codigo %}{{ usina_link(x.codigo, 'ficha') }}{% endif %}</div>

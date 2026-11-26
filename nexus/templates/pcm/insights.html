@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block titulo %}Insights do PCM · PCM{% endblock %}
+{% block conteudo %}
+{% from "_explica.html" import explica %}
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+{# PCM → Insights do PCM (25/11/2026; `nexus/pcm/insights_pcm.py`). O Levi: "Menos é mais. Vamos tentar ser diretos e ter
+   informações bem direcionadas, fáceis de leitura. Não precisa ficar enchendo de KPI. Se a informação se repete, a gente
+   mantém só uma informação." Cinco cartões, uma frase cada; a lista abre no cartão só quando ela não mora noutra tela. #}
+<div class="pg">
+<p class="gc-eyebrow">PCM</p>
+<div class="gc-titulo-explica"><h1 class="titulo-pagina">Insights do PCM</h1>
+{% call explica('Entenda esta tela') %}<p><b>Para que serve.</b> Ver em poucos segundos o que pede ação no PCM agora. Cada
+  cartão é uma frase: quantos, e o pior caso. A lista abre no cartão; a da OS parada fica no Radar de Backlog.</p>
+<p><b>De onde vem.</b> A Gestão PCM (as tarefas do Fracttal, de 15 em 15 minutos) e a programação da semana. As regras são
+  as da planilha de controle semanal do PCM: aberta é a tarefa de OS que não está finalizada nem em verificação; os dias
+  são o atraso contra a data programada; usina de teste e OS do backoffice ficam fora.</p>
+<p><b>Como se conta.</b> Religamento: aberto há mais de {{ d.religamento_dias if d else 7 }} dias. MPM: a do mês, com tarefa
+  já vencida e aberta. Handover: usina com tarefa de handover vencida. OS parada: a conta do Radar de Backlog (aberta há
+  mais de 25 dias). Rolagem: a OS que entrou em {{ d.rolagem_min if d else 5 }} semanas ou mais da programação.</p>
+<p><b>O que não está aqui.</b> MPA e MPS atrasadas, o backlog completo, a carga por supervisor e as usinas que pedem
+  atenção já estão no Acompanhamento PCM, no Quadro da semana e no Relatório Executivo. As observações do time vão na
+  conversa da OS (o link de cada OS).</p>{% endcall %}</div>
+{% if gerado %}<p class="ins-quando">Gestão PCM de {{ gerado[8:10] }}/{{ gerado[5:7] }} às {{ gerado[11:16] }}</p>{% endif %}
+
+{% if not d %}
+<div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-warning-circle"></i><div><strong>Não consegui ler a Gestão PCM
+  agora</strong> ({{ erro or 'sem dado' }}). Tente de novo em alguns minutos.</div></div>
+{% else %}
+
+{% macro os_link(os) %}<a href="{{ ('/t/comando/conversa/os/' ~ os)|na_raiz }}" title="A OS no Nexus, com a conversa do time">OS {{ os }}</a>{% endmacro %}
+
+{% macro cartao(n, tom, titulo, vazio) %}
+<section class="ins-c ins-c--{{ tom if n else 'ok' }}">
+  <p class="ins-c-n gc-num">{{ n }}</p>
+  <div class="ins-c-corpo">
+    <p class="ins-c-tit"><span class="gc-ponto gc-ponto--{{ tom if n else 'ok' }}">{{ ('Agir' if tom == 'critico' else 'Atenção') if n else 'Em dia' }}</span>
+      {{ titulo if n else vazio }}</p>
+    {% if n %}{{ caller() }}{% endif %}
+  </div>
+</section>
+{% endmacro %}
+
+<div class="ins">
+{% set r = d.religamento %}
+{% call cartao(r.n, 'critico', ('religamento aberto' if r.n == 1 else 'religamentos abertos') ~ ' há mais de ' ~ d.religamento_dias ~ ' dias',
+               'Nenhum religamento aberto há mais de ' ~ d.religamento_dias ~ ' dias') %}
+  {% set p = r.linhas[0] %}
+  <p class="ins-c-pior">O mais antigo: {{ p.usina }}, {{ p.dias }} dias ({{ os_link(p.os) }}). {{ r.abertas }} abertos ao todo.</p>
+  <details class="ins-lista"><summary>Ver {{ 'o' if r.n == 1 else 'os ' ~ r.n }}</summary>
+    <ul>{% for x in r.linhas %}<li><b class="gc-num">{{ x.dias }} d</b><span>{{ x.usina }}</span><span class="mudo">{{ x.tipo }}</span>{{ os_link(x.os) }}</li>{% endfor %}</ul>
+  </details>
+{% endcall %}
+
+{% set m = d.mpm %}
+{% call cartao(m.n, 'alerta', ('usina com MPM de ' if m.n == 1 else 'usinas com MPM de ') ~ m.mes ~ ' vencida',
+               'Nenhuma MPM de ' ~ m.mes ~ ' vencida') %}
+  {% set p = m.linhas[0] %}
+  <p class="ins-c-pior">A mais atrasada: {{ p.usina }}, {{ p.feitas }} de {{ p.total }} feitas e {{ p.vencidas }} vencidas.</p>
+  <details class="ins-lista"><summary>Ver {{ 'a' if m.n == 1 else 'as ' ~ m.n }}</summary>
+    <ul>{% for x in m.linhas %}<li><b class="gc-num">{{ x.feitas }}/{{ x.total }}</b><span>{{ x.usina }}</span><span class="mudo">{{ x.vencidas }} vencida{{ 's' if x.vencidas != 1 }}</span></li>{% endfor %}</ul>
+  </details>
+{% endcall %}
+
+{% set h = d.handover %}
+{% call cartao(h.n, 'alerta', ('usina com handover vencido' if h.n == 1 else 'usinas com handover vencido'),
+               'Nenhum handover vencido') %}
+  {% set p = h.linhas[0] %}
+  <p class="ins-c-pior">O mais antigo: {{ p.usina }}, {{ p.vencidas }} de {{ p.abertas }} tarefas vencidas, há {{ p.dias }} dias.</p>
+  <details class="ins-lista"><summary>Ver {{ 'a' if h.n == 1 else 'as ' ~ h.n }}</summary>
+    <ul>{% for x in h.linhas %}<li><b class="gc-num">{{ x.dias }} d</b><span>{{ x.usina }}</span><span class="mudo">{{ x.vencidas }}/{{ x.abertas }} vencidas</span>{% for o in x.os %}{{ os_link(o) }}{% endfor %}</li>{% endfor %}</ul>
+  </details>
+{% endcall %}
+
+{% set q = d.parada %}
+{% call cartao(q.n, 'alerta', ('OS parada' if q.n == 1 else 'OS paradas') ~ ' há mais de ' ~ q.dias ~ ' dias', 'Nenhuma OS parada há mais de ' ~ q.dias ~ ' dias') %}
+  {% set p = q.pior %}
+  <p class="ins-c-pior">A mais antiga: {{ p.u }}, {{ p.idade }} dias ({{ os_link(p.os) }}).
+    <a href="{{ ('/t/pcm/acompanhamento?aba=bkl')|na_raiz }}">Ver no Radar de Backlog</a></p>
+{% endcall %}
+
+{% set o = d.rolagem %}
+{% call cartao(o.n, 'alerta', ('OS rolou ' if o.n == 1 else 'OS rolaram ') ~ d.rolagem_min ~ ' semanas ou mais', 'Nenhuma OS rolou ' ~ d.rolagem_min ~ ' semanas ou mais') %}
+  {% set p = o.linhas[0] %}
+  <p class="ins-c-pior">A que mais rolou: {{ p.usina }}, {{ p.vezes }} semanas ({{ os_link(p.os) }}).</p>
+  <details class="ins-lista"><summary>Ver {{ 'a' if o.n == 1 else 'as ' ~ o.n }}</summary>
+    <ul>{% for x in o.linhas %}<li><b class="gc-num">{{ x.vezes }}×</b><span>{{ x.usina }}</span><span class="mudo">{{ x.tarefa }}</span>{{ os_link(x.os) }}</li>{% endfor %}</ul>
+  </details>
+{% endcall %}
+</div>
+{% endif %}
+</div>
+{% endblock %}

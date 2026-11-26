@@ -200,7 +200,7 @@ def test_sem_configuracao_a_tela_avisa_e_nada_quebra(extra, motivo):
         assert r.status_code == 200, t
         assert "Performance ainda não ligada neste servidor" in h and motivo in h, t
         assert _form(h) is None and "porta-dados" not in h and "curta-demais" not in h
-    assert cli.get("/t/performance/clima").status_code == 200       # o resto do Nexus segue
+    assert cli.get("/t/campo/clima").status_code == 200            # o resto do Nexus segue
     assert cli.get("/").status_code == 200
 
 

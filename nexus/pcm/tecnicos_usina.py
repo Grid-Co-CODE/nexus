@@ -351,16 +351,24 @@ def _comparar_app(cfg, base, nome_usina, nome_pessoa, vale: dict) -> dict:
     except Exception:            # noqa: BLE001
         linhas = []
     if not linhas:
-        return {"existe": False, "so_no_app": [], "so_no_nexus": [], "pendencias": []}
+        return {"existe": False, "so_no_app": [], "so_no_nexus": [], "pendencias": [], "grupos": []}
     m = mapas_de(cfg, base.de_para, base.pessoas)
     pend, nexus, app_ = {}, {}, {}
+    # as pendências por grupo, com o que fazer (24/11/2026, Levi: "Essa comparação com o app está confusa [...] é só uma
+    # lista gigante"): cada item é {usina, pessoa, detalhe}
+    por_grupo: dict[str, dict] = {}
+
+    def em(gid, k, usina, pessoa="", detalhe=""):
+        por_grupo.setdefault(gid, {})[k] = {"usina": usina, "pessoa": pessoa, "detalhe": detalhe}
     for (uid, pid), x in vale.items():
         fr, cod = " ".join(D._txt(x.get("usina_fracttal")).split()), D._txt(x.get("pessoa_hmac"))
         if not fr:
             pend[("nx-usina", uid)] = f"{nome_usina(uid)}: vai ao App sem o nome do Fracttal (o App não acha a usina)"
+            em("sem_fracttal", ("nx-usina", uid), nome_usina(uid))
         elif not cod:
             pend[("nx-pessoa", uid, pid)] = (f"{nome_usina(uid)} · {nome_pessoa(pid)}: vai ao App sem o código (sem "
                                              "e-mail no cadastro), e o App não a aplica")
+            em("sem_codigo", ("nx-pessoa", uid, pid), nome_usina(uid), nome_pessoa(pid))
         else:
             nexus[(_norm(fr), cod)] = (uid, pid, fr)
     for x in linhas:
@@ -370,9 +378,11 @@ def _comparar_app(cfg, base, nome_usina, nome_pessoa, vale: dict) -> dict:
         uid, pid = m["usina"].get(_norm(usina)), m["hmac"].get(cod)
         if not uid:
             pend[("usina", usina)] = f"{usina}: usina do App sem o nome do Fracttal no de-para do cadastro"
+            em("usina_do_app", ("usina", usina), usina)
         elif not pid:
             pend[("pessoa", uid, cod)] = (f"{nome_usina(uid)}: a pessoa de código {cod[:8]}… do App sem ficha que "
                                           "case (sem e-mail no cadastro, ou com outro e-mail)")
+            em("pessoa_do_app", ("pessoa", uid, cod), nome_usina(uid), f"código {cod[:8]}…")
         else:
             app_[(_norm(usina), cod)] = (uid, pid, usina)
 
@@ -380,8 +390,38 @@ def _comparar_app(cfg, base, nome_usina, nome_pessoa, vale: dict) -> dict:
         return sorted(({"usina_id": u, "usina": nome_usina(u), "pessoa_id": p, "nome": nome_pessoa(p), "grafia": g}
                        for k, (u, p, g) in lado.items() if k not in outro),
                       key=lambda i: (norm(i["usina"]), norm(i["nome"]), i["grafia"]))
-    return {"existe": True, "so_no_app": itens(app_, nexus), "so_no_nexus": itens(nexus, app_),
-            "pendencias": [pend[k] for k in sorted(pend, key=str)]}
+    so_no_app, so_no_nexus = itens(app_, nexus), itens(nexus, app_)
+    for x in so_no_app:
+        em("so_no_app", ("app", x["usina_id"], x["pessoa_id"]), x["usina"], x["nome"], x["grafia"])
+    for x in so_no_nexus:
+        em("so_no_nexus", ("nx", x["usina_id"], x["pessoa_id"]), x["usina"], x["nome"], x["grafia"])
+    grupos = []
+    for gid, titulo, o_que_fazer, tom in GRUPOS_APP:
+        lista = sorted(por_grupo.get(gid, {}).values(), key=lambda i: (norm(i["usina"]), norm(i["pessoa"])))
+        if lista:
+            grupos.append({"id": gid, "titulo": titulo, "o_que_fazer": o_que_fazer, "tom": tom, "n": len(lista),
+                           "itens": lista})
+    return {"existe": True, "so_no_app": so_no_app, "so_no_nexus": so_no_nexus,
+            "pendencias": [pend[k] for k in sorted(pend, key=str)], "grupos": grupos}
+
+
+# os grupos da Comparação com o App, na ordem de importância: (id, título, o que fazer, tom). Os quatro primeiros são as
+# pendências (o que o Nexus não consegue mandar ou entender); os dois últimos, a diferença entre as listas
+GRUPOS_APP = (
+    ("sem_codigo", "Técnico sem e-mail no cadastro",
+     "O App não aplica a linha sem o código da pessoa. Ponha o e-mail na ficha dela (Base → Registro mestre).", "critico"),
+    ("sem_fracttal", "Usina sem o nome do Fracttal",
+     "O App não acha a usina. Ligue o local do Fracttal à usina em Base → Ligações.", "critico"),
+    ("usina_do_app", "Usina do App que o Nexus não reconhece",
+     "O nome que o App usa não está no de-para do cadastro. Ligue em Base → Ligações.", "alerta"),
+    ("pessoa_do_app", "Pessoa do App sem ficha no Nexus",
+     "Ninguém no cadastro tem esse e-mail. Corrija o e-mail na ficha, ou a pessoa sai do App quando a troca ligar.",
+     "alerta"),
+    ("so_no_app", "Só no App",
+     "O App mostra a usina a quem o Nexus não tem nela. Ponha no Nexus, ou ela sai do App.", "info"),
+    ("so_no_nexus", "Só no Nexus",
+     "O Nexus tem a pessoa na usina e o App ainda não. O App põe na próxima leitura (de 5 em 5 minutos).", "neutro"),
+)
 
 
 # ── a tela ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -433,7 +473,7 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
     usina | tecnico | app) e `todas` (as usinas fora de operação também)."""
     hoje = hoje or A.hoje_id()
     pedido = _pedido_dos_args(args)
-    ver = args.get("ver") if args.get("ver") in ("tecnico", "app") else "usina"
+    ver = args.get("ver") if args.get("ver") in ("tecnico", "app", "historico") else "usina"
     lido = datetime.now(A._BRT).strftime("%H:%M")
     meta: dict = {}
     try:
@@ -444,7 +484,8 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
                 "todos_tecnicos": [], "opcoes_todas": {k: [] for k in ("equipe", "cliente", "responsavel")},
                 "opcoes": {k: [] for k in FILTROS if k != "q"}, "todas": str(args.get("todas") or "") == "1",
                 "situacoes": dict(SITUACOES), "hoje": hoje, "pessoas_json": [],
-                "app": {"existe": False, "so_no_app": [], "so_no_nexus": [], "pendencias": []}, "livro_vazio": False,
+                "app": {"existe": False, "so_no_app": [], "so_no_nexus": [], "pendencias": [], "grupos": []},
+                "usinas_json": [], "livro_vazio": False,
                 "erro": "", "erro_cadastro": ex.args[0] if ex.args else "erro", "avisos_gerais": [],
                 "reenviar_total": 0, "reenviar_usinas": 0, "reenviar_resumo": ""}
     pessoas = pessoas_de_campo(base, cfg)
@@ -600,6 +641,10 @@ def montar(cfg, args, hoje: int | None = None) -> dict:
             "opcoes_todas": opcoes_todas,
             "total_usinas": len(linhas), "pedido": pedido, "opcoes": opcoes, "todas": todas,
             "situacoes": dict(SITUACOES), "hoje": hoje,
+            # as usinas da janela "escolher as usinas" do técnico (24/11/2026): as do cadastro, com o cliente e se está em
+            # operação (a janela mostra as em operação e as que o técnico já tem)
+            "usinas_json": sorted(({"id": l["usina_id"], "nome": l["nome"], "cliente": l["cliente"], "op": l["op"]}
+                                   for l in todas_linhas), key=lambda u: (norm(u["cliente"]), norm(u["nome"]))),
             "pessoas_json": sorted(({"id": pid, "nome": p["nome"], "equipe_id": p["equipe_id"]}
                                     for pid, p in pessoas.items()), key=lambda p: norm(p["nome"])),
             "app": _comparar_app(cfg, base, nome_usina, nome_pessoa, vale),
@@ -634,3 +679,87 @@ def _quando(iso: str) -> str:
     except ValueError:
         return iso
     return d.strftime("%d/%m/%Y %H:%M")
+
+
+# ── a revisão de 24/11/2026 (Levi) ────────────────────────────────────────────────────────────────────────────────
+def pedidos_do_tecnico(base, pessoas: dict, fr: dict, pessoa_id: int, escolhidas) -> object:
+    """As usinas que o técnico vê, escolhidas de uma vez na aba Por técnico (Levi, 24/11/2026: "clicar no técnico e
+    escolher as usinas, que ele vai ver"; e decidiu: a janela com as usinas e o Salvar, que grava de uma vez). Devolve a
+    função (est, hoje) -> pedidos que o `A.decidir_varias` roda DENTRO da trava, sobre a leitura nova do livro: põe como
+    fixo a marcada que ele não tem, tira a desmarcada que ele tem (o apoio e o agendado também), e a que continua
+    marcada fica como está (com as datas dela). `A.Recusada` se uma das escolhidas não é usina do cadastro."""
+    pid = int(pessoa_id)
+    ids = []
+    for u in escolhidas or []:
+        uid = D._id(u)
+        if not uid or uid not in base.por_id or D._txt(base.por_id[uid].get("excluido")).lower() == "sim":
+            raise A.Recusada(f"A usina {str(u)[:12]} não está no cadastro: atualize a página. Nada foi gravado.")
+        ids.append(uid)
+    quer = set(ids)
+
+    def pedidos(est, hoje):
+        tem = {uid for (uid, p, _papel) in A.atuais(est, hoje) if p == pid}
+        out = [_pedido(uid, fr, pid, pessoas) for uid in sorted(quer - tem)]
+        for uid in sorted(tem - quer):
+            out.append(dict(_pedido(uid, fr, pid, pessoas), na_usina=False))
+        return out
+    return pedidos
+
+
+def historico_geral(cfg, base, pessoas: dict, args) -> dict:
+    """A aba Histórico (Levi, 24/11/2026: "toda a parte de histórico [...] baseado no histórico do OS Creator Web. Mesmo
+    design, mesma lógica, mesma funcionalidade"; decidiu a aba com TODAS as decisões): as decisões de todas as usinas, da
+    mais nova à mais antiga, com os filtros do modelo A do Histórico de OS (a busca, o período e as listas de usina,
+    cliente, técnico, quem decidiu e o que fez; os de lista podem ter vários valores). {"linhas", "opcoes", "filtro",
+    "total"}. As opções são de TODAS as decisões (a cascata fica na tela)."""
+    m = mapas_de(cfg, base.de_para, base.pessoas)
+    hist = A.historico(cfg, A.ler(cfg), None)
+    ids = {h["pessoa_id"] for h in hist} | {m["hmac"].get(h["quem_hmac"]) for h in hist}
+    nomes = base.nomes({i for i in ids if i})
+
+    def nome(pid):
+        return (pessoas.get(pid) or {}).get("nome") or nomes.get(pid) or (f"Pessoa {pid}" if pid else "")
+
+    def lista(chave):
+        v = args.getlist(chave) if hasattr(args, "getlist") else ([args.get(chave)] if args.get(chave) else [])
+        return [str(x).strip()[:80] for x in v if str(x or "").strip()]
+    filtro = {k: lista(k) for k in ("usina", "cliente", "tecnico", "quem", "acao", "origem")}
+    filtro["de"], filtro["ate"] = str(args.get("de") or "")[:10], str(args.get("ate") or "")[:10]
+    filtro["q"] = " ".join(str(args.get("q") or "").split())[:80]
+    todas = []
+    for h in hist:
+        q = m["hmac"].get(h["quem_hmac"])
+        u = base.por_id.get(h["usina_id"]) or {}
+        dia = _quando(h["quando"])
+        todas.append(dict(h, nome=nome(h["pessoa_id"]), usina=D._txt(u.get("nome")) or f"Usina {h['usina_id']}",
+                          cliente=base.nome_cliente.get(D._id(u.get("cliente_id"))) or SEM_CLIENTE,
+                          de=_dm(h["de"]), ate=_dm(h["ate"]), quando_txt=dia,
+                          dia_iso=f"{dia[6:10]}-{dia[3:5]}-{dia[0:2]}" if len(dia) >= 10 else "",
+                          quem=nome(q) if q else ("administrador (senha)" if not h["quem_hmac"] else
+                                                  "alguém fora do cadastro"),
+                          origem_txt=ORIGEM_TXT.get(h["origem"], h["origem"] or "—")))
+
+    def passa(x):
+        f = filtro
+        return ((not f["usina"] or str(x["usina_id"]) in f["usina"]) and (not f["cliente"] or x["cliente"] in f["cliente"])
+                and (not f["tecnico"] or str(x["pessoa_id"]) in f["tecnico"]) and (not f["quem"] or x["quem"] in f["quem"])
+                and (not f["acao"] or x["acao"] in [{"pos": "pôs"}.get(a, a) for a in f["acao"]])
+                and (not f["origem"] or x["origem"] in f["origem"])
+                and (not f["de"] or x["dia_iso"] >= f["de"]) and (not f["ate"] or x["dia_iso"] <= f["ate"])
+                and (not f["q"] or norm(f["q"]) in norm(" ".join((x["usina"], x["nome"], x["quem"], x["obs"] or "")))))
+    linhas = [x for x in todas if passa(x)]
+
+    def opcoes(chave, rotulo):
+        conta = collections.Counter((str(x[chave]), x[rotulo]) for x in todas)
+        return sorted(({"valor": v, "rotulo": r, "n": n} for (v, r), n in conta.items()), key=lambda o: norm(o["rotulo"]))
+    return {"linhas": linhas, "total": len(todas), "filtro": filtro,
+            "opcoes": {"usina": opcoes("usina_id", "usina"), "cliente": opcoes("cliente", "cliente"),
+                       "tecnico": opcoes("pessoa_id", "nome"), "quem": opcoes("quem", "quem"),
+                       "acao": [{"valor": "pôs", "rotulo": "Pôs", "n": sum(x["acao"] == "pôs" for x in todas)},
+                                {"valor": "tirou", "rotulo": "Tirou", "n": sum(x["acao"] == "tirou" for x in todas)}],
+                       "origem": opcoes("origem", "origem_txt")}}
+
+
+# como cada decisão nasceu, em palavras (a coluna `origem` do livro)
+ORIGEM_TXT = {"tela": "Na tela", "carga_inicial": "Carga inicial", "reemissao": "Reenvio ao App",
+              "cadastro": "Pelo cadastro"}

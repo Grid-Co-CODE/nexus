@@ -256,7 +256,8 @@
         if (r.erro) { msg(r.erro); return; }
         msg('');
         pendente = r;
-        if (r.chave && !r.chave.substitui_aba) { perguntar(r); return; }
+        // sem a pergunta desde 24/11/2026 (o Nexus como fonte única): o Salvar grava e o servidor passa a usina a valer
+        // pelo Nexus quando ela pode; o aviso do Salvar diz se ainda segue com a aba e por quê
         gravar(r.st, null, b);
         return;
       }

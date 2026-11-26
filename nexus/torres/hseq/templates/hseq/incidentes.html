@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='hseq.css') }}">
+{# Incidentes (Segurança · HSEQ, 24/11/2026): os relatos de segurança que o campo faz pelo botão vermelho do App de Campo
+   (v376), lidos no servidor do App a cada abertura (cópia de 1 minuto; nexus/hseq/relatos_seguranca.py). Só a tabela,
+   como a APR e PT: os números ficam no "!"; os filtros no padrão do Histórico de OS (static/filtros-os.js); a linha
+   abre o relato com o que aconteceu, a ação imediata e as fotos, que passam pelo Nexus. #}
+{% from '_explica.html' import explica %}
+{% set com_filtro = fl.values()|select|list or q %}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+      {% call explica('Entenda esta tela') %}
+        {% if lido.ligado and lido.lido_em %}<p><b>Agora:</b> {{ total }} relato{{ 's' if total != 1 }}{% for cod, (rot, _tom) in tipos.items() %}{% if contagem[cod] %}; {{ contagem[cod] }} {{ rot|lower }}{% endif %}{% endfor %}.
+          {% if pendentes %}{{ pendentes }} aviso{{ 's' if pendentes != 1 }} à TST ainda não saiu{{ 'ram' if pendentes != 1 }} do App. {% endif %}Lido no App às {{ lido_as }}.</p>{% endif %}
+        <p><b>De onde vem.</b> O técnico relata pelo botão vermelho com a sirene, no topo do App de Campo (ou em Relatar
+          segurança, no Perfil): o tipo, quando foi, a usina, o que aconteceu, as pessoas envolvidas (só a função e a
+          quantidade, sem nome), até 3 fotos e a ação imediata. Sem sinal, o relato fica no celular e sobe sozinho. O
+          Nexus lê os relatos no servidor do App e não guarda nada no banco: o texto livre pode citar nomes.</p>
+        <p><b>Aviso à TST.</b> Acidente e incêndio mandam e-mail à TST na hora, pelo App. <span class="gc-ponto gc-ponto--ok">Enviado</span>:
+          o e-mail saiu. <span class="gc-ponto gc-ponto--alerta">Pendente</span>: ainda não saiu (o App tenta de novo a cada 5 min).
+          Não avisa: incidente, condição insegura, EPI e EPC.</p>
+        <p><b>Como ler.</b> <span class="gc-ponto gc-ponto--critico">Vermelho</span>: acidente e incêndio.
+          <span class="gc-ponto gc-ponto--alerta">Amarelo</span>: incidente e condição insegura.
+          <span class="gc-ponto gc-ponto--info">Azul</span>: EPI e EPC. Clique na linha para ver o relato e as fotos. A usina
+          é a do cadastro, pelo nome do local no Fracttal; o cliente e o Responsável UFV vêm da ficha da usina.</p>
+        {% if sem_ligacao %}<p><b>Locais sem usina no cadastro:</b> {{ sem_ligacao|join(', ') }}. Ligue em Base → Ligações para o cliente e o responsável aparecerem.</p>{% endif %}
+      {% endcall %}</div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+  </div>
+
+  {% if not lido.ligado %}
+  <div class="cn-erro cn-aviso" role="status"><b>Os relatos do App de Campo ainda não estão ligados neste Nexus.</b> Falta a chave dos relatos do App (a mesma das Sugestões) em Base → Chaves do Nexus.</div>
+  {% elif lido.erro %}
+  <div class="cn-erro" role="alert"><b>Não li os relatos no App agora: {{ lido.erro }}.</b>{% if lido.lido_em %} A lista é a da última leitura boa, das {{ lido_as }}.{% endif %}</div>
+  {% endif %}
+
+  {% if lido.ligado %}
+  <form class="cn-filtros" method="get" data-fo>
+    <input type="search" name="q" value="{{ q }}" placeholder="Buscar usina, o que aconteceu ou quem relatou" aria-label="Buscar" autocomplete="off">
+    {% for campo, rotulo in filtros %}
+    <label class="cn-filtro-par"><span class="gc-rotulo">{{ rotulo }}</span>
+    <select class="gc-campo" id="inc-{{ campo }}" name="{{ campo }}" multiple data-todos="Todos">
+      {% for v, n in opcoes[campo] %}<option value="{{ v }}"{% if v in fl[campo] %} selected{% endif %}>{{ v }} ({{ n }})</option>{% endfor %}
+    </select></label>
+    {% endfor %}
+  </form>
+  <script src="{{ url_for('static', filename='filtros-os.js') }}"></script>
+
+  <div class="cn-tab"><table class="cn-expande inc-tab">
+    <thead><tr><th>Quando</th><th>Tipo</th><th>Usina</th><th>Responsável UFV</th><th>Pessoas envolvidas</th><th>Relatado por</th><th>Aviso à TST</th></tr></thead>
+    <tbody>
+    {% for x in lista %}
+      <tr class="cn-linha" tabindex="0" aria-expanded="false">
+        <td class="inc-quando m">{{ x.quando.strftime('%d/%m/%Y %H:%M') if x.quando else '—' }}</td>
+        <td><span class="cn-st cn-t-{{ x.tom }}">{{ x.tipo_rotulo }}</span>{% if x.fotos %}<span class="det">{{ x.fotos }} foto{{ 's' if x.fotos != 1 }}</span>{% endif %}</td>
+        <td>{{ x.usina or '—' }}{% if x.cliente %}<span class="det">{{ x.cliente }}</span>{% endif %}</td>
+        <td>{% if x.responsavel and x.responsavel != sem_responsavel %}{{ x.responsavel }}{% else %}<span class="mudo">sem responsável</span>{% endif %}</td>
+        <td>{% if x.pessoas %}{{ x.pessoas|map(attribute='texto')|join(', ') }}{% else %}<span class="mudo">nenhuma</span>{% endif %}</td>
+        <td>{{ x.autor or '—' }}{% if x.papel %}<span class="det">{{ x.papel }}</span>{% endif %}</td>
+        <td><span class="cn-st cn-t-{{ x.aviso_tom }}">{{ x.aviso_rotulo }}</span>{% if x.aviso_em %}<span class="det">{{ x.aviso_em.strftime('%d/%m %H:%M') }}</span>{% endif %}</td>
+      </tr>
+      <tr class="cn-detalhe" hidden><td colspan="7">
+        <div class="cn-detalhe-grade">
+          <div>
+            <h3>O que aconteceu</h3>
+            <p class="inc-texto">{{ x.o_que_aconteceu }}</p>
+            <h3>Ação imediata</h3>
+            <p class="inc-texto">{% if x.acao_imediata %}{{ x.acao_imediata }}{% else %}<span class="mudo">não informada</span>{% endif %}</p>
+            {% if x.fotos %}
+            <h3>Fotos</h3>
+            <div class="inc-fotos">{% for n in range(x.fotos) %}<a href="{{ url_for('torre_hseq.incidente_foto', rid=x.id, n=n) }}" target="_blank" rel="noopener"><img src="{{ url_for('torre_hseq.incidente_foto', rid=x.id, n=n) }}" alt="Foto {{ n + 1 }} do relato" loading="lazy" width="160" height="120"></a>{% endfor %}</div>
+            {% endif %}
+          </div>
+          <dl class="cn-dados">
+            <dt>Tipo</dt><dd>{{ x.tipo_rotulo }}</dd>
+            <dt>Quando</dt><dd>{{ x.quando.strftime('%d/%m/%Y às %H:%M') if x.quando else '—' }}</dd>
+            <dt>Usina</dt><dd>{{ x.usina or '—' }}{% if x.usina_fonte and x.usina_fonte != x.usina %}<span class="det">no App: {{ x.usina_fonte }}</span>{% endif %}</dd>
+            <dt>Cliente</dt><dd>{{ x.cliente or '—' }}</dd>
+            <dt>Pessoas envolvidas</dt><dd>{% if x.pessoas %}{{ x.pessoas|map(attribute='texto')|join(', ') }}{% if x.pessoas|length > 1 %} ({{ x.pessoas_total }} no total){% endif %}{% else %}nenhuma{% endif %}</dd>
+            <dt>Relatado por</dt><dd>{{ x.autor or '—' }}{% if x.papel %} · {{ x.papel }}{% endif %}</dd>
+            <dt>Registrado</dt><dd>{{ x.criado.strftime('%d/%m/%Y às %H:%M') if x.criado else '—' }}{% if x.versao_app %} · App {{ x.versao_app }}{% endif %}</dd>
+            <dt>Aviso à TST</dt><dd>{{ x.aviso_rotulo }}{% if x.aviso_em %} em {{ x.aviso_em.strftime('%d/%m às %H:%M') }}{% endif %}</dd>
+          </dl>
+        </div>
+      </td></tr>
+    {% else %}
+      <tr><td colspan="7" class="mudo">{% if com_filtro %}Nenhum relato com esses filtros.{% elif lido.erro and not lido.lido_em %}Sem a lista do App por enquanto.{% else %}Nenhum relato de segurança até agora.{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <script>
+    // clicar na linha (ou Enter e espaço nela) abre o relato logo abaixo; as fotos só carregam ao abrir (loading=lazy)
+    document.querySelectorAll('table.inc-tab tr.cn-linha').forEach(function (tr) {
+      function alterna(ev) {
+        if (ev.target.closest('a')) return;
+        var det = tr.nextElementSibling;
+        if (!det || !det.classList.contains('cn-detalhe')) return;
+        det.hidden = !det.hidden;
+        tr.setAttribute('aria-expanded', String(!det.hidden));
+      }
+      tr.addEventListener('click', alterna);
+      tr.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); alterna(ev); } });
+    });
+  </script>
+  {% endif %}
+</div>
+{% endblock %}

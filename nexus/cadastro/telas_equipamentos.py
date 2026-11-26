@@ -14,12 +14,15 @@ você fizer vai ficar fácil de entender para você, quando eu for fazer não vo
 a tela ordena as opções (as parecidas primeiro, com o porquê escrito) e quem escolhe é a pessoa; o "Trazer da aba"
 preenche um rascunho, e só o Salvar grava.
 
-Só administrador (o Registro mestre e a gravação no banco). Os POST são da própria página (`_de_outro_site`, a régua da
+O administrador e, desde 25/11/2026, o setor Performance (`pode_abrir`; a tela virou "Metas e equipamentos"). Os POST são da própria página (`_de_outro_site`, a régua da
 moldura e da aba Pessoas e setores (Base → Acessos)); o Salvar da estrutura vai por fetch com JSON e devolve o estado novo (os IDs novos),
 sem recarregar (a lista de inversores de uma usina grande passa de 40 linhas: recarregar perdia a rolagem).
 """
 import difflib
 import logging
+import os
+import threading
+import time
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
@@ -33,7 +36,7 @@ from . import banco as B
 from . import estrutura_usina as E
 from . import ligacoes as L
 from . import depara_fontes as DF
-from .telas import _quem, _tela
+from .telas import SemCadastro, _quem, servico
 from ..dados.conexao import banco as _banco
 from ..auth.sessao import email_da_sessao as _meu_email
 from ..auth.origem import de_outro_site as _de_outro_site
@@ -50,6 +53,72 @@ _CHAVE_AVISO = "equipamentos_aviso"
 
 def _hora(ts) -> str:
     return datetime.fromtimestamp(ts, _BRT).strftime("%d/%m às %H:%M") if ts else ""
+
+
+# ── a virada para o Nexus como fonte única (24/11/2026; `estrutura_usina.valer_prontas`) ────────────────────────────
+# Levi: "A ideia é usarmos só o do Nexus"; "OK" para a virada das usinas prontas. Não há rotina que rode sozinha quando o
+# Nexus sobe, então a conferência roda em fundo ao abrir esta tela (no máximo a cada 10 minutos, uma por vez) e a cada
+# Salvar (só a usina salva, na hora). A última rodada fica aqui para o bloco do alto ("vale na Sala pelo Nexus: N de M")
+# dizer o que falta em cada usina que segue com a aba.
+VIRADA_A_CADA_S = 600
+_VIRADA = {"rodando": False, "em": 0.0, "fim": 0.0, "pendentes": {}, "marcadas": 0, "erro": ""}
+_VIRADA_TRAVA = threading.Lock()
+
+
+def _virar(cfg, base, sessao, info, aba_chaves, quem_email=""):
+    try:
+        r = E.valer_prontas(cfg, base, sessao, info=info, aba_chaves=aba_chaves, quem_email=quem_email)
+        _VIRADA.update(pendentes=r["pendentes"], marcadas=len(r["marcadas"]), erro="")
+        log.info("Equipamentos: virada para o Nexus: %s usina(s) passaram a valer, %s seguem com a aba.",
+                 len(r["marcadas"]), len(r["pendentes"]))
+    except Exception as ex:      # noqa: BLE001 — a tela segue; a próxima abertura tenta de novo
+        _VIRADA["erro"] = f"{type(ex).__name__}: {str(ex)[:160]}"
+        log.error("Equipamentos: a virada para o Nexus falhou (%s).", _VIRADA["erro"])
+    finally:
+        _VIRADA.update(rodando=False, fim=time.time())
+
+
+VIRADA_AO_SUBIR_S = 120
+
+
+def _virar_ao_subir(app) -> None:
+    """A conferência de todas as usinas uns 2 minutos depois de o Nexus subir (cada publicação reinicia o processo): a
+    virada não depende de alguém abrir a tela. Nos testes, desligada (só com NEXUS_EQUIP_VIRADA)."""
+    def rodar():
+        time.sleep(VIRADA_AO_SUBIR_S)
+        try:
+            with app.app_context():
+                cfg = app.config
+                # conferido na hora de rodar: o teste liga o TESTING depois do create_app
+                if not cfg.get("GRIDCO_SQL_TOKEN") or not cfg.get("NEXUS_EQUIP_VIRADA", not cfg.get("TESTING")):
+                    return
+                from .telas import servico
+                srv = servico()
+                info = _info_usinas(srv, cfg, _usinas(srv))
+                base, sessao = _banco()
+                aba = E.aba_equipamentos(base, sessao)
+                if aba.get("erro"):
+                    log.warning("Equipamentos: a virada ao subir ficou para a abertura da tela (aba: %s).", aba["erro"])
+                    return
+                with _VIRADA_TRAVA:
+                    if _VIRADA["rodando"]:
+                        return
+                    _VIRADA.update(rodando=True, em=time.time())
+                _virar(dict(cfg), base, sessao, info, aba["chaves"])
+        except Exception as ex:  # noqa: BLE001 — a abertura da tela tenta de novo
+            log.error("Equipamentos: a virada ao subir falhou (%s: %s).", type(ex).__name__, ex)
+    if os.environ.get("PYTEST_CURRENT_TEST") or not app.config.get("NEXUS_EQUIP_VIRADA", not app.config.get("TESTING")):
+        return
+    threading.Thread(target=rodar, daemon=True, name="nexus-equipamentos-virada-boot").start()
+
+
+def _virar_em_fundo(cfg, base, sessao, info, aba_chaves, quem_email="") -> None:
+    with _VIRADA_TRAVA:
+        if _VIRADA["rodando"] or time.time() - _VIRADA["em"] < VIRADA_A_CADA_S:
+            return
+        _VIRADA.update(rodando=True, em=time.time())
+    threading.Thread(target=_virar, args=(dict(cfg), base, sessao, info, aba_chaves, quem_email), daemon=True,
+                     name="nexus-equipamentos-virada").start()
 
 
 def _parecido(a, b) -> float:
@@ -238,6 +307,12 @@ def contexto(srv, cfg, args) -> dict:
         painel["fontes_livres"] = fontes_livres(dp["sem_usina"], aberta["nome"])
     aviso = session.pop(_CHAVE_AVISO, None)
     pode_gravar = bool(cfg.get("GRIDCO_SQL_TOKEN")) and not est.get("erro")
+    # a virada (24/11/2026): abrir a tela confere em fundo as usinas que já podem valer pelo Nexus (nos testes, só com
+    # NEXUS_EQUIP_VIRADA: a gravação em fundo não pode correr solta entre um teste e outro)
+    if pode_gravar and not aba.get("erro") and cfg.get("NEXUS_EQUIP_VIRADA", not cfg.get("TESTING")):
+        base, sessao = _banco()
+        _virar_em_fundo(cfg, base, sessao, info, aba["chaves"], _meu_email())
+    virada = _virada(est, aba, nome_usina)
     # o que a "Ligar pela aba Equipamentos" ligaria agora, e o que fica de fora com o motivo (13/10/2026)
     auto = E.proposta_pela_aba(aba["chaves"], L.ler(cfg), est, {u["id"] for u in usinas}) if not aba.get("erro") else \
         {"ligar": {}, "fora": [], "ja_ligadas": 0}
@@ -256,8 +331,31 @@ def contexto(srv, cfg, args) -> dict:
             "n_visao": len(est.get("visao") or []),
             "n_chaves_ligadas": sum(1 for c in aba["chaves"] if any(
                 s["usina_supervisorio"] == c and not s["excluido"] for s in est["supervisorios"])),
-            "auto": auto,
+            "auto": auto, "virada": virada,
             "volta": {k: v for k, v in (("q", q), ("filtro", filtros), ("cliente", cli_escolhidos)) if v}}
+
+
+def _motivo_curto(texto: str) -> str:
+    """O "porque" do aviso do `_marcar`, sem o resto ("A chave “X” não vale no lugar da aba porque: <isto>. A estrutura
+    ficou gravada...")."""
+    t = texto.split("porque: ", 1)[-1]
+    return t.split(". A estrutura ficou", 1)[0].rstrip(".")
+
+
+def _virada(est: dict, aba: dict, nome_usina: dict) -> dict:
+    """O bloco do alto: quantas usinas com chave já valem pelo Nexus na Sala, quais seguem com a aba e por quê (da última
+    conferência) e quantas chaves da aba o Nexus nem tem."""
+    chaves = None if aba.get("erro") else aba["chaves"]
+    vale = E.vale_pelo_nexus(est, chaves)
+    pend = _VIRADA["pendentes"]
+    ligadas = {s["usina_supervisorio"] for s in est["supervisorios"] if not s["excluido"]}
+    fora = sorted(c for c, g in (chaves or {}).items() if g["inversores"] and c not in ligadas)
+    pendentes = sorted(({"id": uid, "titulo": nome_usina.get(uid, f"usina {uid}"),
+                         "motivos": list(dict.fromkeys(_motivo_curto(t) for t in pend.get(uid) or []))}
+                        for uid, v in vale.items() if not v), key=lambda x: E.norm(x["titulo"]))
+    return {"vale": sum(1 for v in vale.values() if v), "com_chave": len(vale), "pendentes": pendentes,
+            "fora_do_nexus": fora, "rodando": _VIRADA["rodando"], "conferida_em": _hora(_VIRADA["fim"]),
+            "erro": _VIRADA["erro"]}
 
 
 def fontes_livres(sem_usina: list, nome_usina: str) -> list:
@@ -468,11 +566,29 @@ def _salvar(srv):
                                       "estrutura não mudou, tente de novo."), 500
     n = r["mudancas"]
     aviso = "Nada mudou: a estrutura já estava assim." if not n else f"Salvo: {n} mudança{'s' if n > 1 else ''} gravada{'s' if n > 1 else ''} no banco."
-    if r.get("visao_mudou"):
-        aviso += f" A visão no formato da aba foi refeita ({r['visao_linhas']} linhas): os leitores pegam no próximo minuto."
     aba = E.aba_equipamentos(base, sessao)
-    return jsonify(ok=True, aviso=aviso, resumo=r["resumo"], editor=editor_dados(r["usina"]),
-                   comparacao=E.comparar_usina(r["usina"], info.get(uid), aba["chaves"]) if not aba.get("erro") else {})
+    chaves_aba = None if aba.get("erro") else aba["chaves"]
+    # o Salvar passa a valer na Sala sozinho quando a usina pode (24/11/2026, o Nexus como fonte única: sem a marca
+    # "No lugar da aba" à mão, que ficava escondida e deixou a Petrolina 2 com 13 strings na Sala depois do Salvar)
+    pendentes = []
+    try:
+        v = E.valer_prontas(cfg, base, sessao, info=info, aba_chaves=chaves_aba, usinas={uid}, quem_email=_meu_email())
+        pendentes = list(dict.fromkeys(_motivo_curto(t) for t in v["pendentes"].get(uid) or []))
+    except Exception as ex:      # noqa: BLE001 — o que foi salvo fica; a próxima abertura da tela confere de novo
+        log.error("Equipamentos: a usina %s foi salva, mas a conferência para valer pelo Nexus falhou (%s: %s).",
+                  uid, type(ex).__name__, ex)
+    est = E.ler(base, sessao)
+    usina = E.da_usina(est, uid)
+    if E.vale_pelo_nexus(est, chaves_aba).get(uid):
+        aviso += (" Vale pelo Nexus na Sala de controle, no tempo real, no gêmeo e nas Ligações: a plataforma pega no "
+                  "próximo minuto.")
+    elif usina["supervisorios"]:
+        aviso += (" Atenção: esta usina ainda vale pela aba Equipamentos na Sala de controle, e não pelo que está salvo "
+                  "aqui" + (", porque: " + "; ".join(pendentes[:3]) if pendentes else "") + ".")
+    cmp = E.comparar_usina(usina, info.get(uid), chaves_aba) if chaves_aba is not None else {}
+    fora = E.fora_da_aba(usina, cmp)
+    return jsonify(ok=True, aviso=aviso, resumo=E.resumo(usina), editor=editor_dados(usina), comparacao=cmp,
+                   fora_da_aba=fora, pendentes=pendentes)
 
 
 def _ativos():
@@ -490,7 +606,7 @@ def _ativos():
 # O "Modo de-para" do tempo real e a Base · De-para de equipamentos (telas da plataforma de Performance, abertas dentro do
 # Nexus pela porta única, na MESMA origem) leem e gravam a estrutura por aqui. O livro é do Nexus: a troca integral sob
 # a trava deste processo não aceita um segundo escritor, então a plataforma manda só o remendo e o Nexus calcula o kWp
-# com o Registro mestre DESTA máquina (o mesmo que a tela Equipamentos mostra). Só administrador (`_tela`), só da mesma
+# com o Registro mestre DESTA máquina (o mesmo que a tela Equipamentos mostra). Quem abre a tela (`pode_abrir`), só da mesma
 # origem (`_de_outro_site`, inclusive o GET: é a rota que o fetch da página chama), JSON nos dois sentidos. O formato é o
 # contrato com a plataforma: `nexus/cadastro/CLAUDE.md`, seção "De-para do tempo real".
 def _recusa_json(motivo: str, status: int, usina_id=None, usina_supervisorio: str = ""):
@@ -683,64 +799,100 @@ def _passe_ligar():
     return r
 
 
+TELA = "base/equipamentos"
+
+
+def pode_abrir() -> bool:
+    """Quem abre (e grava) Metas e equipamentos: o administrador e, desde 25/11/2026, quem tem a tela liberada no setor
+    (`setor_telas.acesso`): o dono é o setor Performance (`Tela.do_setor`), e Base → Acessos pode marcá-la para outro.
+    Levi, 25/11/2026: "Expõe as 43 usinas de fora para o time de Performance" e "a pessoa clica, ela vai poder ver as
+    metas das usinas, vai poder ver os equipamentos das usinas e vai poder fazer o de para ali". Até ali, só administrador
+    (o `_tela` do cadastro). O portão por setor desligado não abre para quem não é administrador (sem setor, sem tela)."""
+    if session.get("admin"):
+        return True
+    from ..auth import setor_telas as ST
+    ac = ST.acesso()
+    return bool(ac.get("setor")) and TELA in (ac.get("telas") or set())
+
+
+def _tela_aberta(titulo):
+    """O `_tela` do cadastro (cadastro ligado; sem a chave, a tela diz o que falta) com o portão de `pode_abrir`."""
+    from functools import wraps
+
+    def deco(fn):
+        @wraps(fn)
+        def envolta(*a, **k):
+            if not pode_abrir():
+                return render_template("cadastro/sem_permissao.html", titulo=titulo,
+                                       email=(session.get("usuario") or {}).get("email", "")), 403
+            try:
+                srv = servico()
+            except SemCadastro as e:
+                return render_template("cadastro/sem_chave.html", titulo=titulo, motivo=str(e))
+            return fn(srv, *a, **k)
+        return envolta
+    return deco
+
+
 def registrar_equipamentos(bp) -> None:
     """Pendura a tela na torre Base (`/t/base/equipamentos`), vencendo o placeholder, e as ações dela."""
+    bp.record_once(lambda estado: _virar_ao_subir(estado.app))
     @bp.route("/equipamentos")
-    @_tela(TITULO)
+    @_tela_aberta(TITULO)
     def equipamentos(srv):
         return render_template("cadastro/equipamentos.html", **contexto(srv, current_app.config, request.args))
 
     @bp.route("/equipamentos/fracttal", methods=["POST"])
-    @_tela(TITULO)
+    @_tela_aberta(TITULO)
     def equipamentos_fracttal(srv):
         return _ligar_fracttal(srv)
 
     @bp.route("/equipamentos/chave", methods=["POST"])
-    @_tela(TITULO)
+    @_tela_aberta(TITULO)
     def equipamentos_chave(srv):
         return _chave(srv)
 
     @bp.route("/equipamentos/visao", methods=["POST"])
-    @_tela(TITULO)
+    @_tela_aberta(TITULO)
     def equipamentos_visao(srv):
         return _visao(srv)
 
     @bp.route("/equipamentos/ligar-aba", methods=["POST"])
-    @_tela(TITULO)
+    @_tela_aberta(TITULO)
     def equipamentos_ligar_aba(srv):
         return _ligar_aba(srv)
 
     @bp.route("/equipamentos/salvar", methods=["POST"])
-    @_tela(TITULO)
+    @_tela_aberta(TITULO)
     def equipamentos_salvar(srv):
         return _salvar(srv)
 
     @bp.route("/equipamentos/ativos")
-    @_tela(TITULO)
-    def equipamentos_ativos(srv):  # noqa: ARG001 — o decorador garante administrador e cadastro
+    @_tela_aberta(TITULO)
+    def equipamentos_ativos(srv):  # noqa: ARG001 — o decorador garante o acesso e o cadastro
         return _ativos()
 
     @bp.route("/equipamentos/depara/estado")
-    @_tela(TITULO)
+    @_tela_aberta(TITULO)
     def equipamentos_depara_estado(srv):
         return _depara_estado(srv)
 
     @bp.route("/equipamentos/depara/salvar", methods=["POST"])
-    @_tela(TITULO)
+    @_tela_aberta(TITULO)
     def equipamentos_depara_salvar(srv):
         return _depara_salvar(srv)
 
     @bp.route("/equipamentos/fontes")
-    @_tela(TITULO)
+    @_tela_aberta(TITULO)
     def equipamentos_fontes(srv):
         return _fontes_json(srv)
 
     @bp.route("/equipamentos/fontes/janela")
-    @_tela(TITULO)
-    def equipamentos_fontes_janela(srv):  # noqa: ARG001 — o decorador garante administrador
+    @_tela_aberta(TITULO)
+    def equipamentos_fontes_janela(srv):  # noqa: ARG001 — o decorador garante o acesso
         return _janela_depara()
 
     @bp.route("/equipamentos/fontes/passe", methods=["POST"])
-    @_tela(TITULO)
-    def equipamentos_fontes_passe(srv):  # noqa: ARG001 — o decorador garante administrador
+    @_tela_aberta(TITULO)
+    def equipamentos_fontes_passe(srv):  # noqa: ARG001 — o decorador garante o acesso
         return _passe_ligar()

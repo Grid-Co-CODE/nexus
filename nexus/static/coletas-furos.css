@@ -38,6 +38,10 @@
 .fr-dobra-cli>summary .ph{color:var(--mudo);transition:none}
 .fr-dobra-cli[open]>summary .ph{transform:rotate(90deg)}
 .fr-dobra-cli>summary:hover .ui-kicker{color:var(--tinta)}
+/* a troca de BD no alto (24/11/2026): vale para a tela toda */
+.fr-bds{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.fr-bds .gc-chip{cursor:pointer;background:transparent;color:var(--tinta)}
+.fr-bds .gc-chip[aria-pressed="true"]{background:var(--superficie-2);box-shadow:inset 0 0 0 1px var(--verde)}
 .fr-dobra-cli>summary:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
 .fr-dobra-cli[open]>summary{margin-bottom:10px}
 .fr-clientes{display:flex;flex-direction:column;gap:2px;max-width:980px}
@@ -51,6 +55,7 @@
 .fr-cli-barra{display:flex;height:10px;border-radius:5px;background:var(--barra);overflow:hidden}
 .fr-cli-barra i{display:block;height:100%}
 .fr-cli-com{background:var(--semcom)}
+.fr-cli-comi{background:var(--anomalo)}
 .fr-cli-semt{background:var(--critico-cheio)}
 .fr-cli-semp{background:var(--severo-cheio)}
 .fr-cli-etm{background:repeating-linear-gradient(135deg,var(--critico-cheio) 0 2px,transparent 2px 5px)}
@@ -121,7 +126,11 @@
    furo e foi falha de comunicação [...] melhora um pouco o contraste"): roxo (o token semcom, "sem comunicação") = furo com
    falha de comunicação no COS, a resolver; vermelho = furo sem justificativa; azul = justificado por queda; verde CHEIO =
    validado (a 40% ele sumia no navy); cinza = completo. Vazado = só IPOA ou GHI; traço azul embaixo = queda curta no COS */
+/* 24/11/2026, a falha de comunicação no INVERSOR (Levi: "tem que ter uma cor só para inversor"): o rosa, que nenhuma outra
+   cor da tira usa (o verde-água foi testado e some ao lado do verde); a roxa fica para a da usina. No mapa do mês a linha
+   já é o equipamento: lá o furo dele com falha de comunicação no COS segue roxo */
 .fr-q--m{background:var(--semcom)}
+.fr-q--k{background:var(--anomalo)}
 .fr-q--s{background:var(--critico-cheio)}
 .fr-q--p{background:var(--severo-cheio)}
 .fr-q--e{background:var(--info-cheio)}

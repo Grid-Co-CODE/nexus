@@ -17,6 +17,17 @@
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Raleway:wght@700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='nexus.css') }}">
+  {# o pop-up de login (24/11/2026, Levi: os supervisores "perdem tudo" quando o login aparece no meio da OS): a sessão que
+     cai abre o pop-up por cima da tela, e a janela não vai mais ao Entrar. Sem defer: a conferência da sessão, no fim da
+     página, já pode chamá-lo #}
+  <script>window.NEXUS_REENTRAR = {{ reentrar|tojson if reentrar is defined else '{}' }};</script>
+  <script src="{{ url_for('static', filename='reentrar.js') }}"></script>
+  <script>
+    // a sessão acabou: o pop-up de login por cima da tela, e não a janela ao Entrar (o que estava preenchido, inclusive
+    // na moldura do OS Creator, fica). O `nexusIrAoEntrar` é o de antes, para quem precisa da tela do Entrar
+    window.nexusIrAoEntrar = window.nexusEntrarDeNovo;
+    if (window.nexusReentrar) window.nexusEntrarDeNovo = function () { return window.nexusReentrar({tipo: "nexus"}); };
+  </script>
   <script>
     // Aplica o menu recolhido antes de pintar, para a página não piscar aberta e depois fechar.
     // localStorage pode faltar (janela privada, dado bloqueado): aí o menu só abre expandido.

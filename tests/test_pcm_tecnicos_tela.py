@@ -131,9 +131,10 @@ def test_tirar_leva_o_nome_e_o_codigo_que_o_app_tem(app, banco, logado):
 
 
 def test_abas_no_estilo_da_pt_e_a_comparacao_com_o_app(app, banco, logado):
-    """As abas Por usina, Por técnico e, com a foto do App, Comparação com o App; os chips das situações."""
+    """As abas Por usina, Por técnico, Histórico e, com a foto do App, Comparação com o App; os chips das situações. Os
+    números grandes do topo saíram em 24/11/2026 (Levi: "os KPIs podem sumir"), e a Comparação vem por grupo."""
     html = logado.get(ROTA).get_data(as_text=True)
-    assert 'class="campo-nativa"' in html and 'class="cn-numeros"' in html and "Sem técnico" in html
+    assert 'class="campo-nativa"' in html and 'class="cn-numeros"' not in html and "Sem técnico" in html
     assert "Por técnico" in html and "Comparação com o App" not in html
     from test_pcm_tecnicos_usina import _aba
     _aba(banco, "organizacao_app_campo", "Atribuicoes", [{"Usina": F1, "Pessoa (HMAC)": _h("t11@exemplo.test"),
@@ -141,16 +142,18 @@ def test_abas_no_estilo_da_pt_e_a_comparacao_com_o_app(app, banco, logado):
     from nexus.campo import visao
     visao.limpar()
     html = logado.get(ROTA + "?ver=app").get_data(as_text=True)
-    assert "Comparação com o App" in html and "Pendências para a troca" in html and "Técnico Onze" in html
+    assert "Comparação com o App" in html and "Só no App" in html and "Técnico Onze" in html
 
 
 def test_tabela_com_cliente_sem_regiao_e_sem_o_botao_tecnico_na_linha(app, banco, logado):
-    """Levi, 17/10: a coluna Cliente antes da Usina, sem a Região de campo; sem o botão "Técnico" na célula (o "Pôr
-    técnico" fica no detalhe da linha); os técnicos um em cima do outro, sem a borda verde."""
+    """Levi, 17/10: sem a Região de campo; sem o botão "Técnico" na célula (o "Pôr técnico" fica no detalhe da linha); os
+    técnicos um em cima do outro, sem a borda verde. Desde 24/11/2026 (Levi: "Faça um rebrand aí dessa tabela") o cliente
+    e a equipe vão embaixo do nome da usina, e não em colunas."""
     logado.post(ROTA + "/decidir", data={"usina_id": "1", "pessoa_id": "10", "acao": "por"})
     html = logado.get(ROTA).get_data(as_text=True)
     cab = html.split("<thead>", 1)[1].split("</thead>", 1)[0]
-    assert cab.index("Cliente") < cab.index("Usina") and "Região" not in cab
+    assert cab.index("Usina") < cab.index("Técnicos") and "Região" not in cab and "Cliente" not in cab
+    assert '<span class="tu-sub">Cliente A · SP Norte 01</span>' in html
     assert 'class="tu-mais"' not in html and "Pôr técnico" in html
     assert 'id="f-cliente"' in html and 'id="f-regiao"' not in html
 

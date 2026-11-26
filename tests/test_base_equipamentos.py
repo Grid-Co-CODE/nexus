@@ -538,15 +538,59 @@ def test_a_tela_mostra_a_comparacao_e_o_salvar_devolve_a_nova(cli, banco):
                              "equipamento_supervisorio": f"INVERSOR0{n}", "potencia_kwp": 250, "strings_esperadas_qtd": 20}
                             for n in (1, 2)]}
     j = cli.post("/t/base/equipamentos/salvar", json=corpo, headers=JSON_).get_json()
-    assert j["ok"] and "visão no formato da aba foi refeita" in j["aviso"]
+    assert j["ok"] and "Vale pelo Nexus na Sala de controle" in j["aviso"]
     c = j["comparacao"][str(ch["supervisorio_id"])]
     assert any("linha da usina" in t for t in c["dif"])           # a UFV fica na "Brodowski" na aba
     assert not any("INVERSOR0" in t for t in c["dif"])              # os dois inversores agora batem
     assert len(banco.linhas(E.LIVRO, E.ABA_VISAO)) == 4             # UFV, UG 01 e os 2 inversores
     html = cli.get("/t/base/equipamentos?usina=1").get_data(as_text=True)
-    assert "no lugar da aba" in html and "Refazer a visão" in html
+    assert "Vale pelo Nexus na Sala" in html and "Refazer a visão" in html
     r = cli.post("/t/base/equipamentos/visao", data={"usina": 1})
     assert "já estava em dia" in cli.get(r.headers["Location"]).get_data(as_text=True)
+
+
+# ── o Salvar avisa a chave que segue com a aba (24/11/2026) ──────────────────────────────────────────────────────────
+def test_o_salvar_avisa_quando_a_chave_salva_segue_com_a_aba(cli, banco):
+    """A Petrolina 2 (23/11/2026): o Levi salvou 12 strings por inversor, o Salvar disse "Salvo" em verde por 5 s e a Sala
+    de controle seguiu com as 13 da aba, porque a chave não estava "No lugar da aba". O Salvar passa a dizer quais chaves
+    a plataforma ainda lê da aba (com inversor no Nexus e diferente dela), e a tela abre a seção e marca a linha."""
+    for chave in ("Brodowski 1 (90)", "Brodowski 2 (91)"):
+        cli.post("/t/base/equipamentos/chave", data={"usina": 1, "acao": "ligar", "chave": chave})
+    html = cli.get("/t/base/equipamentos?usina=1").get_data(as_text=True)
+    dados = json.loads(html.split('id="eq-dados">')[1].split("</script>")[0])
+    c1 = next(c for c in dados["chaves"] if c["chave"] == "Brodowski 1 (90)")
+    corpo = {"usina_id": 1, "selo": dados["selo"], "chaves": dados["chaves"],
+             "cabines": [{"k": "n1", "nome": "UG 01", "potencia_kwp": 500}],
+             "inversores": [{"nome": f"Inversor 1.{n}", "chave": c1["supervisorio_id"], "cabine": "n1",
+                             "equipamento_supervisorio": f"INVERSOR0{n}", "potencia_kwp": 250,
+                             "strings_esperadas_qtd": 19} for n in (1, 2)]}
+    j = cli.post("/t/base/equipamentos/salvar", json=corpo, headers=JSON_).get_json()
+    # só a chave com inversor no Nexus: a "Brodowski 2 (91)" não tem nada montado aqui, o Salvar não mexeu nela
+    assert j["ok"] and j["fora_da_aba"] == ["Brodowski 1 (90)"]
+    assert j["aviso"].startswith("Salvo: ")
+    # desde 24/11/2026 o Salvar confere sozinho se a usina pode valer pelo Nexus: aqui não pode (a "Brodowski 2 (91)" tem
+    # inversores na aba e nenhum no Nexus), e o aviso diz o porquê
+    assert ("ainda vale pela aba Equipamentos na Sala de controle" in j["aviso"] and "porque:" in j["aviso"]
+            and j["pendentes"])
+    # marcada, o mesmo Salvar não avisa mais
+    ed = j["editor"]
+    chaves = [dict(c, substitui_aba=c["chave"] == "Brodowski 1 (90)") for c in ed["chaves"]]
+    j = cli.post("/t/base/equipamentos/salvar", json={"usina_id": 1, "selo": ed["selo"], "chaves": chaves,
+                                                      "cabines": ed["cabines"], "inversores": ed["inversores"]},
+                 headers=JSON_).get_json()
+    assert j["ok"] and j["fora_da_aba"] == [] and "seguem lendo a aba" not in j["aviso"]
+
+
+def test_a_tela_mostra_o_aviso_da_chave_que_segue_com_a_aba():
+    """O "Salvo" verde some em 5 s e passou batido: o aviso da chave fora fica até a pessoa fechar, a seção das chaves
+    abre (desde 17/11 ela abre fechada, e a caixa "No lugar da aba" fica dentro) e a linha da chave fica marcada."""
+    from pathlib import Path
+    raiz = Path(__file__).resolve().parents[1] / "nexus" / "static"
+    js = (raiz / "cadastro-equipamentos.js").read_text(encoding="utf-8")
+    css = (raiz / "cadastro.css").read_text(encoding="utf-8")
+    assert "j.fora_da_aba" in js and "chavesAbertas = true" in js and "eq-chave-fora" in js
+    assert "'alerta'" in js and "Clique para fechar" in js
+    assert ".fr-toast--alerta{" in css and ".eq-chave-fora" in css
 
 
 # ── o filtro de cliente (13/10/2026, Levi: "tem que dar para filtrar o cliente!") ─────────────────────────────────────

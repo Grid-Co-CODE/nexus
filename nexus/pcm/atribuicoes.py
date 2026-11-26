@@ -220,17 +220,18 @@ def _ctx(usina_id, pessoa_id, quando: str) -> str:
     return f"pcm/atribuicoes/{usina_id}/{pessoa_id}/{quando}"
 
 
-def historico(cfg, est: dict, usina_id: int, papel: str | None = "executa") -> list[dict]:
-    """As decisões de uma usina, da mais nova à mais antiga: {quando, pessoa_id, acao ("pôs" | "tirou"), de, ate,
-    origem, quem_hmac, obs}. A observação sai decifrada; sem a chave do cadastro, vazia. Só as do `papel` (o histórico
-    da tela é o dos técnicos); None = todas."""
+def historico(cfg, est: dict, usina_id: int | None, papel: str | None = "executa") -> list[dict]:
+    """As decisões de uma usina (`usina_id` None: de todas, a aba Histórico da tela, 24/11/2026), da mais nova à mais
+    antiga: {quando, usina_id, pessoa_id, acao ("pôs" | "tirou"), de, ate, origem, quem_hmac, obs}. A observação sai
+    decifrada; sem a chave do cadastro, vazia. Só as do `papel` (o histórico da tela é o dos técnicos); None = todas."""
     cofre = _cofre(cfg)
     out = []
     # a mais nova primeiro; duas no mesmo segundo, a gravada depois primeiro (a ordem do livro desempata)
     ordem = sorted(enumerate(est.get("decisoes") or []), key=lambda t: (D._txt(t[1].get("decidida_em")), t[0]),
                    reverse=True)
     for _i, x in ordem:
-        if _int_ou_none(x.get("usina_id")) != usina_id:
+        uid = _int_ou_none(x.get("usina_id"))
+        if not uid or (usina_id is not None and uid != usina_id):
             continue
         if papel is not None and D._txt(x.get("papel") or "executa") != papel:
             continue
@@ -239,10 +240,10 @@ def historico(cfg, est: dict, usina_id: int, papel: str | None = "executa") -> l
         if cofre and D._txt(x.get("dados_cifrados")):
             try:
                 obs = D._txt(json.loads(cofre.decifrar(D._txt(x.get("dados_cifrados")),
-                                                      _ctx(usina_id, pid, quando))).get("obs"))
+                                                      _ctx(uid, pid, quando))).get("obs"))
             except Exception:    # noqa: BLE001 — cifra de outra chave ou linha mexida: sem a observação
                 obs = ""
-        out.append({"quando": quando, "pessoa_id": pid, "acao": "pôs" if _sim(x.get("na_usina")) else "tirou",
+        out.append({"quando": quando, "usina_id": uid, "pessoa_id": pid, "acao": "pôs" if _sim(x.get("na_usina")) else "tirou",
                     "de": _int_ou_none(x.get("de_data_id")), "ate": _int_ou_none(x.get("ate_data_id")),
                     "origem": D._txt(x.get("origem")), "quem_hmac": D._txt(x.get("decidida_por_hmac")), "obs": obs})
     return out

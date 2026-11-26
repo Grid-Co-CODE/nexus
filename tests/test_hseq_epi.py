@@ -2,9 +2,10 @@
 luvas das rondas diárias". Banco falso do Campo (test_campo_visao.py): Altair respondeu Sim há 3 dias e Não ontem;
 Brodowski 1 (ronda sem OS) respondeu Sim anteontem; Coração 1 nunca teve ronda."""
 import re
+from datetime import datetime, time
 
 import pytest
-from test_campo_visao import _aba, _dia, _ronda, banco  # noqa: F401  (banco é fixture)
+from test_campo_visao import BRT, HOJE, _aba, _dia, _ronda, banco  # noqa: F401  (banco é fixture)
 
 from nexus.campo import visao
 from nexus.hseq import epi as EPI
@@ -13,7 +14,10 @@ CK = "Computador: Ligado; As luvas isolantes estão disponíveis?: {}; Banheiro:
 
 
 @pytest.fixture
-def luvas(banco):
+def luvas(banco, monkeypatch):
+    # o relógio do código parado no HOJE do teste (o dia em que o arquivo foi importado): a suíte de 53 min de 24 para
+    # 25/11/2026 cruzou a meia-noite, e "ontem" do teste deixou de ser o ontem do código
+    monkeypatch.setattr(visao, "_agora", lambda: datetime.combine(HOJE, time(12, 0), tzinfo=BRT))
     _aba(banco, "rondas_app_campo", "OS de ronda", [
         _ronda(_dia(1), **{"Checklist da ronda": CK.format("Não")}),
         _ronda(_dia(3), **{"Checklist da ronda": CK.format("Sim")}),

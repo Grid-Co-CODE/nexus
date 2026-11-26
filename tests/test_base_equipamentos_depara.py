@@ -1414,3 +1414,79 @@ def test_o_estado_pelas_chaves_e_pelas_usinas(cli, cfg, banco):
                       "potencia_regra", "fracttal_ligado_por", "conferido_em"}
     assert (i["usina_supervisorio"], i["supervisorio_id"], i["strings_esperadas_qtd"]) == (CH1, s2, 19)
     assert cli.get(ESTADO).status_code == 400
+
+
+# ── a virada para o Nexus como fonte única (24/11/2026) ──────────────────────────────────────────────────────────────
+# Levi: "A ideia é usarmos só o do Nexus [...] o mais simples possível"; "OK" para a virada das usinas prontas. O Salvar
+# da Base (sem a caixa "No lugar da aba") confere a usina pela regra do de-para e a passa a valer sozinha quando pode.
+BASE_SALVAR = "/t/base/equipamentos/salvar"
+
+
+def _salvar_base(cli, cfg, banco, uid, **muda_chave):
+    from nexus.cadastro import telas_equipamentos as TE
+    corpo = dict(TE.editor_dados(_u(cfg, banco, uid)), usina_id=uid)
+    for c in corpo["chaves"]:
+        c.update(muda_chave)
+    return cli.post(BASE_SALVAR, json=corpo, headers={"Accept": "application/json"}).get_json()
+
+
+def test_o_salvar_da_base_passa_a_usina_pronta_a_valer_pelo_nexus_sozinho(cli, cfg, banco):
+    """A Itajá montada como a aba (as três chaves, nada marcado): o Salvar passa a usina INTEIRA a valer, a visão leva as
+    três chaves, e o bloco do alto da tela conta a usina."""
+    _monta_itaja(cfg, banco)
+    assert _marca(banco) == {CH_USINA: 0, CH1: 0, CH2: 0}
+    j = _salvar_base(cli, cfg, banco, ITAJA)
+    assert j["ok"] and "Vale pelo Nexus na Sala de controle" in j["aviso"] and j["pendentes"] == [], j
+    assert _marca(banco) == {CH_USINA: 1, CH1: 1, CH2: 1}
+    assert {E.chave_efetiva(x) for x in _livro(banco)["visao"]} == {CH_USINA, CH1, CH2}
+    assert all(c["substitui_aba"] for c in j["editor"]["chaves"])           # a tela recebe o estado novo
+    html = cli.get("/t/base/equipamentos").get_data(as_text=True)
+    assert "Vale pelo Nexus na Sala" in html and "<b>1</b> de 1 usinas" in html
+
+
+def test_a_usina_com_diferenca_fora_da_regra_segue_com_a_aba_e_o_aviso_diz_por_que(cli, cfg, banco):
+    """O Full O&M da Itaja 1 diferente na aba (sairia de trackers e PR): a usina inteira segue com a aba (nenhuma das três
+    chaves marca), e o aviso do Salvar e o bloco do alto dizem o porquê."""
+    _poe_aba(banco, _aba_itaja() + [dict(x, **{"Full O&M": "Não"}) if x["Usina Supervisório"] == CH1 else x
+                                    for x in _aba_itaja_inv()] + ABA_PHARMA)
+    _monta_itaja(cfg, banco)
+    j = _salvar_base(cli, cfg, banco, ITAJA)
+    assert j["ok"] and "ainda vale pela aba Equipamentos na Sala de controle" in j["aviso"], j
+    assert any("Full O&M" in m for m in j["pendentes"])
+    assert _marca(banco) == {CH_USINA: 0, CH1: 0, CH2: 0}
+
+
+def test_a_tela_aberta_antes_da_virada_nao_tira_a_usina_da_sala(cli, cfg, banco):
+    """A tela aberta antes da conferência ainda manda "não" nas chaves: o Salvar não desmarca (a usina sairia da Sala no
+    meio do Salvar) e a conferência não tira a que já vale."""
+    _monta_itaja(cfg, banco)
+    assert _salvar_base(cli, cfg, banco, ITAJA)["ok"]
+    j = _salvar_base(cli, cfg, banco, ITAJA, substitui_aba=False)
+    assert j["ok"] and _marca(banco) == {CH_USINA: 1, CH1: 1, CH2: 1}
+
+
+def test_a_virada_de_todas_marca_so_as_prontas(cli, cfg, banco, app_dp):
+    """A conferência de todas (a que roda em fundo ao abrir a tela e ao subir o Nexus): a Itajá pronta vira, e rodar de
+    novo não muda nem grava nada."""
+    from nexus.cadastro import telas_equipamentos as TE
+    from nexus.cadastro.telas import servico
+    _monta_itaja(cfg, banco)
+    with app_dp.app_context():
+        info = TE._info_usinas(servico(), app_dp.config)
+    r = E.valer_prontas(cfg, BASE, banco, info=info, aba_chaves=E.aba_equipamentos(BASE, banco)["chaves"])
+    assert ITAJA in r["marcadas"] and _marca(banco) == {CH_USINA: 1, CH1: 1, CH2: 1}
+    # de novo: nada a fazer, nada grava
+    antes = banco.syncs
+    r2 = E.valer_prontas(cfg, BASE, banco, info=info, aba_chaves=E.aba_equipamentos(BASE, banco)["chaves"])
+    assert (r2["mudancas"], r2["marcadas"], banco.syncs) == (0, [], antes)
+    assert E.vale_pelo_nexus(E.ler(BASE, banco, forcar=True), E.aba_equipamentos(BASE, banco)["chaves"]) == {ITAJA: True}
+
+
+def test_a_usina_com_o_kwp_do_registro_longe_do_da_aba_segura_para_conferir(cli, cfg, banco):
+    """A virada levaria à Sala o kWp do Registro mestre: com ele mais de 5% longe do da aba (Diamantino pela metade,
+    Linhares 1 ×3 na simulação de 24/11/2026), a usina segue com a aba e o motivo manda conferir o Registro."""
+    _poe_aba(banco, _aba_itaja(ufv_kwp=5000.0) + _aba_itaja_inv() + ABA_PHARMA)
+    _monta_itaja(cfg, banco)
+    j = _salvar_base(cli, cfg, banco, ITAJA)
+    assert j["ok"] and any("kWp da usina é" in m and "Registro mestre" in m for m in j["pendentes"]), j
+    assert _marca(banco) == {CH_USINA: 0, CH1: 0, CH2: 0}

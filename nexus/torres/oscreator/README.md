@@ -1220,7 +1220,8 @@ adicionar anexos como PDFS e fotos. E quando o PCM gere uma OS pela fila de PCM 
   (a Clonagem segue no menu). O "Abrir chamado" saiu junto e **voltou em 10/11/2026** (Levi: "Quero que no card da OS do
   histórico de OS do OS Creator tenha um botão de 'Abri Chamado' no extremo esquerdo lá em baixo"): o 1º do rodapé, leva à
   Inspeção de chamados com `?pai=<nº>`, e a tela carrega o ativo, a data do incidente e o responsável daquela OS; as abas do
-  OS Creator o abrem na aba de Chamados. No mesmo trabalho, o "ATIVOS (N)" do topo do card deixou de passar da tela a 375 px
+  OS Creator o abrem na aba de Chamados. **Desde 25/11/2026 só na OS de origem** (seção "A OS pai do chamado é a de
+  origem"). No mesmo trabalho, o "ATIVOS (N)" do topo do card deixou de passar da tela a 375 px
   (a linha inteira no celular, e o nome do ativo quebra).
 - **Os anexos do card** (a pergunta do Levi): `.mp4` e PDF entram em "documentos", com "Abrir" (o vídeo toca e o PDF abre
   no navegador) e "Baixar" (a rota renova o link do Fracttal); o "Baixar todos" os põe no .zip.
@@ -3173,6 +3174,12 @@ fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Moni
   cliente, o relatório (um PDF; dois clientes, um .zip) e a planilha; a 375 px a página não rola para o lado e a caixa
   dos avisos fica na tela.
 
+## Garantias: o selo da demanda do chamado (24/11/2026)
+- O cartão do chamado com demanda (a Nova demanda que sai do Raio X do chamado para o supervisor da usina) mostra a
+  situação: "Demanda aberta · vence dd/mm" em âmbar, "vencida" em vermelho, "Demanda respondida" em verde. Quem conta é o
+  Nexus (`ponte.demandas_chamados`, pela cópia das demandas do sininho, sem esperar o banco), que põe no pedido do quadro
+  `os_web.demandas_chamados` (`rotas_acomp.DEMANDAS`); o OS Creator sozinho não mostra nada.
+
 ## A Inspeção nasce Corretiva no OS Creator Web (18/11/2026)
 - **A regra** (Levi: "para as próximas OSs de inspeção ... configure para o tipo de tarefa nascer como corretiva, o resto do
   passado já se foi"): toda OS avulsa que pediria o tipo Inspeção nasce Corretiva (`api.tipo_que_nasce`, chamada pelo
@@ -3366,6 +3373,32 @@ dia, "quero que dê para editar o tipo de tarefa também!".
   Inspeção" e a OS 18625 nasceu com o tipo Inspeção, lido de volta; o padrão voltou e a OS foi cancelada. A 1ª gravação
   depois da coluna `tipo_tarefa` regravou o livro com ela, sem recusa.
 
+## As solicitações pelo Histórico de OS (25/11/2026)
+
+Levi: "faz na parte do histórico ter o mesmo caminho. E aí vai ter acesso ao histórico de solicitação, que eu acho que tá
+meio escondido para os supervisores". O Histórico de solicitações (`/os/solicitacao/historico`) já era aberto a todos (a
+Área do Solicitante; só a Fila e os Temas são do PCM), mas só se chegava a ele pela barra do PCM. Agora ele é a 4ª visão do
+Histórico de OS ("Solicitações", um link com a cara do botão, `.fl-seg a` no os.css), a página dele abre com a mesma barra
+de visões para voltar, e o cartão do Histórico de OS no Início tem o atalho. A tabela ganhou as colunas que ele pediu ("quem
+criou [...] qual foi a OS gerada, quando a OS foi criada"): Criado por, Solicitada em, OS gerada e OS criada em, esta da
+lista central de OS (`rotas_solic._com_a_data_da_os`, pelo id da OS e, sem ele, pelo nº; nada vai ao Fracttal; a OS mais
+velha que a janela da lista fica sem a data). O Exportar segue as mesmas colunas. Prova:
+`tests/test_oscreator_solic_no_historico_25_11.py`.
+
+## A sessão que cai no meio da tela (24/11/2026)
+
+Levi: os supervisores preenchiam a OS, a solicitação ou a OS avulsa e, ao finalizar, "aparece lá o login, para eles fazerem
+o login, eles perdem tudo"; "tem que sempre aparecer um pop-up em cima, ó, faça o login. E aí ele loga, e ele não perde o
+que ele fez". A sessão do Fracttal cai porque o token vence ou por fora (o Fracttal aceita UMA sessão por conta: o site ou
+o celular derrubam a do Nexus). **`static/relogin.js`** (no `base.html`, sem defer, em toda tela menos o login) embrulha o
+`fetch`: o pedido a `/os/...` que volta com o 401 `{"login": true}` (ou desviado ao Entrar do Nexus ou ao `/os/login`) abre
+o pop-up de login da casca do Nexus (`nexus/static/reentrar.js`, a janela de cima; sem ela, o desta página) e espera.
+Entrou: a LEITURA (GET) é refeita e a tela nem fica sabendo; o ENVIO não é refeito (nunca duas OS, a regra do carga.js) e
+a tela recebe, no lugar do erro, "Você entrou de novo. Clique outra vez para enviar: o que você preencheu continua na
+tela." (409, `relogou`). "Agora não": a resposta de antes, como sempre. O `/os/login` responde em JSON ao pop-up, e o
+`/os/api/sessao` confere o "já entrei em outra aba". Sem a palavra `"/os` entre aspas no relogin.js: debaixo do prefixo a
+ponte a reescreveria e a raiz sairia vazia. Prova: `tests/test_reentrar_popup_24_11.py`.
+
 ## Pedir com IA (15/11/2026)
 
 Levi: a pessoa diz "eu quero uma OS de tal coisa, em tal ativo, de tal cliente", e a Nova solicitação já vem preenchida,
@@ -3465,3 +3498,29 @@ quatro fabricantes (três com cara de pessoa).
   --termos <json fora do repositório>` e `RESERVADO` no `CANAL`. O canal digitado no Controle de fornecedores vai para a
   aba `chamado_modelos` em claro, como sempre foi: endereço de e-mail não se digita ali.
 - Prova: `tests/test_oscreator_canal_reservado_19_11.py`.
+
+## Concluir a OS de ETM pela tela ETMs (25/11/2026)
+
+`etm_concluir.py` (rota `/os/_nexus/etm/os/<id>/concluir`, no `bp_raiz` da ponte): a Performance conclui no Fracttal a OS
+de ETM ainda aberta lá, na sessão do Fracttal da pessoa, fechando cada tarefa com a data fim que ela põe
+(`registrar_execucao`) e só então `concluir_os_checado`. Regras no CLAUDE.md da torre Performance, seção "ETMs".
+
+## A OS pai do chamado é a de origem, e o ativo com chamado aberto não ganha outro (25/11/2026)
+- **O caso** (Levi: "Está tendo casos de OS de inspeção gerando outras OS de inspeção na parte de chamados"): o "Abrir
+  chamado" do card (10/11/2026) aparecia em TODA OS, e a Inspeção de chamados aceitava qualquer OS do ativo como pai (as
+  "Últimas OS" trazem a inspeção anterior em cima). Assim, uma inspeção de tracker ganhou três filhas Inspeção em dois dias
+  (duas canceladas), uma de inversor ganhou outra no mesmo dia, e uma corretiva de tracker ganhou duas cadeias de chamado
+  (inspeção e administrativa) com 4 dias entre elas. Nenhuma veio do App: o `/chamado/criar` dele confere a origem de novo,
+  e a ronda cria sem OS pai.
+- **As regras, as do App:** (1) a OS pai é de origem, corretiva, corretiva emergencial, religamento ou religamento remoto
+  (`chamado_garantia.TIPOS_ORIGEM`, por `insp_web.pai_de_origem`; a OS de tarefas de tipos diferentes vale se uma for): o
+  "Abrir chamado" só aparece nela (`pode_chamado` do `os_detalhe`), a OS pai de outro tipo é recusada ao escolher
+  (`/os/api/insp/pai`, o recado no lugar da OS pai) e de novo ao criar (`/os/api/insp/criar`, o tipo lido pelo
+  `_meta_tarefa_por_os`, porque o corpo chega de fora); (2) o ativo com chamado em aberto não ganha outro (409 com a inspeção
+  e a administrativa dele), pela mesma foto que o App lê na v333 e na v361, o livro `nexus_chamados_abertos`
+  (`os_web/chamado_aberto.py`, 1 min de memória). Sem OS pai segue valendo (a data do incidente é a escolhida).
+- **Sem a leitura, cria como antes:** o tipo da OS pai que não veio, ou a foto que não abriu (banco fora), não trava a
+  equipe de chamados; é a regra do App na OS ("não li" não cala a pergunta). O recado fica no log.
+- **O que não muda:** a criação pelo App, a administrativa da Inspeção realizada e a inspeção sem OS pai.
+- **Como provar:** `tests/test_oscreator_chamado_pai_origem_25_11.py` (e o `test_oscreator_card_abrir_chamado_10_11.py`, com a
+  OS de origem).

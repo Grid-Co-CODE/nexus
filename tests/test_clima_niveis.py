@@ -85,23 +85,4 @@ def test_a_lista_tem_a_secao_acompanhar_com_o_resumo_e_a_lista_recolhida(tmp_pat
     assert "Nada a fazer agora; manter a rotina de roçagem, aceiro e limpeza." in t
 
 
-def test_o_mapa_pinta_o_acompanhar_de_azul_e_a_legenda_explica(tmp_path, monkeypatch):
-    from pathlib import Path
-
-    import clima_mapa_mundo as MM
-    from test_torre_performance_mapa import nova_app
-    _, c = nova_app(tmp_path)
-    monkeypatch.setattr(V, "agora", lambda: MM.REF)
-    instalar = instalar_leituras(monkeypatch)
-    MM.mundo_completo(instalar, firms=MM.lei_firms(MM.nasa_a(3.0, BETA)))           # a Beta com fogo perto: atenção
-    html = c.get("/t/performance/clima/mapa").get_data(as_text=True)
-    assert 'class="mp-ponto mp-n-regiao"' in html and 'class="mp-ponto mp-n-atencao"' in html
-    t = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html))
-    # desde 27/10/2026 (a tela enxuta) o número fica na faixa em cima do mapa e a explicação no "!" do título
-    assert re.search(r"Acompanhar 2\b", t) and re.search(r"Atenção 1\b", t)
-    assert re.search(r"Acompanhar Condição da região, nada perto da usina", t) and re.search(r"Atenção Fogo perto", t)
-    css = (Path(V.__file__).resolve().parents[2] / "static" / "clima-mapa.css").read_text(encoding="utf-8")
-    assert ".mp-ponto.mp-n-regiao{fill:var(--cl-regiao)}" in css
-    assert ".mp-oculta-regiao .mp-usinas a:has(.mp-n-regiao),.mp-oculta-regiao .mp-tab--regiao," in css
-    clima_css = (Path(V.__file__).resolve().parents[2] / "static" / "clima.css").read_text(encoding="utf-8")
-    assert "--cl-regiao:var(--info)" in clima_css                                      # um azul de informação, nos dois temas
+# a página do Mapa de risco saiu em 24/11/2026 (Levi: "Mapa de risco pode tirar"); os níveis seguem no modelo

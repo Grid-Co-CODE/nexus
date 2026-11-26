@@ -151,11 +151,13 @@ de 4.989 px com 40 linhas de validação (uma por item, cinco campos cada). Fico
   de comunicação, a gente tem que resolver isso [...] uma cor para o que foi justificado em questão de geração, uma cor
   que tem furo e foi falha de comunicação [...] e conseguir filtrar esses pontos [...] melhora o contraste"). Na tira, no
   mapa e nas barras: **roxo** (o token `--semcom`) = furo pendente num dia em que o COS registrou falha de comunicação
-  (qualquer trecho do dia; a usina gerava e o dado não veio: resolver); sem justificativa no COS, **vermelho** = a usina
+  DA USINA (qualquer trecho do dia; a usina gerava e o dado não veio: resolver); **rosa** (`--anomalo`) = a falha de
+  comunicação que o COS registrou só nos inversores com furo (desde 24/11, abaixo); sem justificativa no COS, **vermelho** = a usina
   toda sem dado no dia (o item "UFV toda", ou todos os equipamentos de geração) e **laranja** = parcial, um inversor ou
   alguns (3ª rodada: "vermelho total é porque caiu a usina inteira [...] tal cor, é porque caiu parcialmente"); com um
   **traço azul embaixo**, o COS tem uma queda curta no dia, que não justifica; **vazado** = falta só IPOA ou GHI;
-  **azul** = justificado por queda (a regra do R01); **verde cheio** = completo OU validado, a mesma cor ("a validação já
+  **azul** = a usina toda justificada por queda (a regra do R01; a queda que pegou só parte da usina, com o resto da
+  geração com dado, é verde desde 24/11); **verde cheio** = completo OU validado, a mesma cor ("a validação já
   tem que ser automática [...] teve todas as gerações, automaticamente vai ficar verde": o dia com todo o dado é o
   validado automático; o motivo da equipe continua para o furo que não tem dado).
   Perguntado, o Levi **manteve as 6 h de sol** para a queda justificar (19/11/2026, com os números: 123 dias de furo em 35
@@ -179,8 +181,8 @@ de 4.989 px com 40 linhas de validação (uma por item, cinco campos cada). Fico
 - **Kanban** ("dá para ter em Kanban também?"): uma coluna por causa (falha de comunicação, usina toda, parcial, só IPOA
   ou GHI; e "sem furo pendente" quando o filtro as traz), a usina na causa com mais dias; o cartão tem a tira e abre a
   usina na tabela;
-- **o tamanho do furo por cliente**: uma barra por cliente, o maior em cima, somando os dias com furo pendente das usinas
-  dele, nas cores da tira. O clique filtra;
+- **o peso do furo por cliente** (era o "tamanho", a soma dos dias; virou peso em 24/11, abaixo): uma barra por cliente
+  (por carteira no BD_Thopen), o maior peso em cima, nas cores da tira. O clique filtra;
 - **a lista**: usina, a **tira do mês** (o `title` de cada dia diz a causa e a ocorrência do COS com as horas), o furo
   pendente em dias com o que falta numa linha, e os dias com falha de comunicação. Ordem: o maior furo primeiro;
 - **a aba "3 · Furos de coleta" do Conversor saiu da tela do Nexus** ("o furo de coleta no conversor pode tirar. Se já
@@ -196,6 +198,45 @@ de 4.989 px com 40 linhas de validação (uma por item, cinco campos cada). Fico
   inversores com o MESMO furo nos mesmos dias (mesmas cores, mesma validação, mesma marcação) viram uma linha**: em
   novembro, 500 linhas de inversor viraram 75; a Crateús, de 40 para 2 de inversor (o painel caiu para 1.297 px). As
   funções do modelo da validação (`setConf`, `setDays`, `setObs`, a sincronização) não mudaram.
+- **Que motivo vale para que item** (`MOT[].ap`, só na tela; o servidor, `furos_conf.MOTIVOS`, aceita qualquer motivo
+  em qualquer item): "sem sensor de IPOA" só no IPOA, "sem sensor de GHI" só no GHI, "zero real" só na geração; o resto
+  vale para todos. **"Equipamento inoperante" vale também para a ETM desde 24/11/2026** (Levi, na Ipixuna 1: "tento
+  justificar ETM POA e GHI e algo trava!" — a tela recusava, "2 itens não aceitam esse motivo", porque a regra veio da
+  ferramenta da analista como só de inversor; a estação quebrada é equipamento inoperante). A ETM inoperante entra no
+  filtro "Com equipamento inoperante", e a recusa que sobrar diz QUAIS itens ficaram marcados. Prova:
+  `tests/test_coletas_furos_r01.py::test_a_etm_aceita_equipamento_inoperante` e a bancada (a Ipixuna 1 com o IPOA e o
+  GHI "validado · inoperante", cinza, e fora do "Furo pendente").
+
+**O desenho de 24/11/2026** (Levi, na Nova Xavantina 1: "está vindo umas informações que dão falso negativo"). Só a
+tela (`static/coletas-furos.js`, `.css` e o template); a conta do R01 não mudou. Medido antes com o banco e o CSV do COS
+de 23/11: a Nova Xavantina 1 tinha 16 dias roxos e 6 azuis, e nenhum dos dois era o que parecia.
+- **O alcance da falha de comunicação** ("é só o inversor com falha de comunicação, o resto está verde [...] tem que ter
+  uma cor só para inversor"). A falha do Inversor 2.4, EM ABERTO no COS desde 22/06, tocava todos os dias de novembro, e a
+  regra antiga pintava de roxo todo dia com furo, até o do IPOA. Agora a ocorrência que cita inversores no campo
+  Equipamentos ("Inversor 2.4", "UG 1": `alvoCom`, a mesma casa de nome do `_casa_equip`) vale só para eles. Dia com TODOS
+  os inversores pendentes citados = **rosa**, "falha de comunicação no inversor" (o resto do furo do dia, como o IPOA,
+  continua no mapa como sem dado); se os citados são a geração inteira (a usina de um inversor só), é roxo. Sem inversor
+  citado (vazio, cabine, relé, SKID, estação, 92 + 40 das 157 de comunicação no CSV de 23/11) ou com nome que não casa,
+  vale para a usina, como antes. No mapa do mês a linha já é o equipamento: o furo dele com a falha registrada segue
+  roxo, e o dos outros não. O verde-água foi testado e some ao lado do verde na tira de 11 px: ficou o rosa, que nenhuma
+  outra cor da tira usa (no mapa ele é o "valor anômalo", por isso o mapa não o usa para isto).
+- **A queda parcial** ("a queda foi parcial"; escolha dele: verde, a queda no detalhe). De 01 a 05/11 o "Desligamento de
+  usina" justificava 15 inversores e os outros 10 tinham dado: o dia saía azul, como se a usina toda tivesse caído. Agora,
+  com algum equipamento de geração com dado no dia (`o` ou `a`), o dia é completo (verde) e o `title` diz quem a queda
+  justificou; o azul é a usina toda parada pela queda.
+- **O peso** ("ele mostra por quantidade e não tá adiantando muito [...] Apollo só tem 3 usinas, as 3 estão com furo [...]
+  tem que mostrar esse peso"; escolha dele, entre esta e a % das usinas com furo: a % dos dias das usinas). A barra é dias
+  com furo pendente ÷ (usinas × dias verificados), de 0 a 100%: a Thopen, com 98 usinas, não esmaga quem tem 3. Na prova
+  de 01 a 22/11: Apolo 38 de 66 = 58%, SEMP 2 de 44 = 5% (pela % das usinas, as duas dariam 100%, e 8 dos 12 clientes
+  empatavam). No BD_Thopen o cliente é um só, e a barra sai por carteira ("Sem carteira" para as 12 sem).
+- **Um BD por vez** ("tem que começar a separar BD performance e BD operações. Para isso é bem direcionado"; o "BD
+  operações" é o BD_Thopen, e a escolha dele foi a tela toda). A troca "BD_Performance | BD_Thopen" no alto filtra as
+  usinas do mês para a legenda, o peso, a lista, o Kanban e o CSV (`P()`); o seletor Fonte saiu do painel. O navegador
+  lembra a escolha (`nexus.furos.bd`); trocar de BD limpa Cliente e Carteira, que não existem no outro.
+- Prova: a bancada (`bancada_furos.py` na porta 8804 com o CSV do COS de 23/11) e
+  `test_a_tela_separa_o_bd_pesa_o_cliente_e_da_o_alcance_da_comunicacao`. Nova Xavantina 1 depois: 01 a 05 e 09/11
+  verdes (o `title` diz "justificado por queda: 15 equipamentos (Inversor 2.1 a 3.5)"), 06 a 08 e 10 a 22/11 rosa (Inversor
+  2.4); o IPOA desses dias no mapa sai vermelho, não roxo.
 
 **O COS na tela** (`furos_r01.ocorrencias_cos`, a chave `oc` de cada usina). Toda ocorrência do COS da usina que toca o
 mês verificado, normalizada ou em aberto (a aberta vai até a hora da conta), com início, fim, falha, equipamentos, OS, se

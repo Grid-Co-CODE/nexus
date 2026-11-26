@@ -35,9 +35,9 @@
     tarefas fechadas no App nos últimos 30 dias e a programação da semana. Clique na linha para ver o detalhe e o histórico
     da usina. <b>O App de Campo ainda não lê esta lista:</b> hoje a aba Ronda segue a tela Organização do site de gestão. A
     troca é ligada quando as pendências da comparação com o App chegarem a zero. Fixo = sem datas; apoio = com a data
-    final (sai sozinho depois dela); a partir de = começa nesse dia.</p>{% endcall %}</div>
+    final (sai sozinho depois dela); a partir de = começa nesse dia.</p>
+    <p><b>Quando foi lido.</b> Cadastro, rondas e decisões do banco, lido às {{ lido }}.</p>{% endcall %}</div>
       <p class="cn-pergunta">Quem vê e pode rondar cada usina no App? Quem esteve lá nos últimos 30 dias?</p></div>
-    <div class="cn-frescor">cadastro, rondas e decisões do banco<br><b>lido às {{ lido }}</b></div>
   </div>
   {% if ok %}<div class="cn-certo" role="status"><span><b>{{ ok }}</b></span></div>{% endif %}
   {% if erro_acao %}<div class="cn-erro" role="alert"><span><b>{{ erro_acao }}</b></span></div>{% endif %}
@@ -47,17 +47,8 @@
     isso, nada se grava.</span></div>{% endif %}
   {% for a in avisos_gerais %}<div class="cn-erro cn-aviso" role="status"><span>{{ a }}</span></div>{% endfor %}
 
-  {% set r, ro, rt = resumo, resumo_op, resumo_todas %}
-  {% macro kpi(chave) %}<span class="v{% if chave == 'sem_tecnico' and r[chave] %} ruim{% endif %}" data-op="{{ ro[chave] }}" data-todas="{{ rt[chave] }}">{{ r[chave] }}</span>{% endmacro %}
-  {% if r %}
-  <div class="cn-numeros" data-tu-numeros>
-    <span><span class="gc-rotulo" data-op="Usinas em operação" data-todas="Usinas no cadastro">Usinas {{ 'no cadastro' if todas else 'em operação' }}</span>{{ kpi('usinas') }}<span class="d"><span data-op="{{ ro.com_tecnico }}" data-todas="{{ rt.com_tecnico }}">{{ r.com_tecnico }}</span> com técnico</span></span>
-    <span><span class="gc-rotulo">Sem técnico</span>{{ kpi('sem_tecnico') }}<span class="d">ninguém vê a usina no App</span></span>
-    <span><span class="gc-rotulo">Pessoas de campo</span><span class="v">{{ r.pessoas }}</span><span class="d">{{ r.com_usina }} com usina</span></span>
-    <span><span class="gc-rotulo">Apoios</span><span class="v">{{ r.apoios }}</span><span class="d">com data para acabar ou começar</span></span>
-    <span><span class="gc-rotulo">Com aviso</span>{{ kpi('com_aviso') }}<span class="d">usinas para o PCM olhar</span></span>
-  </div>
-  {% endif %}
+  {# os números grandes do topo saíram em 24/11/2026 (Levi: "Esses KPIs aqui de cima, eles estão se repetindo com os
+     pequenininhos de baixo. Deixa só os pequenos"): ficam os chips das situações #}
 
   {% if admin and livro_vazio and not erro and not erro_cadastro %}
   <form class="cn-certo tu-carga" method="post" action="{{ raiz }}/t/pcm/tecnicos-por-usina/carga-inicial"
@@ -85,10 +76,12 @@
   <nav class="cn-abas" aria-label="Abas">
     <a href="{{ url(ver='') }}" data-aba="usina"{% if ver == 'usina' %} aria-current="page"{% endif %}>Por usina<i data-fl-conta="usina">{{ chips.get('todas', 0) }}</i></a>
     <a href="{{ url(ver='tecnico') }}" data-aba="tecnico"{% if ver == 'tecnico' %} aria-current="page"{% endif %}>Por técnico<i data-fl-conta="tecnico">{{ tecnicos|length }}</i></a>
+    {# o Histórico (24/11/2026) e a Comparação são outras páginas: o link navega #}
+    <a href="{{ raiz }}/t/pcm/tecnicos-por-usina?ver=historico"{% if ver == 'historico' %} aria-current="page"{% endif %}>Histórico{% if hist %}<i>{{ hist.linhas|length }}</i>{% endif %}</a>
     {% if app.existe %}<a href="{{ url(ver='app') }}"{% if ver == 'app' %} aria-current="page"{% endif %}>Comparação com o App<i>{{ app.pendencias|length }}</i></a>{% endif %}
   </nav>
 
-  {% if ver != 'app' %}
+  {% if ver in ('usina', 'tecnico') %}
   {# o filtro é na própria página (filtro-local.js, 17/10/2026): escolher não recarrega a tela #}
   <form class="cn-filtros" method="get" id="tu-f" data-filtro-local>
     <div class="cn-seg" aria-label="Usinas" data-fl-seg="tu-f" data-so-aba="usina"{% if ver != 'usina' %} hidden{% endif %}>
@@ -110,6 +103,9 @@
     <a class="cn-filtro-ativo" href="{{ raiz }}/t/pcm/tecnicos-por-usina" data-fl-limpar{% if not algum_filtro %} hidden{% endif %}>Limpar filtros <span aria-hidden="true">×</span></a>
   </form>
 
+  {# Por usina, de cara nova (24/11/2026, Levi: "Faça um rebrand aí dessa tabela"): a usina com o cliente e a equipe embaixo,
+     o responsável, os técnicos e a situação. "Em campo (30 dias)" saiu da linha (Levi: "Não precisa ficar aparecendo toda
+     hora [...] parece mais uma curiosidade"): fica no detalhe, ao abrir a usina, e no título dos técnicos #}
   <section data-aba-secao="usina"{% if ver != 'usina' %} hidden{% endif %}>
   <div class="cn-chips" data-fl-chips="tu-f" data-fl-chave="situacao">
     <a href="{{ url(situacao='') }}" data-fl-chip=""{% if not pedido.situacao %} aria-current="page"{% endif %}>Todas <b>{{ chips.get('todas', 0) }}</b></a>
@@ -117,8 +113,8 @@
     <a href="{{ url(situacao=s) }}" data-fl-chip="{{ s }}"{% if pedido.situacao == s %} aria-current="page"{% endif %}><span class="cn-st cn-t-{{ cor }}">{{ situacoes[s] }}</span> <b>{{ chips.get(s, 0) }}</b></a>
     {% endfor %}
   </div>
-  <div class="cn-tab"><table class="cn-expande tu-tabela" data-fl-grupo="tu-f" data-fl-nome="usina">
-    <thead><tr><th>Cliente</th><th>Usina</th><th>Equipe</th><th>Responsável</th><th>Técnicos</th><th>Em campo (30 dias)</th><th>Situação</th></tr></thead>
+  <div class="cn-tab"><table class="cn-expande tu-tabela tu-nova" data-fl-grupo="tu-f" data-fl-nome="usina">
+    <thead><tr><th>Usina</th><th>Responsável</th><th>Técnicos</th><th>Situação</th></tr></thead>
     <tbody>
     {% for l in todas_linhas %}
       <tr class="cn-linha" tabindex="0" aria-expanded="false" data-usina="{{ l.usina_id }}" data-usina-nome="{{ l.nome }}"
@@ -126,22 +122,19 @@
           data-fl-linha{% if not l.op %} data-fl-fora="1"{% endif %} data-f-equipe="{{ l.equipe }}" data-f-cliente="{{ l.cliente }}"
           data-f-responsavel="{{ l.responsavel }}" data-f-situacao="{{ 'com_tecnico' if l.tem_tecnico else 'sem_tecnico' }}{% if l.avisos %}|com_aviso{% endif %}"
           data-f-busca="{{ l._busca }}"{% if not l._visivel %} hidden{% endif %}>
-        <td class="tu-nw">{{ l.cliente }}</td>
-        <td class="tu-usina"><span class="tu-nome">{{ l.nome }}</span>{% if todas and l.status != 'OPERAÇÃO' %}<span class="det">{{ l.status|lower or 'sem status' }}</span>{% endif %}</td>
-        <td class="tu-nw">{{ l.equipe }}</td><td>{{ l.responsavel }}</td>
+        <td class="tu-usina"><span class="tu-nome">{{ l.nome }}</span><span class="tu-sub">{{ l.cliente }} · {{ l.equipe }}{% if todas and l.status != 'OPERAÇÃO' %} · {{ l.status|lower or 'sem status' }}{% endif %}</span></td>
+        <td>{{ l.responsavel }}</td>
         <td><div class="tu-tecs">{% for t in l.tecnicos %}{{ selo(t, t.nome, l.usina_id, l.nome) }}{% else %}<span class="mudo">Ninguém</span>{% endfor %}</div></td>
-        <td>{% for e in l.evidencia[:3] %}<span class="tu-ev-l">{{ e.nome }}<span class="m">{% if e.rondas %} · {{ e.rondas }} {{ 'ronda' if e.rondas == 1 else 'rondas' }}{% endif %}{% if e.fechamentos %} · {{ e.fechamentos }} {{ 'tarefa' if e.fechamentos == 1 else 'tarefas' }}{% endif %}{% if e.na_programacao %} · programado{% endif %}{% if e.do_cadastro and not (e.rondas or e.fechamentos or e.na_programacao) %} · do cadastro{% endif %}</span></span>{% else %}<span class="mudo">—</span>{% endfor %}
-          {% if l.evidencia|length > 3 %}<span class="det">e mais {{ l.evidencia|length - 3 }}</span>{% endif %}</td>
         <td><span class="cn-st cn-t-{{ l.sit[0] }}">{{ l.sit[1] }}</span>{% if l.avisos %}<span class="det">{{ l.avisos|length }} aviso{{ 's' if l.avisos|length > 1 }}</span>{% endif %}</td>
       </tr>
-      <tr class="cn-detalhe" hidden><td colspan="7">
+      <tr class="cn-detalhe" hidden><td colspan="4">
         <div class="cn-detalhe-grade">
           <div>
             <dl class="cn-dados">
               <dt>No Fracttal</dt><dd>{{ l.fracttal or '—' }}{% if not l.fracttal %}<span class="det">sem o nome no de-para do cadastro: o App não acha a usina</span>{% endif %}</dd>
               <dt>Equipe</dt><dd>{{ l.equipe }} · {{ l.regiao }}</dd>
               <dt>Responsável</dt><dd>{{ l.responsavel }}</dd>
-              <dt>Em campo</dt><dd>{% for e in l.evidencia %}{{ e.nome }}{% if e.rondas %} · {{ e.rondas }} {{ 'ronda' if e.rondas == 1 else 'rondas' }}{% endif %}{% if e.fechamentos %} · {{ e.fechamentos }} {{ 'tarefa fechada' if e.fechamentos == 1 else 'tarefas fechadas' }}{% endif %}{% if e.na_programacao %} · na programação da semana{% endif %}{% if e.do_cadastro %} · técnico do cadastro{% endif %}{% if not loop.last %}<br>{% endif %}{% else %}ninguém nos últimos 30 dias{% endfor %}</dd>
+              <dt>Em campo (30 dias)</dt><dd>{% for e in l.evidencia %}{{ e.nome }}{% if e.rondas %} · {{ e.rondas }} {{ 'ronda' if e.rondas == 1 else 'rondas' }}{% endif %}{% if e.fechamentos %} · {{ e.fechamentos }} {{ 'tarefa fechada' if e.fechamentos == 1 else 'tarefas fechadas' }}{% endif %}{% if e.na_programacao %} · na programação da semana{% endif %}{% if e.do_cadastro %} · técnico do cadastro{% endif %}{% if not loop.last %}<br>{% endif %}{% else %}ninguém nos últimos 30 dias{% endfor %}</dd>
               <dt>Avisos</dt><dd>{% if l.avisos %}<ul class="tu-avisos">{% for a in l.avisos %}<li>{{ a }}</li>{% endfor %}</ul>{% else %}nenhum{% endif %}</dd>
             </dl>
             {% if pode %}<div class="tu-acoes">
@@ -151,41 +144,89 @@
                 <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"><i class="ph ph-arrows-clockwise"></i> Reenviar ao App</button></form>{% endif %}
             </div>{% endif %}
           </div>
-          <div><h3>Histórico</h3><div class="tu-hist-caixa" data-historico="{{ l.usina_id }}"><p class="mudo">Carregando…</p></div></div>
+          <div><h3>Histórico da usina</h3><div class="tu-hist-caixa" data-historico="{{ l.usina_id }}"><p class="mudo">Carregando…</p></div>
+            <a class="tu-hist-tudo" href="{{ raiz }}/t/pcm/tecnicos-por-usina?ver=historico&amp;usina={{ l.usina_id }}">Ver no Histórico</a></div>
         </div>
       </td></tr>
     {% endfor %}
-    <tr data-fl-vazio="usina"{% if linhas %} hidden{% endif %}><td colspan="7" class="mudo">Nenhuma usina com esses filtros.</td></tr>
+    <tr data-fl-vazio="usina"{% if linhas %} hidden{% endif %}><td colspan="4" class="mudo">Nenhuma usina com esses filtros.</td></tr>
     </tbody></table></div>
   </section>
 
+  {# Por técnico: a linha abre a janela das usinas dele (24/11/2026, Levi: "clicar no técnico e escolher as usinas, que ele
+     vai ver"; decidiu a janela com o Salvar, que grava de uma vez) #}
   <section data-aba-secao="tecnico"{% if ver != 'tecnico' %} hidden{% endif %}>
-  <div class="cn-tab"><table class="tu-tabela" data-fl-grupo="tu-f" data-fl-nome="tecnico">
-    <thead><tr><th>Pessoa</th><th>Cargo</th><th>Equipe</th><th>Usinas</th><th>Nº</th><th>Em campo (30 dias)</th><th>Situação</th></tr></thead>
+  <div class="cn-tab"><table class="tu-tabela tu-nova" data-fl-grupo="tu-f" data-fl-nome="tecnico">
+    <thead><tr><th>Pessoa</th><th>Usinas que vê no App</th><th>Situação</th></tr></thead>
     <tbody>
     {% for t in todos_tecnicos %}
-      <tr data-fl-linha data-f-equipe="{{ t.equipe }}" data-f-cliente="{{ t.clientes|join('|') }}" data-f-busca="{{ t._busca }}"{% if not t._visivel %} hidden{% endif %}>
-        <td><span class="tu-nome">{{ t.nome }}</span></td><td>{{ t.cargo or '—' }}</td><td class="tu-nw">{{ t.equipe }}</td>
+      <tr data-fl-linha data-f-equipe="{{ t.equipe }}" data-f-cliente="{{ t.clientes|join('|') }}" data-f-busca="{{ t._busca }}"{% if not t._visivel %} hidden{% endif %}
+          {% if pode %} class="tu-escolhe" tabindex="0" data-escolher-usinas="{{ t.pessoa_id }}" data-nome="{{ t.nome }}" data-usinas-dele="{{ t.usinas|map(attribute='usina_id')|join(',') }}"{% endif %}>
+        <td class="tu-usina"><span class="tu-nome">{{ t.nome }}</span><span class="tu-sub">{{ t.cargo or 'sem cargo' }} · {{ t.equipe }}</span></td>
         <td><div class="tu-tecs">{% for u in t.usinas %}{{ selo(u, u.nome, None, '') }}{% else %}<span class="mudo">Nenhuma</span>{% endfor %}</div></td>
-        <td class="m">{{ t.n_usinas }}</td>
-        <td>{% if t.rondas or t.fechamentos %}{{ t.rondas }} {{ 'ronda' if t.rondas == 1 else 'rondas' }}<span class="det">{{ t.fechamentos }} {{ 'tarefa fechada' if t.fechamentos == 1 else 'tarefas fechadas' }}</span>{% else %}<span class="mudo">—</span>{% endif %}</td>
-        <td><span class="cn-st cn-t-{{ t.sit[0] }}">{{ t.sit[1] }}</span>{% if t.sem_email and t.sit[0] != 'alerta' %}<span class="det">sem e-mail</span>{% endif %}</td></tr>
+        <td><span class="cn-st cn-t-{{ t.sit[0] }}">{{ t.sit[1] }}</span>{% if t.sem_email and t.sit[0] != 'alerta' %}<span class="det">sem e-mail</span>{% endif %}
+          {% if pode %}<span class="det tu-escolhe-dica"><i class="ph ph-pencil-simple"></i> escolher as usinas</span>{% endif %}</td></tr>
     {% endfor %}
-    <tr data-fl-vazio="tecnico"{% if tecnicos %} hidden{% endif %}><td colspan="7" class="mudo">Nenhuma pessoa de campo com esses filtros.</td></tr>
+    <tr data-fl-vazio="tecnico"{% if tecnicos %} hidden{% endif %}><td colspan="3" class="mudo">Nenhuma pessoa de campo com esses filtros.</td></tr>
     </tbody></table></div>
   </section>
 
+  {% elif ver == 'historico' %}
+  {# o Histórico no modelo do Histórico de OS do OS Creator Web (24/11/2026, Levi: "Mesmo design, mesma lógica, mesma
+     funcionalidade"): a barra com a busca, o período e o botão Filtros (static/filtros-os.js: o painel com as listas
+     digitáveis, o Aplicar que só acende com mudança e as etiquetas do que está aplicado), o resumo e a lista; a linha abre
+     o detalhe. O filtro é no servidor (o Aplicar envia) #}
+  {% set f = hist.filtro if hist else {} %}
+  <form class="tu-hist-filtros" method="get" action="{{ raiz }}/t/pcm/tecnicos-por-usina" data-fo>
+    <input type="hidden" name="ver" value="historico">
+    <label class="tu-hf-busca"><span class="gc-rotulo">Busca</span><input class="gc-campo" type="search" name="q" value="{{ f.q }}" placeholder="usina, técnico, quem ou observação" autocomplete="off"></label>
+    <label class="tu-hf-data"><span class="gc-rotulo">De</span><input class="gc-campo" type="date" name="de" value="{{ f.de }}"></label>
+    <label class="tu-hf-data"><span class="gc-rotulo">Até</span><input class="gc-campo" type="date" name="ate" value="{{ f.ate }}"></label>
+    {% for chave, rotulo, todos in (('acao', 'O que fez', 'Pôs e tirou'), ('cliente', 'Cliente', 'Todos os clientes'), ('usina', 'Usina', 'Todas as usinas'), ('tecnico', 'Técnico', 'Todos os técnicos'), ('quem', 'Quem decidiu', 'Todas as pessoas'), ('origem', 'Como', 'Todas as origens')) %}
+    <label><span class="gc-rotulo">{{ rotulo }}</span>
+      <select class="gc-campo" name="{{ chave }}" multiple data-todos="{{ todos }}">
+        {% for o in (hist.opcoes[chave] if hist else []) %}<option value="{{ o.valor }}"{% if o.valor in f[chave] %} selected{% endif %}>{{ o.rotulo }} ({{ o.n }})</option>{% endfor %}
+      </select></label>
+    {% endfor %}
+    <button class="gc-btn gc-btn--ui" type="submit" data-fo-some>Filtrar</button>
+  </form>
+  {% if hist %}
+  <div class="fl-resumo tu-hist-resumo"><span>{{ hist.linhas|length }} {{ 'decisão' if hist.linhas|length == 1 else 'decisões' }}{% if hist.linhas|length != hist.total %} de {{ hist.total }}{% endif %}</span><span class="mudo">da mais nova para a mais antiga</span></div>
+  <div class="cn-tab"><table class="tu-tabela tu-nova tu-hist-t" id="tu-hist">
+    <thead><tr><th>Quando</th><th>O que fez</th><th>Técnico</th><th>Usina</th><th>Período</th><th>Quem decidiu</th></tr></thead>
+    <tbody>
+    {% for h in hist.linhas %}
+      <tr class="tu-h-linha" tabindex="0">
+        <td class="tu-nw">{{ h.quando_txt }}</td>
+        <td><span class="cn-st cn-t-{{ 'ok' if h.acao == 'pôs' else 'critico' }}">{{ 'Pôs' if h.acao == 'pôs' else 'Tirou' }}</span></td>
+        <td>{{ h.nome }}</td>
+        <td class="tu-usina"><span class="tu-nome">{{ h.usina }}</span><span class="tu-sub">{{ h.cliente }}</span></td>
+        <td>{% if h.acao == 'tirou' %}—{% elif h.ate %}apoio até {{ h.ate }}{% elif h.de %}a partir de {{ h.de }}{% else %}fixo{% endif %}</td>
+        <td>{{ h.quem }}<span class="tu-sub">{{ h.origem_txt }}</span>{% if h.obs %}<span class="tu-obs">{{ h.obs }}</span>{% endif %}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6" class="mudo">Nenhuma decisão com esses filtros.</td></tr>
+    {% endfor %}
+    </tbody></table></div>
+  {% endif %}
+  <script src="{{ url_for('static', filename='filtros-os.js') }}"></script>
+
   {% else %}
-  <div class="cn-lista-cab"><h2>Pendências para a troca</h2><span class="mudo">o que o App tem e o Nexus não consegue dizer; o conserto é no cadastro do Nexus</span></div>
-  <div class="cn-tab"><table class="tu-tabela tu-tabela--estreita"><thead><tr><th>Pendência</th></tr></thead><tbody>
-    {% for p in app.pendencias %}<tr><td class="tu-esq">{{ p }}</td></tr>{% else %}<tr><td class="mudo">Nenhuma: a troca pode ser ligada quando a diferença abaixo estiver conferida.</td></tr>{% endfor %}
-  </tbody></table></div>
-  {% for titulo, lista, vazio in (('Só no App', app.so_no_app, 'O App não tem ninguém que o Nexus não tenha.'), ('Só no Nexus', app.so_no_nexus, 'O Nexus não tem ninguém que o App não tenha.')) %}
-  <div class="cn-lista-cab"><h2>{{ titulo }}</h2><span class="mudo">{{ lista|length }}</span></div>
-  <div class="cn-tab"><table class="tu-tabela tu-tabela--estreita"><thead><tr><th>Usina</th><th>Pessoa</th><th>Como o nome da usina vai</th></tr></thead><tbody>
-    {% for x in lista %}<tr><td>{{ x.usina }}</td><td>{{ x.nome }}</td><td class="m">{{ x.grafia }}</td></tr>{% else %}<tr><td colspan="3" class="mudo">{{ vazio }}</td></tr>{% endfor %}
-  </tbody></table></div>
+  {# a Comparação com o App por grupo (24/11/2026, Levi: "Essa comparação com o app está confusa [...] é só uma lista
+     gigante"): um cartão por tipo de pendência, com quantas são e o que fazer, e a lista dele recolhida #}
+  <p class="tu-app-intro">O que o App de Campo tem hoje comparado com esta lista. A troca só tira gente do App quando as
+    pendências chegarem a zero; até lá ele só põe.</p>
+  {% if not app.grupos %}<div class="cn-certo" role="status"><span><b>Nada a acertar:</b> o App e o Nexus têm as mesmas pessoas nas mesmas usinas.</span></div>{% endif %}
+  <div class="tu-app-grupos">
+  {% for g in app.grupos %}
+    <details class="tu-app-g tu-app-g--{{ g.tom }}"{% if loop.first %} open{% endif %}>
+      <summary><span class="tu-app-n">{{ g.n }}</span><span class="tu-app-t"><b>{{ g.titulo }}</b><span>{{ g.o_que_fazer }}</span></span><i class="ph ph-caret-down" aria-hidden="true"></i></summary>
+      <div class="cn-tab"><table class="tu-tabela tu-nova"><thead><tr><th>Usina</th><th>Pessoa</th><th>Detalhe</th></tr></thead><tbody>
+        {% for x in g.itens %}<tr><td>{{ x.usina }}</td><td>{{ x.pessoa or '—' }}</td><td class="m">{{ x.detalhe or '—' }}</td></tr>{% endfor %}
+      </tbody></table></div>
+    </details>
   {% endfor %}
+  </div>
   {% endif %}
 
   {# a explicação "De onde vem" foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html) #}
@@ -217,7 +258,24 @@
   </form>
 </template>
 {% endif %}
-<script type="application/json" id="tu-dados">{{ {"pessoas": pessoas_json}|tojson }}</script>
+{% if pode %}
+{# escolher as usinas que o técnico vê (24/11/2026): as em operação por cliente, as dele já marcadas (e as dele fora de
+   operação também, para poder tirar); o Salvar grava de uma vez (põe as novas como fixo, tira as desmarcadas) #}
+<template id="tu-usinas">
+  <p class="gc-eyebrow">Usinas que vê no App</p>
+  <h2 class="q-det-titulo" data-us-nome></h2>
+  <form method="post" action="{{ raiz }}/t/pcm/tecnicos-por-usina/usinas-do-tecnico" class="tu-us-form">
+    <input type="hidden" name="pessoa_id" value="">{{ manter() }}<input type="hidden" name="v_ver" value="tecnico">
+    <input class="gc-campo" type="search" placeholder="buscar usina ou cliente" autocomplete="off" data-us-busca aria-label="Buscar usina ou cliente">
+    <p class="tu-sub" data-us-conta></p>
+    <div class="tu-us-lista" data-us-lista></div>
+    <p class="tu-sub">A usina marcada que ele não tem entra como fixa; a desmarcada sai. A que continua marcada fica como está (o apoio, com as datas dele).</p>
+    <div class="tu-por-pe"><button class="gc-btn gc-btn--ui gc-btn--contorno" type="button" data-det-fechar>Cancelar</button>
+      <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit" data-us-salvar><i class="ph ph-floppy-disk"></i> Salvar</button></div>
+  </form>
+</template>
+{% endif %}
+<script type="application/json" id="tu-dados">{{ {"pessoas": pessoas_json, "usinas": usinas_json}|tojson }}</script>
 <script src="{{ url_for('static', filename='filtro-local.js') }}"></script>
 <script src="{{ url_for('static', filename='pcm-tecnicos.js') }}"></script>
 {% endblock %}

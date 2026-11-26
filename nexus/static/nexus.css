@@ -862,6 +862,28 @@ mark.menu-achado{background:none;color:var(--tinta);font-weight:700;text-decorat
 .nt-caixa .nt-t{font:500 13px/18px var(--font-sans);color:var(--tinta);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
   overflow:hidden}
 .nt-caixa .nt-m{font-size:12px;line-height:16px;color:var(--mudo);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* o pop-up de login (24/11/2026, static/reentrar.js; Levi: "tem que sempre aparecer um pop-up em cima, ó, faça o login. E aí
+   ele loga, e ele não perde o que ele fez"): por cima de tudo, inclusive do sino e das janelas da casca */
+.nx-reentrar{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;padding:16px;
+  background:var(--veu)}
+.nx-reentrar-caixa{width:min(400px,100%);max-height:calc(100vh - 32px);overflow:auto;display:grid;gap:12px;padding:20px 22px;
+  background:var(--superficie);border:1px solid var(--linha-forte);border-radius:var(--raio-md);
+  box-shadow:0 18px 48px var(--cartao-sombra);color:var(--tinta);font-family:var(--font-sans)}
+.nx-reentrar-t{margin:0;display:flex;align-items:center;gap:8px;font:600 16px/22px var(--font-sans)}
+.nx-reentrar-t .ph{color:var(--alerta);font-size:20px}
+.nx-reentrar-d{margin:0;font-size:13px;line-height:19px;color:var(--tinta-2)}
+.nx-reentrar-form{display:grid;gap:10px}
+.nx-reentrar-form[hidden],.nx-reentrar-ms[hidden],.nx-reentrar-erro[hidden]{display:none}
+.nx-reentrar-l{display:grid;gap:4px}
+.nx-reentrar-l .gc-campo{width:100%}
+.nx-reentrar-erro{margin:0;font-size:12.5px;line-height:17px;color:var(--critico)}
+.nx-reentrar-bts,.nx-reentrar-ms{display:flex;gap:8px;flex-wrap:wrap}
+.nx-reentrar-bts .gc-btn--primario,.nx-reentrar-ms .gc-btn--primario{flex:1;justify-content:center;text-decoration:none}
+.nx-reentrar-pe,.nx-reentrar-nota{margin:0;font-size:12px;line-height:17px;color:var(--mudo)}
+.nx-reentrar-pe a,.nx-reentrar-link{color:var(--verde-texto)}
+.nx-reentrar-link{border:0;background:none;padding:0;font:inherit;text-decoration:underline;cursor:pointer}
+.nx-reentrar a:focus-visible,.nx-reentrar button:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+
 /* os Avisos das OS em três linhas (22/11/2026, Levi: "OS número, traço, e aí o que aconteceu [...] ao lado [...] a data e a
    hora [...] o ativo [...] vira uma terceira linha"): a OS e o que aconteceu com a hora à direita; quem e o status, com a
    cor e a palavra; o ativo e a atividade. Nenhuma linha quebra: o que passa vira reticências, e a hora sempre aparece */

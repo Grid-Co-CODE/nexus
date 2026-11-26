@@ -198,11 +198,15 @@ def _liga_brodowski(cli):
 
 
 def test_uma_tela_so_sem_numeros_no_alto_e_as_tres_luzes_na_lista(app_eq, cli, plataforma):
-    """17/11/2026, Levi: "Tire esse KPIS" e "Da para deixar tudo numa tela só!": sem as abas e sem os quatro números."""
+    """17/11/2026, Levi: "Tire esse KPIS" e "Da para deixar tudo numa tela só!": sem a aba De-para e sem os quatro
+    números. Desde 25/11/2026 as abas de cima são as de "Metas e equipamentos" (as Metas das usinas ao lado; o de-para
+    segue dentro dos Equipamentos)."""
     app_eq.config.update(CFG)
     _liga_brodowski(cli)
     html = cli.get("/t/base/equipamentos").get_data(as_text=True)
-    assert 'class="gc-subabas"' not in html and 'class="eqx-kpis"' not in html and "Usinas com equipamentos" not in html
+    abas = html.split('class="gc-subabas"', 1)[1].split("</nav>", 1)[0]
+    assert abas.count("<a ") == 2 and "Metas das usinas" in abas and ">De-para<" not in abas
+    assert 'class="eqx-kpis"' not in html and "Usinas com equipamentos" not in html
     lista = html.split('id="eq-itens"')[1]
     assert 'aria-label="Chave: ok; equipamentos: atenção; fonte: atenção"' in lista
     assert 'aria-label="Chave: falta; equipamentos: sem leitura; fonte: sem leitura"' in lista   # Matões 100

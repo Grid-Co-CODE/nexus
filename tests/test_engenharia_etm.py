@@ -233,7 +233,7 @@ def test_marcacao_recusada(banco):
     M.marcar(OSE, "diagnostico", 1, ANA, True)
     with pytest.raises(M.Recusada, match="Nada mudou"):
         M.marcar(OSE, "diagnostico", 1, ANA, True)
-    with pytest.raises(M.Recusada, match="Engenharia"):
+    with pytest.raises(M.Recusada, match="Performance"):
         M.marcar(OSE, "diagnostico", 2, BETO, False)
     with pytest.raises(M.Recusada, match="lista"):
         M.marcar(OSE, "status_pos", 9, ANA, True)
@@ -258,7 +258,7 @@ def test_livro_existente_sem_a_aba_e_leitura_incompleta(banco):
 
 
 # ── a tela ETMs, o Planner (Task 3) ──────────────────────────────────────────────────────────────────────────────────
-URL_TELA = "/t/engenharia/etm"
+URL_TELA = "/t/performance/etm"
 
 
 @pytest.fixture
@@ -278,7 +278,7 @@ def tela(banco, app, monkeypatch):
     monkeypatch.setattr(E, "dados", lambda: {"os": oss, "lido": time.time(), "lendo": False, "erro": ""})
     monkeypatch.setattr(E, "pedir_releitura", lambda app=None, esperar=False, forcar=False:
                         pedidos.append((esperar, forcar)))
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.ENGENHARIA, "nome": "Engenharia"},
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"performance/etm", "performance/equipe"}, "setor": {"id": SID.PERFORMANCE, "nome": "Performance"},
                                                "erro": ""})
     return pedidos
 
@@ -291,9 +291,11 @@ def _dados_da_tela(html):
 def test_a_tela_etms_na_torre_da_engenharia(tela, cliente):
     from test_engenharia_acompanhamento import ANA, _como
 
-    from nexus.torres import engenharia as torre
+    # a tela foi da Engenharia para a Performance em 24/11/2026 (Levi: "a parte de ETM agora vem para performance")
+    from nexus.torres import engenharia as eng
+    from nexus.torres import performance as torre
     t = torre.TORRE.tela("etm")
-    assert t.nome == "ETMs" and t.do_setor == SID.ENGENHARIA
+    assert t.nome == "ETMs" and t.do_setor == SID.PERFORMANCE and eng.TORRE.tela("etm") is None
     html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
     d = _dados_da_tela(html)
     assert sorted(o["os"] for o in d["oss"]) == ["1", "2", "3", "4"]
@@ -303,7 +305,7 @@ def test_a_tela_etms_na_torre_da_engenharia(tela, cliente):
            ("nao_iniciada", "em_andamento", "finalizada", "cancelada")
     assert o["2"]["trabalho"] == "engenharia" and o["1"]["trabalho"] == "campo" and o["1"]["cliente"] == "Cliente X"
     assert o["1"]["solicitante"] == "Pessoa Dois" and o["1"]["criado_por"] == "Pessoa Três"
-    assert "nexusRota('/t/engenharia/etm/os/')" in html          # o clique abre a OS da ETM
+    assert "nexusRota('/t/performance/etm/os/')" in html          # o clique abre a OS da ETM
 
 
 def test_os_filtros_do_planner_no_padrao_do_nexus(tela, cliente):
@@ -319,12 +321,14 @@ def test_os_filtros_do_planner_no_padrao_do_nexus(tela, cliente):
     defs = html.split("var FILTROS = [", 1)[1].split("];", 1)[0]
     chaves = [x.split("'")[1] for x in defs.split("k: ")[1:]]
     assert chaves == ["cliente", "usina", "trabalho", "status", "criado_por", "responsavel"]
-    # a coluna de filtros à esquerda (Levi: "tem um espaço livre do lado esquerdo que está sendo mau utilizado")
-    assert html.index('class="etm-lado"') < html.index('class="kb-quadro"')
+    # desde 25/11/2026 os filtros ficam numa barra em cima, com o painel suspenso do Histórico de OS do OS Creator (Levi:
+    # "padronizar ali com os filtros do histórico de OS do OS Creator [...] o filtro que você expande"), e a coluna saiu
+    assert 'class="etm-lado"' not in html and html.index('id="etm-barra"') < html.index('class="kb-quadro"')
+    assert 'id="etm-fl-painel"' in html and 'id="etm-fl-ok"' in html and 'id="etm-fl-chips"' in html
     assert "l: 'Status da OS'" in defs and "l: 'Tipo de trabalho'" in defs
     assert "etm-ms-painel" in html and "'Selecionar todos'" in html
-    # a caixa marcada filtra na hora: sem Aplicar nem Cancelar
-    assert "'Aplicar'" not in html and "'Cancelar'" not in html and "addEventListener('change'" in html
+    # a caixa marcada filtra na hora; o Aplicar do painel fecha com o que está marcado e o × desfaz
+    assert "addEventListener('change'" in html and "fecharFiltros(true)" in html
     # a coluna Em andamento filtra o que está em andamento e o que está em verificação (Levi, 09/11/2026: "ao invés de
     # 'OS em campo', 'Stand By' e 'Validação Final' quero filtros do que está em andamento e o que está em verificação")
     assert 'data-fase="andamento"' in html and 'data-fase="verificacao"' in html and "data-etiqueta=" not in html
@@ -367,7 +371,7 @@ def test_a_faixa_de_numeros(tela, cliente):
     kpis = html.split('aria-label="As ETMs agora"', 1)[1].split("</section>", 1)[0]
     import re
     pares = re.findall(r'kb-kpi-rot">([^<]+)</span>\s*<span class="kb-kpi-linha"><b class="kb-kpi-v[^"]*">([^<]+)</b>', kpis)
-    assert pares == [("Abertas no Fracttal", "2"), ("Abertas para a Engenharia", "3"), ("Em acompanhamento", "1"),
+    assert pares == [("Abertas no Fracttal", "2"), ("Abertas para a Performance", "3"), ("Em acompanhamento", "1"),
                      ("Finalizadas em 30 dias", "1")]
 
 
@@ -377,7 +381,7 @@ def test_sem_o_livro_a_tela_diz_e_nao_chuta_marcacao(tela, cliente, monkeypatch)
     from nexus.engenharia import etm_marcas as M
     monkeypatch.setattr(M, "ler", lambda forcar=False: {"eventos": [], "lido_em": None, "erro": "Timeout: banco"})
     html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
-    assert "Não consegui ler as marcações da Engenharia (Timeout)" in html
+    assert "Não consegui ler as marcações da Performance (Timeout)" in html
     assert _dados_da_tela(html)["sem_marcas"] is True
     kpis = html.split('aria-label="As ETMs agora"', 1)[1].split("</section>", 1)[0]
     assert kpis.count('">—</b>') == 2                                # as duas contas que dependem das marcações
@@ -386,11 +390,13 @@ def test_sem_o_livro_a_tela_diz_e_nao_chuta_marcacao(tela, cliente, monkeypatch)
 def test_atualizar_rele_o_fracttal_e_a_leitura_que_falhou_diz(tela, cliente, monkeypatch):
     from test_engenharia_acompanhamento import ANA, _como
     _como(cliente, ANA).get(URL_TELA + "?atualizar=1")
-    assert tela[-1] == (True, True)
+    # com cópia (a da memória ou a do disco, 24/11/2026), a releitura forçada vai por trás: a tela não espera o Fracttal
+    assert tela[-1] == (False, True)
     monkeypatch.setattr(E, "dados", lambda: {"os": [], "lido": time.time(), "lendo": False,
                                              "erro": "o Fracttal recusou por excesso de pedidos (HTTP 429)"})
     html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
-    assert "O Fracttal recusou a leitura agora" in html and "HTTP 429" in html
+    # com cópia, a recusa não esconde a tela: fica dita no canto da hora (24/11/2026, a cópia em disco)
+    assert "recusada pelo Fracttal; mostrando a cópia guardada" in html and "HTTP 429" in html
 
 
 def test_leitura_que_o_fracttal_recusou_nao_recarrega_a_tela_de_8_em_8_segundos(tela, cliente, monkeypatch):
@@ -418,7 +424,7 @@ def test_a_subida_liga_a_releitura_por_tras(app, monkeypatch):
 
 
 # ── a OS da ETM (Task 4): a página da OS da Engenharia com o painel das marcações ───────────────────────────────────
-URL_OS = "/t/engenharia/etm/os/17003"
+URL_OS = "/t/performance/etm/os/17003"
 
 
 @pytest.fixture
@@ -454,7 +460,7 @@ def pagina_etm(banco, app, monkeypatch):
     monkeypatch.setattr(os_equipe, "_ler_fracttal", rest)
     monkeypatch.setattr(torre, "_onde_do_cadastro",
                         lambda: (lambda texto, cod: {"usina_id": 7, "ligada_por": "de-para do Fracttal"}))
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.ENGENHARIA, "nome": "Engenharia"},
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"performance/etm", "performance/equipe"}, "setor": {"id": SID.PERFORMANCE, "nome": "Performance"},
                                                "erro": ""})
 
 
@@ -467,14 +473,15 @@ def test_a_os_da_etm_tem_o_painel_das_marcacoes(pagina_etm, cliente):
 
     from test_engenharia_acompanhamento import ANA, _como
     html = _como(cliente, ANA).get(URL_OS).get_data(as_text=True)
-    p = _secao_os(html, "Marcações da Engenharia")
+    p = _secao_os(html, "Marcações da Performance")
     assert '<option value="0">— sem diagnóstico —</option>' in p
     assert all(f">{n}</option>" in p for n in ("Falha de Equipamento", "Falha de Comunicação", "Sujidade", "Outro"))
     assert all(f">{n}</option>" in p for n in ("Chamado de Garantia", "Alinhamento com o Cliente", "Regularizado"))
     assert all(f'aria-pressed="false">{n}</button>' in p for n in ("OS em campo", "Stand By", "Validação Final"))
-    assert ">Pôr em acompanhamento</button>" in p and ">Finalizar pela Engenharia</button>" in p
+    assert ">Pôr em acompanhamento</button>" in p and ">Finalizar pela Performance</summary>" in p
+    assert 'name="comentario"' in p and "required" in p.split('name="comentario"', 1)[1].split(">", 1)[0]
     assert "<h2>Status e prioridade</h2>" not in html                    # o painel da ETM no lugar dele
-    assert re.search(r'class="eg-ac-volta" href="/t/engenharia/etm">← ETMs</a>', html)
+    assert re.search(r'class="eg-ac-volta" href="/t/performance/etm">← ETMs</a>', html)
     rot = re.findall(r'<div class="lbl">([^<]+)</div>', html.split('class="eg-ac-kpis"', 1)[1].split("</section>", 1)[0])
     assert rot == ["Diagnóstico", "Status pós-OS", "Em aberto", "Última atualização"]
 
@@ -488,7 +495,10 @@ def test_marcar_grava_e_volta_com_o_aviso(pagina_etm, cliente):
     assert r.status_code == 303 and r.headers["Location"].split("?", 1)[0].endswith(URL_OS) and "ok=" in r.headers["Location"]
     c.post(URL_OS + "/marcar", data={"evento": "etiqueta", "valor": "2", "ligado": "sim"}, headers=SAME)
     c.post(URL_OS + "/marcar", data={"evento": "acompanhamento", "ligado": "sim"}, headers=SAME)
-    c.post(URL_OS + "/marcar", data={"evento": "finalizado", "ligado": "sim"}, headers=SAME)
+    # o Finalizar sem o comentário é recusado e não marca nada (25/11/2026, Levi: "deve ser obrigatório")
+    r = c.post(URL_OS + "/marcar", data={"evento": "finalizado", "ligado": "sim"}, headers=SAME)
+    assert "erro=O+coment" in r.headers["Location"] and not M.estado(M.ler(forcar=True)["eventos"])["60003"].get("finalizado")
+    c.post(URL_OS + "/marcar", data={"evento": "finalizado", "ligado": "sim", "comentario": "Sensor limpo"}, headers=SAME)
     e = M.estado(M.ler(forcar=True)["eventos"])["60003"]
     assert (e["diagnostico_id"], e["status_pos_id"], e["etiquetas"], e["acompanhamento"], e["finalizado"]) == \
            (2, 1, {2}, True, True)
@@ -518,15 +528,16 @@ def test_quem_nao_e_da_engenharia_le_as_marcacoes_sem_formularios(pagina_etm, cl
     from test_engenharia_acompanhamento import BETO, _como
 
     from nexus.auth import setor_telas as ST
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"etm"}, "setor": {"id": SID.PERFORMANCE, "nome": "Performance"},
+    # desde 24/11/2026 quem marca é a Performance: a Engenharia lê
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"etm"}, "setor": {"id": SID.ENGENHARIA, "nome": "Engenharia"},
                                                "erro": ""})
-    p = _secao_os(_como(cliente, BETO).get(URL_OS).get_data(as_text=True), "Marcações da Engenharia")
+    p = _secao_os(_como(cliente, BETO).get(URL_OS).get_data(as_text=True), "Marcações da Performance")
     assert "<form" not in p and "<dt>Diagnóstico</dt><dd>—</dd>" in p
 
 
 def test_os_que_nao_e_de_etm_abre_a_pagina_comum(pagina_etm, cliente):
     from test_engenharia_acompanhamento import ANA, _como
-    r = _como(cliente, ANA).get("/t/engenharia/etm/os/17009")
+    r = _como(cliente, ANA).get("/t/performance/etm/os/17009")
     assert r.status_code == 302 and r.headers["Location"].endswith("/t/engenharia/equipe/os/17009")
 
 
@@ -534,7 +545,8 @@ def test_os_comentarios_sao_os_da_os_da_engenharia(pagina_etm, cliente):
     from test_engenharia_acompanhamento import ANA, _como
     html = _como(cliente, ANA).get(URL_OS).get_data(as_text=True)
     assert 'data-comentar="/os/_nexus/engenharia/os/60003/comentar"' in html
-    assert 'data-volta="/t/engenharia/etm?atualizar=1"' in html            # a troca de responsável volta para ETMs
+    # a troca de responsável volta para ETMs relendo só esta OS (24/11/2026: um pedido, não as 15 páginas)
+    assert 'data-volta="/t/performance/etm?releia=17003"' in html
 
 
 def test_o_login_do_fracttal_do_comentario_volta_para_a_os_da_etm(pagina_etm, cliente):
@@ -546,10 +558,10 @@ def test_o_login_do_fracttal_do_comentario_volta_para_a_os_da_etm(pagina_etm, cl
         s["logado"], s["admin"], s["usuario"] = True, False, ANA
         s["via"], s["ms_ate"] = "microsoft", time.time() + 3600
     html = cliente.get(URL_OS).get_data(as_text=True)
-    assert 'data-de="/t/engenharia/etm/os/17003"' in html
+    assert 'data-de="/t/performance/etm/os/17003"' in html
     r = cliente.post("/os/_nexus/engenharia/os/60003/comentar",
-                     json={"texto": "x", "folio": "17003", "de": "/t/engenharia/etm/os/17003"}, headers=SAME)
-    assert r.status_code == 401 and "%2Ft%2Fengenharia%2Fetm%2Fos%2F17003" in r.get_json()["login"]
+                     json={"texto": "x", "folio": "17003", "de": "/t/performance/etm/os/17003"}, headers=SAME)
+    assert r.status_code == 401 and "%2Ft%2Fperformance%2Fetm%2Fos%2F17003" in r.get_json()["login"]
     r = cliente.post("/os/_nexus/engenharia/os/60003/comentar",
                      json={"texto": "x", "folio": "17003", "de": "https://outro.site/x"}, headers=SAME)
     assert "%2Ft%2Fengenharia%2Fequipe%2Fos%2F17003" in r.get_json()["login"]      # endereço estranho: a de sempre
@@ -561,8 +573,8 @@ def test_os_de_varios_ativos_com_a_etm_depois_abre_como_etm_e_grava_a_etm(pagina
 
     from nexus.engenharia import etm_marcas as M
     c = _como(cliente, ANA)
-    assert c.get("/t/engenharia/etm/os/17010").status_code == 200
-    c.post("/t/engenharia/etm/os/17010/marcar", data={"diagnostico": "1"}, headers=SAME)
+    assert c.get("/t/performance/etm/os/17010").status_code == 200
+    c.post("/t/performance/etm/os/17010/marcar", data={"diagnostico": "1"}, headers=SAME)
     (l,) = [x for x in M._reler()["eventos"] if str(x["os_folio"]) == "17010"]
     assert l["codigo_ativo"] == "ALF100-ESTM1"
 
@@ -589,10 +601,10 @@ def test_formulario_com_um_salvo_e_outro_falhando_diz_os_dois(pagina_etm, client
 def test_a_pilula_da_os_de_etm_conta_a_marcacao(pagina_etm, cliente):
     from test_engenharia_acompanhamento import ANA, SAME, _como
     c = _como(cliente, ANA)
-    antes = c.get("/t/engenharia/etm/os/17011").get_data(as_text=True)
+    antes = c.get("/t/performance/etm/os/17011").get_data(as_text=True)
     assert "dias sem atualização" in antes.split('class="eg-ac-tag', 1)[1].split("</span>", 1)[0]
-    c.post("/t/engenharia/etm/os/17011/marcar", data={"diagnostico": "3"}, headers=SAME)
-    depois = c.get("/t/engenharia/etm/os/17011").get_data(as_text=True)
+    c.post("/t/performance/etm/os/17011/marcar", data={"diagnostico": "3"}, headers=SAME)
+    depois = c.get("/t/performance/etm/os/17011").get_data(as_text=True)
     assert "sem atualização" not in depois.split('class="eg-ac-tag', 1)[1].split("</span>", 1)[0]
 
 
@@ -652,16 +664,20 @@ def test_as_abas_do_app_planner_historico_estacoes_em_aberto_e_fechamentos(tela,
     from test_engenharia_acompanhamento import ANA, _como
     html = _como(cliente, ANA).get(URL_TELA).get_data(as_text=True)
     nav = html.split('class="cn-abas etm-abas"', 1)[1].split("</nav>", 1)[0]
-    assert re.findall(r'data-aba="(\w+)"', nav) == ["planner", "historico", "abertas", "fechamentos"]
+    # as Estações em Aberto primeiro, e a tela abre nelas (Levi, 24/11/2026: "Eu queria que sempre começasse com estações
+    # em aberto")
+    assert re.findall(r'data-aba="(\w+)"', nav) == ["abertas", "planner", "historico", "fechamentos"]
+    assert re.search(r'data-aba="abertas" aria-current="page"', nav) and "vistaNova() { return {aba: 'abertas'," in html
     assert [t.strip() for t in re.findall(r">([^<>]+)<", nav) if t.strip()][:4] == \
-           ["Planner", "Histórico", "Estações em Aberto", "Fechamentos"]
+           ["Estações em Aberto", "Planner", "Histórico", "Fechamentos"]
     for painel in ("planner", "historico", "abertas", "fechamentos"):
         assert f'id="etm-p-{painel}"' in html
-    # o Chat da usina e o Finalizar pela Engenharia do app
-    assert "Chat da usina" in html and "Finalizar pela Engenharia" in html and "Ver histórico desta usina" in html
+    # a gaveta da usina (25/11/2026): a linha do tempo, o Finalizar pela Performance, a Nova demanda e o Chat do Histórico
+    assert 'id="etm-us"' in html and "Linha do tempo" in html and "Finalizar pela Performance" in html
+    assert "Nova demanda" in html and "Chat da usina" in html
     # os Fechamentos do app: por semana, pela data de fechamento no Fracttal ou pela Engenharia
     assert 'data-visao="fracttal"' in html and 'data-visao="engenharia"' in html
-    assert "Fechamento no Fracttal" in html and "Fechamento pela Engenharia" in html
+    assert "Fechamento no Fracttal" in html and "Fechamento pela Performance" in html
 
 
 def test_quem_pode_finalizar_vai_no_json(tela, cliente, monkeypatch):
@@ -669,12 +685,12 @@ def test_quem_pode_finalizar_vai_no_json(tela, cliente, monkeypatch):
 
     from nexus.auth import setor_telas as ST
     assert _dados_da_tela(_como(cliente, ANA).get(URL_TELA).get_data(as_text=True))["pode"] is True
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"engenharia/etm"},
-                                               "setor": {"id": SID.PERFORMANCE, "nome": "Performance"}, "erro": ""})
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"performance/etm"},
+                                               "setor": {"id": SID.ENGENHARIA, "nome": "Engenharia"}, "erro": ""})
     assert _dados_da_tela(_como(cliente, BETO).get(URL_TELA).get_data(as_text=True))["pode"] is False
 
 
-URL_FIN = "/t/engenharia/etm/finalizar"
+URL_FIN = "/t/performance/etm/finalizar"
 
 
 @pytest.fixture
@@ -698,7 +714,7 @@ def test_finalizar_pela_engenharia_em_lote(lote, cliente, monkeypatch):
     real = M._publicar
     monkeypatch.setattr(M, "_publicar", lambda eventos: (gravacoes.append(len(eventos)), real(eventos)))
     c = _como(cliente, ANA)
-    r = c.post(URL_FIN, json={"usina": U, "os": ["3", "5", "1", "99"]}, headers=SAME)
+    r = c.post(URL_FIN, json={"usina": U, "os": ["3", "5", "1", "99"], "comentario": "Sensores limpos"}, headers=SAME)
     j = r.get_json()
     assert r.status_code == 200 and sorted(j["feitas"]) == ["3", "5"] and sorted(j["fora"]) == ["1", "99"]
     assert len(gravacoes) == 1
@@ -706,7 +722,7 @@ def test_finalizar_pela_engenharia_em_lote(lote, cliente, monkeypatch):
     assert e["50003"]["finalizado"] is True and e["50005"]["finalizado"] is True and "50001" not in e
     assert {x["usina_id"] for x in M._reler()["eventos"]} == {7}
     # de novo: já estão finalizadas, nada a gravar
-    j = c.post(URL_FIN, json={"usina": U, "os": ["3"]}, headers=SAME).get_json()
+    j = c.post(URL_FIN, json={"usina": U, "os": ["3"], "comentario": "ok"}, headers=SAME).get_json()
     assert j["feitas"] == [] and j["ja"] == ["3"] and len(gravacoes) == 1
 
 
@@ -715,7 +731,7 @@ def test_finalizar_em_lote_pula_a_que_tem_diagnostico(lote, cliente):
 
     from nexus.engenharia import etm_marcas as M
     M.marcar({"wid": 50003, "folio": "3", "codigo": "ALF100-ESTM1"}, "diagnostico", 1, ANA, True)
-    j = _como(cliente, ANA).post(URL_FIN, json={"usina": U, "os": ["3", "5"]}, headers=SAME).get_json()
+    j = _como(cliente, ANA).post(URL_FIN, json={"usina": U, "os": ["3", "5"], "comentario": "ok"}, headers=SAME).get_json()
     assert j["feitas"] == ["5"] and j["ja"] == ["3"]
 
 
@@ -726,14 +742,15 @@ def test_finalizar_em_lote_so_quem_e_da_engenharia_e_do_proprio_site(lote, clien
     from nexus.engenharia import etm_marcas as M
     r = _como(cliente, ANA).post(URL_FIN, json={"usina": U, "os": ["3"]}, headers={"Sec-Fetch-Site": "cross-site"})
     assert r.status_code == 403
-    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"engenharia/etm"},
-                                               "setor": {"id": SID.PERFORMANCE, "nome": "Performance"}, "erro": ""})
-    r = _como(cliente, BETO).post(URL_FIN, json={"usina": U, "os": ["3"]}, headers=SAME)
-    assert r.status_code == 403 and "Engenharia" in r.get_json()["erro"]
+    # desde 24/11/2026 quem finaliza é a Performance: a Engenharia, com a tela marcada, lê e não grava
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"performance/etm"},
+                                               "setor": {"id": SID.ENGENHARIA, "nome": "Engenharia"}, "erro": ""})
+    r = _como(cliente, BETO).post(URL_FIN, json={"usina": U, "os": ["3"], "comentario": "ok"}, headers=SAME)
+    assert r.status_code == 403 and "Performance" in r.get_json()["erro"]
     assert M._reler()["eventos"] == []
 
 
-URL_CHAT = "/t/engenharia/etm/usina/comentarios"
+URL_CHAT = "/t/performance/etm/usina/comentarios"
 
 
 def test_o_chat_da_usina_junta_os_comentarios_das_os_dela(tela, cliente):
@@ -800,7 +817,7 @@ def test_sem_leitura_do_fracttal_finalizar_e_chat_dizem_que_estao_lendo(tela, cl
     from nexus.engenharia import etm_marcas as M
     monkeypatch.setattr(E, "dados", lambda: {"os": [], "usinas": {}, "lido": 0.0, "lendo": True, "erro": ""})
     c = _como(cliente, ANA)
-    r = c.post(URL_FIN, json={"usina": U, "os": ["3"]}, headers=SAME)
+    r = c.post(URL_FIN, json={"usina": U, "os": ["3"], "comentario": "ok"}, headers=SAME)
     assert r.status_code == 503 and "Lendo" in r.get_json()["erro"]
     r = c.get(URL_CHAT, query_string={"usina": U})
     assert r.status_code == 503 and "Lendo" in r.get_json()["erro"]
@@ -879,3 +896,37 @@ def test_cada_os_em_andamento_diz_se_esta_em_verificacao(tela, cliente):
             assert o["fase"] == "", o["os"]
     assert any(o["fase"] for o in d["oss"])
 
+
+
+def test_a_demanda_que_cita_a_os_entra_na_linha_do_tempo_da_os(pagina_etm, cliente, monkeypatch):
+    # Levi, 25/11/2026: "Quando eu criar uma nova demanda, vai aparecer também na linha do tempo? [...] Na linha do tempo da OS"
+    from test_engenharia_acompanhamento import ANA, _como
+
+    from nexus.torres.performance import etm_tela
+    pedidas = []
+    monkeypatch.setattr(etm_tela, "demandas_das", lambda folios, uid=None: pedidas.append(set(folios)) or [
+        {"titulo": "Conferir o piranômetro", "para": "Caio Reis", "situacao": "Aberta", "ultimo": "Caio Reis respondeu",
+         "de": "Ana Lima", "quando": "25/11 07:00", "iso": "2026-11-25T10:00:00+00:00"}])
+    html = _como(cliente, ANA).get(URL_OS).get_data(as_text=True)
+    assert pedidas == [{"17003"}]
+    assert "Demanda para Caio Reis: Conferir o piranômetro (Aberta) · Caio Reis respondeu" in html and "Ana Lima · 25/11 07:00" in html
+
+
+def test_o_finalizar_em_lote_pede_o_comentario_e_ele_fica_na_linha_do_tempo(lote, cliente):
+    # Levi, 25/11/2026: "deve ser obrigatório, eu coloco um comentário [...] na linha do tempo [...] vai ter lá, finalizado
+    # por tal pessoa, e aí o comentário [...] Não é para se perder essa linha do tempo"
+    from test_engenharia_acompanhamento import ANA, SAME, _como
+
+    from nexus.engenharia import etm_marcas as M
+    from nexus.torres.performance import etm_tela
+    c = _como(cliente, ANA)
+    r = c.post(URL_FIN, json={"usina": U, "os": ["3"], "comentario": "   "}, headers=SAME)
+    assert r.status_code == 400 and "obrigatório" in r.get_json()["erro"] and M._reler()["eventos"] == []
+    j = c.post(URL_FIN, json={"usina": U, "os": ["3", "5"], "comentario": "Sensores limpos e cabo trocado"}, headers=SAME).get_json()
+    assert sorted(j["feitas"]) == ["3", "5"] and j["sem_comentario"] == []
+    chat = c.get(URL_CHAT, query_string={"usina": U}).get_json()
+    fins = [x for x in chat["comentarios"] if x["texto"].startswith(etm_tela.COMENTARIO_FIM)]
+    assert sorted(x["os"] for x in fins) == ["3", "5"] and all(x["nome"] == "Ana Lima" for x in fins)
+    assert fins[0]["texto"] == etm_tela.COMENTARIO_FIM + "Sensores limpos e cabo trocado"
+    html = c.get(URL_TELA).get_data(as_text=True)
+    assert '"Finalizado pela Performance: "' in html and "'Finalizada pela Performance por '" in html

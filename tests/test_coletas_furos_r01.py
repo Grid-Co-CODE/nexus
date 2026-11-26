@@ -494,3 +494,45 @@ def test_as_paradas_saem_das_mesmas_linhas_do_csv_do_cos(monkeypatch):
     # sem o COS (o PC): a conta sai sem as paradas e diz por quê
     monkeypatch.setattr(NO, "ler", lambda cfg, ag=None: AND.Leitura("", None, erro="a fonte do Andamento não está ligada neste servidor"))
     assert FF.linhas_cos({}, agora) == (None, "a fonte do Andamento não está ligada neste servidor")
+
+
+def test_a_tela_separa_o_bd_pesa_o_cliente_e_da_o_alcance_da_comunicacao(furos):
+    """24/11/2026, Levi, na Nova Xavantina 1: a falha de comunicação do Inversor 2.4 (em aberto desde 22/06) pintava de roxo
+    todo dia com furo, até o do IPOA ("é só o inversor com falha de comunicação, o resto está verde [...] tem que ter uma cor
+    só para inversor"); o "Desligamento de usina" de 01 a 05/11, com 10 dos 25 inversores gerando, saía azul ("a queda foi
+    parcial"; escolha dele: verde, a queda no detalhe); a barra por cliente somava dias ("tem que mostrar esse peso"; escolha
+    dele: a % dos dias das usinas); e "separar BD performance e BD operações" (escolha dele: a troca no alto, a tela toda)."""
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    js = open(os.path.join(raiz, "nexus", "static", "coletas-furos.js"), encoding="utf-8").read()
+    css = open(os.path.join(raiz, "nexus", "static", "coletas-furos.css"), encoding="utf-8").read()
+    # o alcance: a ocorrência que cita inversores vale só para eles; o dia é "k" quando TODO inversor pendente foi citado
+    assert "function alvoCom(p, j)" in js and "return (c[j] = n ? s : null);" in js
+    assert 'var ki = !cm && !pu && pg > 0 && pgN.every(function (n) { return ci[n]; });' in js
+    assert "if (ki && total) { cm = true; ki = false; }" in js               # o inversor único é a usina
+    assert 'x.s = cm ? "m" : ki ? "k" : (total || !pg) ? "s" : "p";' in js
+    assert '(bs.indexOf(c) >= 0 && (m.com[i] || m.comI[i][e.nome]) ? "m" : c)' in js   # no mapa, só o equipamento citado
+    assert ".fr-q--k{background:var(--anomalo)}" in css and ".fr-cli-comi{background:var(--anomalo)}" in css
+    # a queda parcial: com algum equipamento de geração com dado no dia, é completo; o azul é a usina toda
+    assert 'if (p.eqs.some(function (e) { return isGen(e) && "oa".indexOf(e.st[k]) >= 0; })) {' in js
+    assert "} else { x.s = \"e\"; dJ++; }" in js
+    # o peso: dias com furo ÷ (usinas × dias verificados); no BD_Thopen, por carteira
+    assert "var peso = function (c) { return c.cap ? c.dd / c.cap : 0; }" in js
+    assert 'var campoCli = function () { return BD === "BD_Thopen" ? "carteira" : "cliente"; };' in js
+    # o BD da tela: as usinas do mês só do BD escolhido, e a Fonte saiu do painel
+    assert 'var BDS = ["BD_Performance", "BD_Thopen"], BD = BDS[0];' in js
+    assert "PC.v = ps.filter(function (p) { return p.src === BD; });" in js and 'lista("fonte"' not in js
+    html = furos.get("/t/performance/coletas/furos-de-coleta").get_data(as_text=True)
+    assert 'id="fr-bds"' in html and 'id="fr-cli-titulo"' in html
+
+
+def test_a_etm_aceita_equipamento_inoperante():
+    """24/11/2026, Levi, na Ipixuna 1: "tento justificar ETM POA e GHI e algo trava!" — marcou o IPOA e o GHI e escolheu
+    "Equipamento inoperante, fora de operação"; a tela recusou ("2 itens não aceitam esse motivo e ficaram marcados"),
+    porque o motivo valia só para inversor (regra trazida da ferramenta da analista em 16/11; o servidor aceita qualquer
+    motivo para qualquer item). A estação quebrada é equipamento inoperante: vale para o IPOA e o GHI também, entra no
+    filtro "Com equipamento inoperante", e a recusa que sobrar diz QUAIS itens ficaram marcados."""
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    js = open(os.path.join(raiz, "nexus", "static", "coletas-furos.js"), encoding="utf-8").read()
+    assert '{ k: "fora_op", l: "Equipamento inoperante, fora de operação (fica sinalizado)", ap: "both" }' in js
+    assert 'var inop = p.eqs.filter(function (e) { return /[vxzp]/.test(e.st) && hasReason(getEntry(p, e.nome), "fora_op"); })' in js
+    assert "recusadosN.push(t.nome)" in js and 'recusadosN.join(", ")' in js

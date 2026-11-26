@@ -39,7 +39,9 @@ def test_a_linha_das_rondas_leva_ao_kanban_da_pessoa(banco, logado):
 
 
 def test_as_pt_por_responsavel_numa_tabela_e_a_linha_leva_as_pt_dela(banco, logado):
-    for base in ("/t/campo/atencao?vista=pt", "/t/hseq/apr-pt"):
+    # só a Usinas 360°: a APR e PT da Segurança ficou só com a tabela de cada PT em 23/11/2026 ("saiu o Por responsável",
+    # 870c9eb3; tests/test_hseq_*)
+    for base in ("/t/campo/atencao?vista=pt",):
         html = logado.get(base).get_data(as_text=True)
         t = _tabela(html)
         assert _cab(t) == ["Responsável UFV", "PT esperando", "Paradas há mais de 2 h", "Aguardando", "Usinas",

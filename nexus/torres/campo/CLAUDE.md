@@ -2114,8 +2114,8 @@ O Levi viu a tela na bancada: "Gostei bastante! ... inclua também essas melhori
   no mapa"). `?ver=usinas` é o MESMO mapa do Técnicos (`situacao.desenho` sem ponto de técnico), com as usinas em
   operação do cadastro em destaque (`eq-u--dest`, o nome e o "cliente · UF" na dica) e a lista delas no painel ao lado.
   De 08/11 a 10/11/2026 este botão trazia a tela inteira do Mapa de risco da Performance para dentro desta (o pedido de
-  08/11: "quando clica em usinas aparece os alertas das UFVs"); o clima passou ao botão Incluir clima, abaixo, e a tela
-  inteira segue em Performance → Clima e risco → Mapa de risco. `?ver=tecnicos` (o padrão; qualquer outro valor também)
+  08/11: "quando clica em usinas aparece os alertas das UFVs"); o clima passou ao botão Incluir clima, abaixo (desde 24/11/2026 o Mapa de risco da Performance saiu, e o endereço
+  dele abre aqui com `?ver=usinas&clima=1`). `?ver=tecnicos` (o padrão; qualquer outro valor também)
   é a tela de sempre. **Nada de técnico no Usinas**: o serviço das posições nem sobe, o filtro de supervisor e equipe e
   o piloto somem, e a abertura **não grava "abriu_mapa"** na trilha da LGPD: não há dado pessoal ali. Sem o clima pedido
   a página nem vai às fontes do clima. Quem vê é o mesmo `_quem_ve` dos cinco setores e dos administradores, conferido
@@ -2695,6 +2695,30 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       Todos (o responsável do login cortaria a usina de outro); a usina sem OS na fila abre vazia, com o nome do cadastro
       na lista. O nome repetido na lista leva o cliente (em produção há duas "Linhares 1": a da Axis, id 27, e a da
       Thopen, id 96). O total diz o recorte ("na Usina X", "executadas por Y"). Prova: `test_campo_aprovacao_filtros_15_11.py`.
+    - **Tipo de tarefa e Etiqueta, e a barra no padrão do Histórico de OS (25/11/2026**, o Otávio, pelo Levi: "Tipo por
+      Handouver, MPA/MPS [...] e também de quem solicitou, por exemplo: Performance, COS etc ---> Para esse sei que o
+      pessoal usa uma etiqueta"; o Levi: "no estilo histórico de os do os creator web, com o mesmo estilo e
+      funcionalidade"). O formulário passou do cartão suspenso (`data-fs`, `campo-filtros.js`) ao componente do Histórico
+      (`data-fo`, `static/filtros-os.js`, regra em `nexus/casca/CLAUDE.md`): a busca na barra, o painel com as listas
+      digitáveis, o Aplicar e as etiquetas. Os dois filtros novos são **de marcar** (`<select multiple>`, `?tipo=` e
+      `?etiqueta=` repetidos), no servidor como os outros: a OS entra se ALGUMA tarefa dela tem um dos tipos marcados
+      (e uma das etiquetas), comparados sem acento e sem caixa. O tipo é o `tasks_log_task_type_main` e a etiqueta o
+      `labels` das linhas do Fracttal que a fila já guarda (`regras_app._FILA_CACHE`, as do pré-filtro;
+      `_tipos_e_etiquetas`): **nenhum pedido novo ao Fracttal**. As opções são o que a fila inteira tem, na grafia do
+      Fracttal. A OS com a etiqueta PERFORMANCE ou CHAMADOS segue "Fora do pré-filtro" (a regra de 04/11): o filtro só a
+      acha lá. O `_url` da torre passou a levar todos os valores de um filtro de marcar (o CSV levava só o 1º). **O plano
+      da preventiva** (o Levi, testando no mesmo dia: "pesquisei por MPA e não filtrou nada"; escolha dele, "No Tipo e na
+      busca"): no Fracttal o tipo é só "Preventiva" (221 OS na fila de 25/11/2026) e o MPM, MPT, MPQ, MPS e MPA vêm no
+      nome da tarefa. O Tipo de tarefa mostra "Preventiva MPA", "Preventiva MPS"... (o código `MP` + uma letra como palavra
+      inteira no nome; sem código, "Preventiva"; `_tipo_da_tarefa`), e a busca passou a procurar também o nome das
+      tarefas, no começo de uma palavra ("MPA" acha "MPA - Limpeza" e não "Limpar"). A OS com Etiqueta PERFORMANCE ou
+      CHAMADOS conta zero no total do quadro (ela fica no "Fora do pré-filtro", que não entra na conta). **Criado por
+      (setor)** (o Levi, no mesmo dia: "criado por, aí bota entre parênteses setor, aí performance, engenharia, chamados e
+      assim por diante"; o COS do Otávio não é etiqueta no Fracttal): lista de marcar `?criado=` com o setor de quem criou
+      a OS (`code_create_by`, e sem ele o `created_by`) no livro `nexus_setores`. Sai da mesma conta que acha o COS
+      (`verificacao.criadores_cos`, feita pela leitura de fundo e guardada 10 min; ela passou a guardar o setor de toda
+      pessoa com setor, `setor_por_codigo`/`setor_por_nome`, e `setor_do_criador` lê): a visita não lê nada. Quem criou
+      sem setor no Nexus não entra em opção nenhuma. Prova: `test_campo_aprovacao_tipo_etiqueta_25_11.py`.
     - **As fotos citadas aparecem na barra lateral (16/11/2026**, Levi: "Aprovação de OS quando tiver algo que cita
       Fotos tem que carregar as fotos!"): em cada fato que cita foto (foto tarde, repetida, que não abriu, GPS longe), a
       miniatura de cada uma (`loading="lazy"`) com o nome embaixo, que segue abrindo o card; a miniatura abre a foto
@@ -2829,6 +2853,14 @@ relógio da conta do App só congela trocando `datetime.datetime` no módulo `da
 outra); e com `TESTING` ligado o `credencial()` do Fracttal só olha a credencial de teste. O receptor do
 `template_rendered` precisa de `weak=False` (o blinker guarda referência fraca e a lambda some).
 
+## E-mails automáticos do App (24/11/2026)
+
+A tela é da Base (Base › E-mails automáticos, só administrador) e o código mora em `nexus/campo/emails_app.py` (a
+leitura dos livros do App) e `nexus/campo/emails_controle.py` (a regra que o Nexus escreve). O contrato com o App, as
+regras e a prova: `nexus/cadastro/CLAUDE.md`, seção "E-mails automáticos". Daqui, só o que toca o Campo: o
+`email_app_campo · Envios` (o semanal da Segurança, que a tela da Segurança lê) NÃO muda; os dois livros novos do App são
+próprios (`email_tipos_app_campo`, `email_todos_envios_app_campo`).
+
 ## Guia do App de Campo (21-22/11/2026; `nexus/campo/guia_app.py`, `guia_tela.py`, `campo/guia_app.html`)
 
 Levi, pelo chat do App de Campo: "guia do app de campo. E pode ficar no Usina 360 com nova sessão mesmo [...] perguntas que
@@ -2862,3 +2894,14 @@ alto, a separação por tema e o texto curto, "para quem tem pouco tempo, porém
 
 Levi: "limitação de potência quero na parte de performance". A tela é `/t/performance/limitacoes`; a regra continua em
 `nexus/campo/limitacoes.py`. Tudo em `nexus/torres/performance/CLAUDE.md`, seção "Limitações de potência".
+
+## Clima e risco (veio da Performance em 24/11/2026)
+
+Levi, 24/11/2026: "clima e risco vai para usinas 360. Mapa de risco pode tirar. Já está tudo lá na parte de mapa de equipe".
+A lista e a página da usina (`/t/campo/clima`, `/t/campo/clima/usina/<id>`) moram em `clima_tela.py` e
+`templates/campo/clima.html` e `clima_usina.html`, logo depois do Mapa de equipe no menu; a regra segue em
+`nexus/performance/clima/` (a mesma que o Incluir clima do Mapa de equipe lê) e o que vale para ela está no
+`nexus/performance/CLAUDE.md`, seção "Clima e risco". O "Ver no Mapa de equipe" da lista abre `/t/campo/equipe?ver=usinas&clima=1`
+(o Mapa de risco saiu). Os endereços antigos `/t/performance/clima/...` respondem 308 (`torres/performance/mapa_tela.py`) e a
+marca de "performance/clima" vale para "campo/clima" (`setor_telas.RENOMEADAS`). Prova: `tests/test_torre_performance_clima*.py`
+e `tests/test_performance_etm.py` (os endereços antigos e o menu).

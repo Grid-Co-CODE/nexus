@@ -17,15 +17,25 @@
       <p><b>Como se conta.</b> <b>Gerando agora</b> soma o kW das usinas da lista com leitura nova; a que está sem leitura nova
       fica fora da soma, para um número parado não inflar o total. A <b>curva de hoje</b> é a média, de 15 em 15 minutos, das
       amostras de 5 minutos que a Ronda COS grava do SCADA, das {{ '%02d'|format(curva_de) }}h às {{ curva_ate }}h; cada curva
-      vai de zero ao máximo da própria usina (a plataforma não guarda a potência instalada). O SunOP não guarda a série:
-      a usina dele aparece sem curva. Passe o mouse na curva para ver o kW de cada horário.</p>
+      vai de zero ao máximo da própria usina (a plataforma não guarda a potência instalada). A do SunOP é a série que a
+      Ronda COS grava do portal desde 13/11. Passe o mouse na curva para ver o kW de cada horário.</p>
+      <p><b>Curva ou barras.</b> O seletor no alto troca a curva de hoje pelas barras por inversor: uma barra por inversor,
+      com o kW de agora (ou a fração da potência nominal, quando todos a têm), na ordem da usina. A linha tracejada é a
+      mediana dos que estão gerando: quem fica bem abaixo dela gera menos que os vizinhos. Vermelho é desligado ou em falha,
+      âmbar é sem comunicação, e a barra só com o contorno não tem medida agora. A escolha fica guardada neste navegador e vale
+      também na janela da usina, onde as barras comparam o kW de agora ou a energia do trecho do gráfico (o dia inteiro ou o do
+      zoom), pela curva gravada; clicar numa barra abre o inversor.</p>
       <p><b>Os inversores.</b> Clique numa usina para ver a curva dela e a de cada inversor, na mesma escala, com o estado de
       cada um (desligado, em falha, sem comunicação). O kW, o estado e a ponta das curvas andam de 3 em 3 segundos, lidos da
-      Ronda COS como na tela de monitoramento de lá. "Sem comunicação" é o inversor que não responde: ele pode estar gerando.</p>
+      Ronda COS como na tela de monitoramento de lá; nas usinas do SunOP, a cada leitura do portal (de minuto em minuto).
+      "Sem comunicação" é o inversor que não responde: ele pode estar gerando. No SunOP, "desligado" é o inversor em 0 kW
+      com a usina gerando, e "em falha", o que está em 0 kW com alarme ativo no portal.</p>
       <p><b>Como funciona.</b> A tela se atualiza sozinha a cada 30 segundos, sem recarregar a página. Clique no nome da usina
       para abrir a ficha dela.</p>{% endcall %}</div>
       <p class="cn-pergunta">{{ tela.pergunta }}</p></div>
-    <div class="cn-frescor"><a class="gc-btn gc-btn--contorno cos-mon-tv" href="{{ url(tv='1', situacao=None, q=None) }}">Abrir no videowall</a>
+    <div class="cn-frescor">{% if cos_api %}<div class="cn-seg cos-mon-vista" role="group" aria-label="Como ver as usinas" data-cos-vista-sel hidden>
+      <button type="button" data-vista="curva" aria-pressed="true">Curva de hoje</button><button type="button" data-vista="barras" aria-pressed="false">Barras por inversor</button>
+    </div><br>{% endif %}<a class="gc-btn gc-btn--contorno cos-mon-tv" href="{{ url(tv='1', situacao=None, q=None) }}">Abrir no videowall</a>
       <br>Andamento da Ronda COS<br><span id="cos-mon-lido">{% if lido %}lido às <b>{{ lido }}</b>{% endif %}</span></div>
   </div>
   <div id="cos-mon-corpo">{% include "cos/_monitoramento_corpo.html" %}</div>

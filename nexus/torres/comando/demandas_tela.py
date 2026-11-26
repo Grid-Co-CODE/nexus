@@ -6,6 +6,7 @@ As rotas ficam debaixo de `/t/comando/caixa-de-entrada/demandas/...`: herdam a p
 todos (`de_todos`); debaixo de `/t/comando/demandas/` o portão por setor não acharia a tela e barraria quem só tem a Caixa.
 Fica num módulo à parte, importado no fim do `__init__` da torre (como as Ocorrências e a Visão do cliente do Campo).
 """
+import re
 from datetime import datetime, timedelta, timezone
 
 from flask import abort, current_app, jsonify, redirect, render_template, request, send_file, session
@@ -148,14 +149,23 @@ def demanda_nova():
     # vinda da janela da conversa da usina, no prontuário (13/11/2026): volta à janela, e não à Caixa de entrada
     jan = request.args.get("usina_jan", "")
     jan = jan if jan.isdigit() else ""
-    destino = na_raiz(f"/t/comando/conversa/usina/{jan}/janela?aba=pedir") if jan else _volta("pedi")
+    # vinda do chamado de Garantias (24/11/2026): volta ao Raio X do chamado, com o aviso na própria página
+    ch = request.args.get("chamado", "")
+    ch = ch if ch.isdigit() else ""
+    # vinda da usina das ETMs (25/11/2026): volta à tela ETMs, com o aviso nela; pelo mesmo caminho da do chamado
+    if not ch and request.args.get("etm") == "1":
+        ch = "etm"
+    destino = (na_raiz(f"/t/comando/conversa/usina/{jan}/janela?aba=pedir") if jan else
+               _no_chamado(ch, "erro", f"O formulário venceu: abra {'a usina' if ch == 'etm' else 'o chamado'} de novo. "
+                                       "Nada foi enviado.") if ch else
+               _volta("pedi"))
     # o tamanho ANTES de ler o corpo (o `_form_venceu` lê o formulário): o pedido maior que o teto não chega a ocupar a
     # memória nem o disco, e o sem tamanho declarado para no teto (a regra das Sugestões; revisão de 12/11/2026)
     teto = SUG.MAX_MB_TOTAL * SUG.MB + SUG.MB
     grande = ("erro", f"Os anexos passam de {SUG.MAX_MB_TOTAL} MB juntos. Nada foi enviado.")
     if (request.content_length or 0) > teto:
         session[_AVISO] = grande
-        return redirect(destino, code=303)
+        return redirect(_no_chamado(ch, *grande) if ch else destino, code=303)
     request.max_content_length = teto
     try:
         venceu = _form_venceu(destino)
@@ -167,9 +177,13 @@ def demanda_nova():
         arquivos = [(f.filename, f.stream) for f in request.files.getlist("anexos")]
     except RequestEntityTooLarge:
         session[_AVISO] = grande
-        return redirect(destino, code=303)
+        return redirect(_no_chamado(ch, *grande) if ch else destino, code=303)
     try:
         d = D.abrir(form, arquivos, _usuario())
+        if ch:
+            return redirect(_no_chamado(ch, "ok", "Demanda enviada: quem recebeu é avisado no sininho e a vê na Caixa de "
+                                                  "entrada" + ("." if ch == "etm" else "; a resposta volta para este chamado.")),
+                            code=303)
         if jan:
             session[_AVISO] = ("ok", "Demanda enviada. Quem recebeu é avisado no sininho; ela está aqui e em \"Que eu "
                                      "pedi\", na Caixa de entrada.")
@@ -177,18 +191,134 @@ def demanda_nova():
         session[_AVISO] = ("ok", "Demanda enviada. Ela aparece em \"Que eu pedi\", e quem recebeu é avisado no sininho.")
         return redirect(_volta("pedi", d.get("demanda_id") or ""), code=303)
     except D.Recusada as ex:
+        if ch:
+            return redirect(_no_chamado(ch, "erro", f"{ex}. Nada foi enviado"
+                                                    f"{'; anexe os arquivos de novo' if arquivos else ''}."), code=303)
         session[_AVISO] = ("erro", f"{ex}. Nada foi enviado{'; anexe os arquivos de novo' if arquivos else ''}.")
     except Exception as ex:      # noqa: BLE001 — banco fora, rede: a pessoa sabe que não foi
         current_app.logger.exception("demanda não gravada")
+        if ch:
+            return redirect(_no_chamado(ch, "erro", f"Não consegui gravar agora ({type(ex).__name__}). Nada foi "
+                                                    "enviado."), code=303)
         session[_AVISO] = ("erro", f"Não consegui gravar agora ({type(ex).__name__}). Nada foi enviado.")
     return redirect(destino, code=303)
+
+
+def _no_chamado(folio: str, tipo: str, texto: str, did: str = "") -> str:
+    """O Raio X do chamado de Garantias, com o aviso na página (o `?ok=`/`?erro=` que ele mostra) e no bloco das demandas;
+    com a demanda (`did`), ela volta aberta. `folio` "etm": a tela ETMs da Performance (a Nova demanda da usina, 25/11/2026),
+    com o mesmo aviso."""
+    from urllib.parse import urlencode
+    if folio == "etm":
+        return na_raiz("/t/performance/etm") + "?" + urlencode({tipo: texto}) + "#abertas"
+    q = {"de": "garantias", tipo: texto}
+    if did:
+        q["dm"] = did
+    return na_raiz(f"/t/engenharia/equipe/os/{folio}") + "?" + urlencode(q) + (f"#dm-{did}" if did else "#demandas")
+
+
+# ── a demanda que sai do chamado de Garantias (24/11/2026) ──────────────────────────────────────────────────────────
+# Pedido da equipe de chamados ("um chatzinho com os supervisores" dentro do chamado, no lugar do Teams, onde cinco
+# chamados se misturavam no mesmo canal) e o desenho que o Levi aprovou no mockup: no lugar do chat solto, a Nova demanda
+# da Caixa de entrada dentro do chamado. "Quando a pessoa escolhe supervisor de campo, já puxa automaticamente o
+# supervisor de campo daquela usina"; a usina e a OS vão vinculadas sozinhas, do chamado; o tema "Acompanhamento de
+# chamado", de 3 dias úteis, já vem escolhido. A demanda é a de sempre (o mesmo livro, os mesmos passos, a mesma Caixa).
+_RESERVA = re.compile(r"(Supervisor|Respons[aá]vel) \d+")    # o nome de reserva do cadastro, sem a chave
+
+
+def _supervisor_da_usina(b, uid) -> str:
+    """O nome de quem a Nova demanda do chamado já traz em "Para quem" (a tela acha a pessoa na Supervisão Campo pelo
+    nome; sem achar, fica em branco). Primeiro o Supervisor de Campo da região da usina; sem ele, o Responsável O&M da
+    usina (os supervisores de antes). Medido em 24/11/2026: as 8 regiões de campo do cadastro estão com a vaga de
+    supervisor aberta, e só pela região nenhum chamado trazia ninguém; pelo responsável, 74 das 144 usinas trazem uma
+    pessoa da Supervisão Campo. Nome de reserva do cadastro ("Supervisor 92", sem a chave) não vale."""
+    from ...campo import visao
+    r = b.info_regiao(b.regiao_da_usina(uid))
+    for nome in ((r["supervisor"] if r.get("supervisor_id") else ""), b.responsavel_da_usina(uid)):
+        nome = (nome or "").strip()
+        if nome and nome not in (visao.VAGA, visao.SEM_RESPONSAVEL) and not _RESERVA.fullmatch(nome):
+            return nome
+    return ""
+
+
+def contexto_do_chamado(folio: int) -> dict:
+    """O bloco "Demandas do chamado" do Raio X e a Nova demanda dele: os setores e os temas (para as listas digitáveis),
+    a usina e a OS do chamado, o supervisor de campo da usina (o nome: a tela acha a pessoa na lista de quem tem setor) e
+    as demandas que citam a OS."""
+    from ...cadastro import setor_ids as SID
+    from ...casca import sugestoes as SUG
+    from ...comando import temas_padrao as TP
+    falta = D.faltam_chaves()
+    out = {"falta": falta, "erro": "", "tem_login": bool(_meu_hmac()), "codigo": _codigo(), "novo_id": D.novo_id("d"),
+           "folio": int(folio), "usina": None, "supervisor": "", "setor_sugerido": str(SID.SUPERVISAO_CAMPO),
+           "tema_padrao": "", "setores": [], "temas": [], "demandas": [], "abertas": 0, "proximo": "",
+           "acao": na_raiz(f"/t/comando/caixa-de-entrada/demandas/nova?chamado={int(folio)}"),
+           "pessoas_url": na_raiz("/t/comando/caixa-de-entrada/demandas/pessoas"),
+           "anexo": {"aceitos": SUG.aceitos(), "max_mb": SUG.MAX_MB_ARQUIVO, "max_arquivos": SUG.MAX_ARQUIVOS,
+                     "max_total": SUG.MAX_MB_TOTAL},
+           "limites": {"titulo": D.TITULO_MAX, "texto": D.TEXTO_MAX}}
+    if falta:
+        return out
+    hoje = _hoje()
+    try:
+        lido = D.ler()
+        lst = D.lista(hoje, lido)
+        temas = D.temas()
+    except Exception as ex:      # noqa: BLE001 — o banco fora: o bloco diz, o chamado abre igual
+        current_app.logger.exception("demandas do chamado: a lista não abriu")
+        return dict(out, erro=type(ex).__name__)
+    meu, aberta = _meu_hmac(), request.args.get("dm") or ""
+    doc = [dict(d, pendente=_pendente(d), caixa=na_raiz(CAIXA) + f"?d={d['demanda_id']}#demandas",
+                eu_recebo=bool(meu) and d["para_hmac"] == meu, eu_pedi=bool(meu) and d["de_hmac"] == meu,
+                aberta_agora=d["demanda_id"] == aberta,
+                passo_url=na_raiz(f"{CAIXA}/demandas/{d['demanda_id']}/passo?chamado={int(folio)}"))
+           for d in lst if int(folio) in (d.get("oss") or [])]
+    abertas = [d for d in doc if d["estado"]["aberta"]]
+    prox = min((d["estado"]["prazo"] for d in abertas if d["estado"]["prazo"]), default=None)
+    # os setores que recebem (os que têm tema) e as áreas deles ("Chamados", dentro da Performance)
+    try:
+        from ...auth import setor_telas as ST
+        from ...dados.conexao import banco
+        nome_setor = {s["setor_id"]: s["nome"] for s in (ST._setores_no_clique(*banco()).get("setores") or [])}
+    except Exception:            # noqa: BLE001 — sem os nomes, os setores saem pelo número
+        nome_setor = {}
+    setores = {}
+    for t in temas:
+        sid = t["setor_id"]
+        valor = f"{sid}:{t['area']}" if t.get("area") else str(sid)
+        setores.setdefault(valor, t["area"] or nome_setor.get(sid) or f"Setor {sid}")
+    padrao = TP.codigo(SID.SUPERVISAO_CAMPO, *TP.TEMA_DO_CHAMADO)
+    out.update(demandas=doc, abertas=len(abertas), proximo=dia_txt(prox) if prox else "",
+               novo_evento=lambda: D.novo_id("e"), sozinha_dias=R.CONCLUI_SOZINHA_DIAS, passo_max=D.PASSO_MAX,
+               setores=sorted(setores.items(), key=lambda kv: kv[1].lower()),
+               temas=[{"tema_id": t["tema_id"], "setor": (f"{t['setor_id']}:{t['area']}" if t.get("area")
+                                                          else str(t["setor_id"])),
+                       "nome": f"{t['nome']} ({t['prazo_dias_uteis']} {'dia útil' if t['prazo_dias_uteis'] == 1 else 'dias úteis'})"}
+                      for t in temas],
+               tema_padrao=padrao if any(t["tema_id"] == padrao for t in temas) else "")
+    # a usina do chamado (o retrato das OS abertas) e o supervisor de campo dela (a região de campo da usina)
+    try:
+        from ...campo import visao
+        uid = D.usina_da_os(folio)
+        if uid:
+            b = visao._Base()
+            out["usina"] = (uid, (b.por_id.get(uid) or {}).get("nome") or f"usina {uid}")
+            out["supervisor"] = _supervisor_da_usina(b, uid)
+    except Exception:            # noqa: BLE001 — sem a usina, a demanda vai sem ela e sem a OS
+        current_app.logger.exception("demandas do chamado: a usina da OS %s não saiu", folio)
+    return out
 
 
 @bp.route("/caixa-de-entrada/demandas/<demanda_id>/passo", methods=["POST"])
 def demanda_passo(demanda_id):
     """Um passo da demanda: o botão diz qual (`acao`); o texto vai junto quando o passo pede."""
     aba = request.form.get("aba") or "para"
-    destino = _volta(aba, demanda_id)
+    # vindo do chamado de Garantias (24/11/2026): volta ao Raio X do chamado, com a demanda aberta e o aviso na página
+    ch = request.args.get("chamado", "")
+    ch = ch if ch.isdigit() else ""
+    did = demanda_id if D.ID_DEMANDA.fullmatch(demanda_id or "") else ""
+    destino = (_no_chamado(ch, "erro", "O formulário venceu: abra o chamado de novo. Nada foi gravado.", did) if ch
+               else _volta(aba, demanda_id))
     venceu = _form_venceu(destino)
     if venceu:
         return venceu
@@ -196,11 +326,19 @@ def demanda_passo(demanda_id):
     try:
         os_n = request.form.get("os", type=int)
         D.registrar(demanda_id, acao, request.form.get("texto") or "", _usuario(), request.form.get("novo_id"), os=os_n)
-        session[_AVISO] = ("ok", f"Feito: {D.ROTULO_PASSO.get(acao, acao)}" + (f", com a OS {os_n} atrelada." if os_n else "."))
+        feito = f"Feito: {D.ROTULO_PASSO.get(acao, acao)}" + (f", com a OS {os_n} atrelada." if os_n else ".")
+        if ch:
+            return redirect(_no_chamado(ch, "ok", feito, did), code=303)
+        session[_AVISO] = ("ok", feito)
     except D.Recusada as ex:
+        if ch:
+            return redirect(_no_chamado(ch, "erro", f"{ex}. Nada foi gravado.", did), code=303)
         session[_AVISO] = ("erro", f"{ex}. Nada foi gravado.")
     except Exception as ex:      # noqa: BLE001
         current_app.logger.exception("passo da demanda não gravado")
+        if ch:
+            return redirect(_no_chamado(ch, "erro", f"Não consegui gravar agora ({type(ex).__name__}). Nada foi gravado.",
+                                        did), code=303)
         session[_AVISO] = ("erro", f"Não consegui gravar agora ({type(ex).__name__}). Nada foi gravado.")
     return redirect(destino, code=303)
 

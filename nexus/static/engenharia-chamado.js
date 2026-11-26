@@ -103,3 +103,148 @@
     if (b) copiar(b);
   });
 })();
+
+/* A Nova demanda do chamado (24/11/2026; o mockup aprovado): a demanda da Caixa de entrada dentro do chamado de Garantias.
+   As listas são as digitáveis do Nexus (`lista-sugestoes.js`, input[data-lista]): o texto escolhido vira o valor escondido
+   (o setor, a pessoa, o tema). Ao abrir, as pessoas com setor vêm do servidor (a mesma lista da Caixa); o setor da
+   Supervisão Campo já vem escolhido, com o supervisor de campo da usina (achado pelo nome do cadastro) e o tema
+   "Acompanhamento de chamado" (Levi: "quando a pessoa escolhe supervisor de campo, já puxa automaticamente o supervisor
+   de campo daquela usina"). A usina e a OS vão do chamado, fixas no formulário. */
+(function () {
+  var veu = document.querySelector('[data-dm-ch]');
+  if (!veu) return;
+  var form = veu.querySelector('[data-dm-ch-form]'), dados = {};
+  try { dados = JSON.parse(document.getElementById('dm-ch-dados').textContent) || {}; } catch (e) { dados = {}; }
+  var setores = dados.setores || [], temas = dados.temas || [], pessoas = null, carregando = null;
+  var sem = (window.ListaSugestoes && window.ListaSugestoes.sem) ||
+    function (s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim(); };
+  function campo(k) { return form.querySelector('[data-dm-ch-t="' + k + '"]'); }
+  function valor(k) { return form.querySelector('[data-dm-ch-v="' + k + '"]'); }
+  var msg = form.querySelector('[data-dm-ch-msg]'), sug = form.querySelector('[data-dm-ch-sug]');
+  function dizer(t) { msg.textContent = t || ''; msg.hidden = !t; }
+  // a lista de um campo: um <script type="application/json"> com id próprio (a lista-sugestoes guarda cada id que leu)
+  function lista(id, nomes) {
+    var no = document.getElementById(id);
+    if (!no) {
+      no = document.createElement('script'); no.type = 'application/json'; no.id = id;
+      no.textContent = JSON.stringify(nomes); document.body.appendChild(no);
+    }
+    return id;
+  }
+  function idDe(prefixo, v) { return prefixo + String(v).replace(/[^a-z0-9]+/gi, '-'); }
+  // o que a pessoa vê de cada setor e o valor que vai: "Supervisão Campo" vira "7"; a área "Chamados", "2:Chamados"
+  function setorDoTexto(t) {
+    var a = sem(t), s = setores.filter(function (x) { return sem(x[1]) === a; })[0];
+    return s ? s[0] : '';
+  }
+  function pessoasDoSetor(v) {
+    if (!pessoas) return [];
+    var partes = String(v).split(':'), sid = parseInt(partes[0], 10), area = partes.slice(1).join(':');
+    var ps = pessoas.filter(function (p) { return p.setor_id === sid; });
+    if (area) {                                    // a área com gente marcada recebe só nela (a regra da Caixa)
+      var marcadas = ps.filter(function (p) { return (p.areas || []).indexOf(area) >= 0; });
+      if (marcadas.length) ps = marcadas;
+    }
+    return ps;
+  }
+  function temasDoSetor(v) { return temas.filter(function (t) { return t.setor === String(v); }); }
+  // o nome do cadastro (o curto, "Nome padrão") e o do Fracttal (o completo): o mesmo 1º nome, e as palavras do mais
+  // curto aparecem no mais comprido, na mesma ordem ("Fulana Souza" acha "Fulana de Tal Souza")
+  function mesmoNome(a, b) {
+    var x = sem(a).split(' '), y = sem(b).split(' ');
+    if (!x[0] || !y[0] || x[0] !== y[0]) return false;
+    var curto = x.length <= y.length ? x : y, longo = curto === x ? y : x, i = 0;
+    longo.forEach(function (w) { if (i < curto.length && w === curto[i]) i++; });
+    return i === curto.length;
+  }
+  function aoPessoa() {
+    var a = sem(campo('pessoa').value), v = valor('setor').value;
+    var p = pessoasDoSetor(v).filter(function (x) { return sem(x.nome) === a; })[0];
+    valor('pessoa').value = p ? p.hmac : '';
+  }
+  function aoTema() {
+    var a = sem(campo('tema').value), v = valor('setor').value;
+    var t = temasDoSetor(v).filter(function (x) { return sem(x.nome) === a; })[0];
+    valor('tema').value = t ? t.tema_id : '';
+  }
+  function aoSetor(manter) {
+    var v = setorDoTexto(campo('setor').value), mudou = valor('setor').value !== v;
+    var p = campo('pessoa'), t = campo('tema');
+    valor('setor').value = v;
+    sug.hidden = true;
+    if (!v) {
+      if (!manter) { p.value = ''; valor('pessoa').value = ''; t.value = ''; valor('tema').value = ''; }
+      p.setAttribute('data-lista', 'dm-ch-pessoas-vazio');
+      t.setAttribute('data-lista', 'dm-ch-temas-vazio');
+      p.placeholder = t.placeholder = 'Escolha o setor primeiro';
+      return;
+    }
+    p.setAttribute('data-lista', pessoas ? lista(idDe('dm-ch-p-', v), pessoasDoSetor(v).map(function (x) { return x.nome; }))
+                                         : 'dm-ch-pessoas-vazio');
+    t.setAttribute('data-lista', lista(idDe('dm-ch-t-', v), temasDoSetor(v).map(function (x) { return x.nome; })));
+    p.placeholder = pessoas ? 'Digite ou escolha' : 'Carregando as pessoas…';
+    t.placeholder = 'Digite ou escolha';
+    if (mudou && !manter) { p.value = ''; valor('pessoa').value = ''; t.value = ''; valor('tema').value = ''; }
+    if (v === String(dados.sugerido)) {
+      var sup = dados.supervisor ? pessoasDoSetor(v).filter(function (x) { return mesmoNome(x.nome, dados.supervisor); })[0] : null;
+      if (sup && !p.value) { p.value = sup.nome; aoPessoa(); }
+      if (dados.supervisor) {
+        sug.textContent = 'Sugerido: ' + (sup ? sup.nome : dados.supervisor) + ', supervisor de campo da usina' +
+          (sup || !pessoas ? '' : ' (não achei no setor com esse nome: escolha na lista)');
+        sug.hidden = false;
+      }
+      var tp = temas.filter(function (x) { return x.tema_id === dados.tema_padrao; })[0];
+      if (tp && !t.value) { t.value = tp.nome; aoTema(); }
+    }
+  }
+  campo('setor').addEventListener('input', function () { aoSetor(false); });
+  campo('pessoa').addEventListener('input', aoPessoa);
+  campo('tema').addEventListener('input', aoTema);
+  function carregar() {
+    if (pessoas) return Promise.resolve();
+    if (carregando) return carregando;
+    carregando = fetch(dados.pessoas_url, {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        pessoas = (j && j.pessoas) || [];
+        if (!j || j.ok === false) dizer('Não consegui ler a lista de pessoas agora: recarregue a página.');
+      })
+      .catch(function () { pessoas = []; dizer('Não consegui ler a lista de pessoas agora: recarregue a página.'); })
+      .then(function () { carregando = null; aoSetor(true); });
+    return carregando;
+  }
+  function abrir() {
+    veu.hidden = false;
+    dizer('');
+    if (!campo('setor').value) {
+      var s = setores.filter(function (x) { return x[0] === String(dados.sugerido); })[0];
+      if (s) campo('setor').value = s[1];
+    }
+    aoSetor(true);
+    carregar().then(function () {
+      var alvo = !valor('setor').value ? campo('setor') : !valor('pessoa').value ? campo('pessoa')
+        : !valor('tema').value ? campo('tema') : form.querySelector('[name="titulo"]');
+      alvo.focus();
+    });
+  }
+  function fechar() { veu.hidden = true; }
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('[data-dm-ch-abrir]')) { abrir(); return; }
+    if (e.target.closest('[data-dm-ch-fechar]') || e.target === veu) fechar();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !veu.hidden && !document.querySelector('.ls-menu:not([hidden])')) fechar();
+  });
+  form.addEventListener('submit', function (e) {
+    aoPessoa(); aoTema();
+    if (!valor('setor').value || !valor('pessoa').value || !valor('tema').value) {
+      e.preventDefault();
+      dizer(!valor('setor').value ? 'Escolha o setor da lista.' : !valor('pessoa').value ? 'Escolha a pessoa da lista do setor.'
+        : 'Escolha o tema da lista do setor.');
+    }
+  });
+  if (location.hash === '#demandas' && /[?&](ok|erro)=/.test(location.search)) {
+    var b = document.getElementById('demandas');
+    if (b) b.scrollIntoView();
+  }
+})();

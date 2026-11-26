@@ -41,6 +41,10 @@
 <link rel="stylesheet" href="/os/static/abas.css">
 <script src="/os/static/os_busca.js" defer></script>
 <script src="/os/static/carga.js"></script>{# sem defer: as telas usam o OsCarga já na carga #}
+{# a sessão que cai no meio da tela abre o pop-up de login, e o que está preenchido fica (24/11/2026, static/relogin.js). Sem
+   defer e antes das telas: ele embrulha o fetch. Fora do login (que não tem script na tela) #}
+{% if not sem_abas %}<meta name="os-conta-email" content="{{ (conta or {}).get('email') or '' }}">
+<script src="/os/static/relogin.js"></script>{% endif %}
 {# se o carga.js não chegar, as buscas seguem sem o círculo — nenhuma tela pode parar por causa dele #}
 <script>window.OsCarga = window.OsCarga || {buscar: function (u, o) { return fetch(u, o); }, durante: function (p) { return p; },
   girar: function () {}, mostrar: function () {}, esconder: function () {}, token: function () { return ""; }};</script>

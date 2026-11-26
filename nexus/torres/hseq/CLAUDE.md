@@ -1,8 +1,8 @@
 # CLAUDE.md — Segurança · HSEQ
 
 Torre do menu "Segurança · HSEQ". Telas vivas: a **Mesa da Segurança** (a primeira, 24/10/2026), **Extintores** (com o
-relatório de cada cliente e usina em PDF e Excel, a foto diária dos fora do em dia e as tratativas, desde 24/11/2026), **EPI e EPC** (com o mesmo relatório, desde 23/11/2026), **APR e PT** (09/10/2026) e **Colaboradores** (05/11/2026, as pessoas do cadastro e a documentação de segurança de cada uma). Riscos da semana, DSS e
-Incidentes ainda são placeholder (a view com a mesma rota vence a genérica). As contas moram em `nexus/hseq/`; a view e o
+relatório de cada cliente e usina em PDF e Excel, a foto diária dos fora do em dia e as tratativas, desde 24/11/2026), **EPI e EPC** (com o mesmo relatório, desde 23/11/2026), **APR e PT** (09/10/2026), **Colaboradores** (05/11/2026, as pessoas do cadastro e a documentação de segurança de cada uma) e **Incidentes** (24/11/2026, os relatos de segurança do App de Campo). Riscos da semana e DSS
+ainda são placeholder (a view com a mesma rota vence a genérica). As contas moram em `nexus/hseq/`; a view e o
 template, aqui.
 
 **O desenho da Segurança (24/10/2026, escolhido pelo Levi numa amostra com dado real).** Os filtros em squircle; os
@@ -664,3 +664,36 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
 com a assinatura e a decisão que volta, quem pode e quem não pode, o PDF da APR mais perto da PT, o vínculo COS) e os
 testes de PT do Campo (`test_campo_visao.py`, `test_campo_central_supervisor.py`), que agora abrem `/t/hseq/apr-pt`.
 
+## Incidentes (24/11/2026)
+
+Levi, no chat do App de Campo (23/11/2026): "a pessoa vai lá no início, consegue relatar [...] entrará na parte de
+segurança do Nexus". O App ganhou o botão vermelho com a sirene no topo (v376, 23/11) e o "Relatar segurança" no Perfil
+(v377): o técnico relata **acidente, incidente, incêndio, condição insegura ou EPI e EPC**, com quando, a usina (o nome
+do local no Fracttal), o que aconteceu, as pessoas envolvidas (só a função e a quantidade, sem nome), até 3 fotos e a
+ação imediata. Acidente e incêndio avisam a TST por e-mail na hora, pelo App.
+- **O App é a fonte; o Nexus só lê e não grava nada** (`nexus/hseq/relatos_seguranca.py`): o texto livre pode citar
+  nomes e a API do banco tem leitura aberta (regra 8 de `nexus/dados/CLAUDE.md`), o mesmo caminho dos relatos nas
+  Sugestões (`nexus/casca/relatos_app.py`). Por isso não há fato nem livro no catálogo: a lista fica numa cópia de 1
+  minuto, na memória; as fotos passam pelo Nexus na hora (`/t/hseq/incidentes/<id>/foto/<n>`), sem ficar guardadas.
+- **O contrato v1** (do App, 23/11/2026; o texto inteiro no topo de `relatos_seguranca.py`): `GET
+  .../api/app/nexus/seguranca/relatos` e `.../relatos/<id>/foto/<n>`, com o cabeçalho `X-Nexus-Chave`. A chave e o
+  endereço são os das Sugestões (`NEXUS_APP_RELATOS_CHAVE`, em Base → Chaves do Nexus; o endereço troca o `/relatos` do
+  fim por `/seguranca/relatos`). Sem a chave o Nexus nem chama o App e a tela diz o que falta. O App que não responde,
+  recusa a chave ou muda a versão do contrato vira aviso no alto (a lista é a da última leitura boa), nunca erro.
+- **A tela**: só a tabela, do mais novo para o mais antigo (Quando, Tipo, Usina com o cliente, Responsável UFV, Pessoas
+  envolvidas, Relatado por, Aviso à TST); a linha abre o relato (o que aconteceu, a ação imediata, as fotos em
+  miniatura que abrem inteiras, o registro e a versão do App); no celular, cartões. Os números e as regras ficam no "!".
+  Os filtros são os da APR e PT (o padrão do Histórico de OS, `static/filtros-os.js`): Tipo (na ordem da gravidade),
+  Cliente, Usina e Responsável UFV, de vários valores, em cascata, com a conta; mais a busca.
+- **A usina** sai do nome do local que o App escreve, pelo de-para "Fracttal · Classificação 1" do cadastro
+  (`visao.usinas_do_fracttal`, o mesmo da APR e PT), com o cliente e o Responsável UFV da ficha. O local sem ligação
+  fica com o nome do App sem o cliente e a UF (`visao.nome_da_usina_crua`), "sem responsável", e vai listado no "!"
+  para ligar em Base → Ligações.
+- **O e-mail do autor não aparece** (a tela mostra o nome e o papel), nem a chave, nem o endereço do App.
+- **Ainda não há andamento** (em análise, tratado, encerrado): se a Segurança quiser devolver ao técnico, é propor a
+  rota de resposta ao chat do App, como o `responder` das Sugestões.
+
+**Como provar.** `python -m pytest -q tests/test_hseq_incidentes.py` (sem a chave nada é chamado; a lista com a usina do
+cadastro e sem o e-mail nem a chave; os filtros de vários valores; o App fora, noutra versão ou recusando a chave vira
+aviso; o relato sem id ou sem texto fica fora; a foto só passa quando é imagem). Na tela, sem a chave no PC: uma cópia de
+prova com um App falso local no contrato v1 (relatos fictícios), como a de 24/11/2026.

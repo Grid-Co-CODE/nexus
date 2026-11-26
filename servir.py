@@ -54,6 +54,10 @@ if __name__ == "__main__":
     # o e-mail semanal das pendências da Segurança, que o App de Campo manda (24/10/2026; ligado desde 30/10, NEXUS_HSEQ_EMAIL_AUTO=0 desliga)
     from nexus.hseq import email_semanal
     email_semanal.ligar(app)
+    # os e-mails que o próprio Nexus manda (25/11/2026): a fila, a agenda dos e-mails criados pela tela e o registro;
+    # roda em toda máquina servida, mas só envia onde a chave NEXUS_EMAIL_ENVIAR é 1 (o servidor)
+    from nexus.emails import fila as emails_fila
+    emails_fila.ligar(app)
     # as telas quentes depois de cada deploy (13/10/2026: a 1ª abertura do servidor recém-subido levou 27 s; 5 min)
     from nexus.auth import pre_carga
     pre_carga.aquecer_ao_subir(app)

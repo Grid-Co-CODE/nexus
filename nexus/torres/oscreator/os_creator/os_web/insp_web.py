@@ -16,6 +16,7 @@ from __future__ import annotations
 import datetime as dt
 
 import chamado_insp_spec as ci
+from chamado_garantia.regras import TIPOS_ORIGEM
 
 from .tradicional_web import BRT, agora_brt, data_brt
 
@@ -36,6 +37,39 @@ COR_STATUS = {"Em Processo": "#d9a441", "Em Verificação": "#57b6f5",
 ERRO_ATIVO = "Escolha o ativo."
 ERRO_MARCA = "Escolha a marca do ativo."
 ERRO_RESP = "Escolha o responsável em campo."
+
+# A OS PAI DO CHAMADO É A DE ORIGEM (25/11/2026, Levi: "Está tendo casos de OS de inspeção gerando outras OS de inspeção na
+# parte de chamados"). O "Abrir chamado" do card da OS (10/11/2026) aparecia em TODA OS, e a Inspeção virava pai de outra
+# Inspeção: uma inspeção de tracker ganhou três filhas Inspeção em dois dias (duas canceladas), uma de inversor ganhou
+# outra no mesmo dia, e uma corretiva de tracker ganhou duas cadeias de chamado com 4 dias entre elas. O App só abre
+# chamado de corretiva, corretiva emergencial e religamento (`chamado_garantia.TIPOS_ORIGEM`, conferido de novo no
+# /chamado/criar dele) e não abre outro no ativo com chamado em aberto (a v361); a web segue as mesmas duas regras: o
+# botão só aparece na OS de origem, a OS pai de outro tipo é recusada (ao escolher e ao criar) e o ativo com chamado em
+# aberto não ganha outro (`chamado_aberto.py`).
+_ORIGEM = {t.lower() for t in TIPOS_ORIGEM}
+
+
+def pai_de_origem(tipo) -> bool:
+    """A OS com este tipo de tarefa pode ser a OS pai de um chamado? A OS com tarefas de tipos diferentes vem como
+    "A / B" (`_meta_tarefa_por_os`) e vale se uma delas for de origem."""
+    return any(t.strip().lower() in _ORIGEM for t in str(tipo or "").split("/"))
+
+
+def erro_pai(tipo, folio=None) -> str:
+    """O recado da OS pai que não é de origem (ao escolher pelo nº ou pelas Últimas OS, e na criação)."""
+    qual = ("A OS %s" % folio) if folio else "A OS pai escolhida"
+    return ("%s é %s. A OS pai do chamado é a corretiva, a corretiva emergencial ou o religamento em que a falha "
+            "apareceu: escolha essa OS ou crie sem OS pai." % (qual, tipo or "de outro tipo"))
+
+
+def erro_chamado_aberto(ab: dict) -> str:
+    """O recado do ativo que já tem chamado em aberto (a foto do Nexus que o App também lê)."""
+    ab = ab or {}
+    partes = [("inspeção %s" % ab["inspecao"]) if ab.get("inspecao") else "",
+              ("administrativa %s" % ab["adm"]) if ab.get("adm") else ""]
+    qual = " e ".join(p for p in partes if p) or "de garantia"
+    return ("Este ativo já tem chamado em aberto (%s). Siga por ele no Acompanhamento de chamados: outro chamado do "
+            "mesmo ativo duplicaria a cadeia." % qual)
 
 
 # ── o catálogo da inspeção ──────────────────────────────────────────────────────────────────────

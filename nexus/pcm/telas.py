@@ -23,6 +23,7 @@ from . import gestao_confiab as GC, observacoes as O
 from ..cadastro import setor_ids as SID
 from . import atribuicoes as AT, tecnicos_usina as TU
 from . import fama_quadro as FQ
+from . import copias_pcm as CP
 from . import nota_os as NO, publicar as PB, quadro as Q, semana as S
 from ..auth import setor_telas as ST
 from ..prefixo import na_raiz
@@ -131,6 +132,8 @@ def _ctx_gerar(cfg, rodada=None, erro=None, semana=None, ok=None) -> dict:
     # as rodadas que têm a planilha para baixar (19/10/2026: "tem que ter a opção de baixar!")
     com_planilha = {u["id"] for u in ultimas + ([sel] if sel else []) if geracao.planilha(cfg, u.get("id") or "")}
     return {"conf": geracao.conferir(cfg, semana), "ultimas": ultimas, "sel": sel, "com_planilha": com_planilha,
+            # o motor daqui atrás do do PCM (24/11/2026): a semana gerada aqui pode sair diferente da do robô
+            "copias_pcm": CP.diferentes(cfg, "motor"),
             "admin": bool(session.get("admin")), "pode": pode_programar(), "app_sel": app_sel,
             "pode_publicar": bool(sel) and not PB.motivos_para_nao_publicar(cfg, sel["id"]),
             "log": geracao.log(cfg, sel["id"], 40) if sel else "", "semana_sugerida": semana,
@@ -729,7 +732,12 @@ def tecnicos():
     cfg = current_app.config
     ctx = TU.montar(cfg, request.args)
     aviso = session.pop("pcm_tecnicos_aviso", None) or {}
-    return render_template("pcm/tecnicos.html", **ctx, pode=pode_programar() and not ctx["erro_cadastro"],
+    # a aba Histórico (24/11/2026): todas as decisões, no modelo do Histórico de OS
+    hist = None
+    if ctx["ver"] == "historico" and not ctx["erro_cadastro"]:
+        base = TU.ler_base()
+        hist = TU.historico_geral(cfg, base, TU.pessoas_de_campo(base, cfg), request.args)
+    return render_template("pcm/tecnicos.html", **ctx, hist=hist, pode=pode_programar() and not ctx["erro_cadastro"],
                            admin=bool(session.get("admin")),
                            ok=aviso.get("ok", ""), erro_acao=aviso.get("erro", ""),
                            algum_filtro=any(ctx["pedido"].values()))
@@ -746,6 +754,36 @@ def tecnicos_decidir():
     volta = {k: str(f.get("v_" + k))[:80] for k in ("ver", "todas") + TU.FILTROS if f.get("v_" + k)}
     try:
         session["pcm_tecnicos_aviso"] = {"ok": _tecnicos_decidir(cfg, f)}
+    except (AT.Recusada, TU.SemCadastro) as ex:
+        session["pcm_tecnicos_aviso"] = {"erro": str(ex)}
+    return redirect(na_raiz("/t/pcm/tecnicos-por-usina") + ("?" + urlencode(volta) if volta else ""), code=303)
+
+
+def tecnicos_usinas_do_tecnico():
+    """As usinas que o técnico vê, escolhidas de uma vez na aba Por técnico (24/11/2026; Levi: "clicar no técnico e
+    escolher as usinas, que ele vai ver"): põe como fixo as marcadas que ele não tem e tira as desmarcadas, numa gravação
+    só (`TU.pedidos_do_tecnico`, montados dentro da trava). Quem `pode_programar`."""
+    cfg = current_app.config
+    if not pode_programar() or _de_outro_site():
+        abort(403)
+    f = request.form
+    volta = {k: str(f.get("v_" + k))[:80] for k in ("ver", "todas") + TU.FILTROS if f.get("v_" + k)}
+    try:
+        pid = _num_arg(f.get("pessoa_id"))
+        base = TU.ler_base()
+        pessoas = TU.pessoas_de_campo(base, cfg)
+        if not pid or pid not in pessoas:
+            raise AT.Recusada("Essa pessoa não é de campo no cadastro: atualize a página. Nada foi gravado.")
+        antes = {uid for (uid, p, _papel) in AT.atuais(AT.ler(cfg, forcar=True), AT.hoje_id()) if p == pid}
+        quer = {u for u in (_num_arg(x) for x in f.getlist("usina")) if u}
+        fr = TU._fracttal(base, est=AT.ler(cfg), hoje=AT.hoje_id())
+        n = AT.decidir_varias(cfg, TU.pedidos_do_tecnico(base, pessoas, fr, pid, f.getlist("usina")), _usuario(), "tela")
+        postas, tiradas = len(quer - antes), len(antes - quer)
+        nome = pessoas[pid]["nome"]
+        partes = [f"{postas} {'usina posta' if postas == 1 else 'usinas postas'}" if postas else "",
+                  f"{tiradas} {'tirada' if tiradas == 1 else 'tiradas'}" if tiradas else ""]
+        session["pcm_tecnicos_aviso"] = {"ok": (f"{nome}: {' e '.join(x for x in partes if x)}." if n else
+                                                f"{nome}: nada mudou.")}
     except (AT.Recusada, TU.SemCadastro) as ex:
         session["pcm_tecnicos_aviso"] = {"erro": str(ex)}
     return redirect(na_raiz("/t/pcm/tecnicos-por-usina") + ("?" + urlencode(volta) if volta else ""), code=303)
@@ -831,6 +869,7 @@ def registrar_pcm(bp) -> None:
     bp.add_url_rule("/tecnicos-por-usina", view_func=tecnicos)
     bp.add_url_rule("/tecnicos-por-usina/decidir", view_func=tecnicos_decidir, methods=["POST"])
     bp.add_url_rule("/tecnicos-por-usina/reemitir-tudo", view_func=tecnicos_reemitir_tudo, methods=["POST"])
+    bp.add_url_rule("/tecnicos-por-usina/usinas-do-tecnico", view_func=tecnicos_usinas_do_tecnico, methods=["POST"])
     bp.add_url_rule("/tecnicos-por-usina/carga-inicial", view_func=tecnicos_carga_inicial, methods=["POST"])
     bp.add_url_rule("/tecnicos-por-usina/historico", view_func=tecnicos_historico)
 

@@ -56,6 +56,11 @@ numa moldura em `nexus/pcm/relatorio_exec` (tela `pcm-executivo`, ver o CLAUDE.m
   o resumo de capacidade, as pendências e a qualidade (Alerta), a engenharia e o backlog do fechamento ficam da empresa
   toda, como lá; o backlog do diário com recorte é o das tarefas do recorte (como lá).
 - **A logo** é a do PCM (`static/grid-h-verde.png`), embutida na folha para ela abrir sozinha.
+- **As OS do backoffice saem de tudo** (24/11/2026, reunião do PCM: "as pessoas do backoffice não devem aparecer no
+  relatório"): `dados.sem_backoffice`, no `montar`, tira das linhas, das pendentes e das tarefas toda OS com a marca
+  `bo` que o robô do PCM grava pela lista do Nexus (PCM → Gerar a semana → Backoffice), como o executivo faz desde
+  09/11 (`rexBoOS`). O Python do PCM não tirava. A preventiva fora da planilha já conta no plano sozinha: desde
+  16/11 o robô a grava com `foraDoPlano: false`. Prova: `tests/test_relatorios_pcm_backoffice.py`.
 
 ## Como provar
 

@@ -49,7 +49,7 @@ from collections import Counter
 
 from . import tipos
 from .calculos import ERRO
-from .esquema import ENTIDADES, VINCULO_CAMPO, VINCULO_SUPERVISOR_CAMPO
+from .esquema import ENTIDADES, VINCULO_CAMPO, VINCULO_GESTOR, VINCULO_SUPERVISOR_CAMPO
 from .servico import chave_texto
 
 ID = "ID da usina"
@@ -74,7 +74,13 @@ COLUNAS = {
     "Código equipamento (CMMS)": "codigo_equipamento_cmms", "Acesso comando remoto": "acesso_comando_remoto",
     "Acesso visualização": "acesso_visualizacao", "Databook": "databook",
 }
-REFS = {"Cliente": "cliente", "Equipe": "equipe", "Responsável O&M": "responsavel_om"}
+# o "Supervisor de contrato" do CSV é o Gestor de contrato da ficha (23/11/2026, Levi: "pode ligar, chama de Gestor de
+# contrato"): até então a coluna ficava de fora, e o gestor seguia o da importação de 07/10 (188 de 258 usinas diferentes
+# do CSV de 23/11, com dois supervisores de campo ainda como gestores)
+REFS = {"Cliente": "cliente", "Equipe": "equipe", "Responsável O&M": "responsavel_om",
+        "Supervisor de contrato": "gestor_contrato"}
+# o vínculo da ficha que nasce para a pessoa que ainda não tem uma, por coluna
+VINCULO_DA_REF = {"responsavel_om": VINCULO_SUPERVISOR_CAMPO, "gestor_contrato": VINCULO_GESTOR}
 COL_PESSOAS = "Pessoas da equipe"
 CAMPO_PESSOAS = "pessoas"                   # a "coluna" das fichas de pessoas na prévia (a caixa de marcar dela)
 NOVA_PESSOA = "nova-pessoa:"                # a ficha que nasce nesta aplicação (a usina aponta para ela)
@@ -375,7 +381,8 @@ def proposta(linhas: list, srv, cabecalho=None, fracttal=None) -> dict:
                     continue
             anotar(r, k, form, cid, texto, antes, texto)
         # as referências: o cliente só casa com quem existe; a equipe nova é criada; o Responsável O&M que não tem ficha
-        # ganha uma (Supervisor de Campo), como a importação antiga fazia: o CSV manda, a usina não segue com o antigo
+        # ganha uma (Supervisor de Campo), como a importação antiga fazia, e o Gestor de contrato também (com esse
+        # vínculo): o CSV manda, a usina não segue com o antigo
         for col, cid in REFS.items():
             texto = _limpo(ln.get(col))
             if not texto or texto == "0" or col not in ln:
@@ -399,7 +406,7 @@ def proposta(linhas: list, srv, cabecalho=None, fracttal=None) -> dict:
                 if _casar_pessoa(texto, pessoas)[0] is None and eh_rotulo_de_regiao(texto, regioes):
                     sem_pessoa[texto] += 1          # a região no lugar da pessoa (a vaga): não vira ficha
                     continue
-                alvo, depois, nota = fichas.ref(texto, VINCULO_SUPERVISOR_CAMPO)
+                alvo, depois, nota = fichas.ref(texto, VINCULO_DA_REF.get(cid, VINCULO_SUPERVISOR_CAMPO))
                 if alvo is None:
                     sem_pessoa[texto] += 1          # nome de duas fichas: não adivinha
                     continue

@@ -301,9 +301,10 @@ def pode_agir(setor: dict | None, admin: bool) -> bool:
     return bool(admin) or (setor or {}).get("id") == SETOR
 
 
-def _quem(usuario, pode: bool, o_que: str) -> dict:
+def _quem(usuario, pode: bool, o_que: str, dono: str = "da Engenharia") -> dict:
+    # `dono`: o setor que age, no texto da recusa (as ETMs são da Performance desde 24/11/2026)
     if not pode:
-        raise Recusada(f"Só quem é da Engenharia ou administrador {o_que}")
+        raise Recusada(f"Só quem é {dono} ou administrador {o_que}")
     email = str((usuario or {}).get("email") or "").strip().lower()
     if not email:
         raise Recusada("Entre com o seu login (Microsoft ou Fracttal) para acompanhar: a senha de administrador não "

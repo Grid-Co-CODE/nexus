@@ -831,6 +831,13 @@ def avisos_lida():
 
 
 def instalar_contexto(app) -> None:
+    def _ms_ligado() -> bool:
+        from ..auth import microsoft
+        try:
+            return bool(microsoft.ligado(current_app.config))
+        except Exception:        # noqa: BLE001 — sem a configuração da Microsoft, a porta é a do Fracttal
+            return False
+
     @app.context_processor
     def _contexto():
         blueprint = request.blueprint or ""
@@ -866,4 +873,8 @@ def instalar_contexto(app) -> None:
             # o que o cliente vê no menu lateral (08/11/2026, o mockup da Visão do cliente): o cliente e "Comando"
             "vista_cliente": _vista_cliente(menu),
             "codigo_casca": _codigo_casca() if session.get("admin") or setor_telas.visao_de_cliente() else "",
+            # o pop-up de login (24/11/2026, static/reentrar.js): a raiz, o e-mail para vir preenchido e se a porta é a
+            # Microsoft (aí a senha do Fracttal não entra no Nexus)
+            "reentrar": {"raiz": raiz(), "email": str((session.get("usuario") or {}).get("email") or ""),
+                         "ms": _ms_ligado()},
         }

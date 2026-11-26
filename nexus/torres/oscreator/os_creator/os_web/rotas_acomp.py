@@ -624,7 +624,8 @@ def quadro():
     m = _montar(request.args.get("atualizar") == "1")
     return render_template("acomp.html", conta=_conta(), aba="criar", q=m["q"], quando=m["d"].get("quando") or "",
                            erro=m["erro"], erro_obs=m["erro_obs"], equipe=aw.equipe()[1], renovando=m["por_tras"],
-                           status_geral=aw.STATUS_GERAL, pagina_os=_pagina_da_os(), admin=_admin_nexus())
+                           status_geral=aw.STATUS_GERAL, pagina_os=_pagina_da_os(), admin=_admin_nexus(),
+                           demandas=_demandas())
 
 
 def _cartoes_do_quadro(q: dict) -> list:
@@ -1037,6 +1038,14 @@ def _pagina_da_os():
 # abertas para ela. O Nexus põe no pedido `request.environ["os_web.admin_nexus"]` (`ponte.encaminhar`); sem a chave (o OS
 # Creator sozinho) ninguém troca por aqui, e a equipe segue a do .env.
 ADMIN_NEXUS = "os_web.admin_nexus"
+# a demanda de cada chamado (24/11/2026): {nº: {"texto", "tom"}}, posta pelo Nexus (`ponte.demandas_chamados`); sem a
+# chave (o OS Creator sozinho), os cartões não dizem nada
+DEMANDAS = "os_web.demandas_chamados"
+
+
+def _demandas() -> dict:
+    v = request.environ.get(DEMANDAS)
+    return v if isinstance(v, dict) else {}
 
 
 def _admin_nexus() -> bool:

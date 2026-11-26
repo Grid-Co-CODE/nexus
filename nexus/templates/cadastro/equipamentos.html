@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titulo %}Equipamentos das usinas{% endblock %}
+{% block titulo %}Metas e equipamentos{% endblock %}
 {% block conteudo %}
 {% from "_explica.html" import explica %}
 {# Base > Equipamentos das usinas (13/10/2026, Levi: "Temos que substituir a aba equipamentos aproveitando o que tem lá e
@@ -28,10 +28,10 @@
 {% macro mantem() %}{% for k, v in volta.items() %}{% if v is string %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% else %}{% for x in v %}<input type="hidden" name="{{ k }}" value="{{ x }}">{% endfor %}{% endif %}{% endfor %}{% endmacro %}
 <link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
 <div class="eq-pagina">
-<p class="gc-eyebrow">Base · Equipamentos das usinas</p>
+<p class="gc-eyebrow">Base · Metas e equipamentos</p>
 <div class="cad-topo">
   <div>
-    <div class="gc-titulo-explica"><h1 class="titulo-pagina">Equipamentos das usinas</h1>
+    <div class="gc-titulo-explica"><h1 class="titulo-pagina">Metas e equipamentos</h1>
     {% call explica('Como funciona') %}
 <p><strong>O que é.</strong> O que cada usina do Registro mestre tem: as chaves do supervisório (a "Usina Supervisório"), as cabines e os inversores, com strings e kWp, nas colunas da aba Equipamentos. É o cadastro que a plataforma, o gêmeo e o coletor leem na chave marcada "no lugar da aba". Nada grava até o Salvar (livro nexus_estrutura_usina).</p>
 <p><strong>A lista.</strong> As três luzes de cada usina: chave do supervisório, equipamentos (o kWp dos inversores fecha com o Registro mestre) e fonte de dados (a pior fonte da usina). Apagada: sem leitura. Os filtros valem no Aplicar.</p>
@@ -40,7 +40,7 @@
 <p><strong>Usina Supervisório dos inversores.</strong> Com uma chave só na usina, o inversor sem chave entra nela sozinho; com mais de uma, escolha.</p>
 <p><strong>Chaves do supervisório.</strong> O nome que o supervisório dá à usina. Uma usina pode ter mais de uma: a Altair tem seis na aba, uma com as cabines e uma por cabine com os inversores. Cada chave serve a uma usina só.</p>
 <p><strong>Cabines e inversores.</strong> O "N de Inversores" da cabine cria os inversores com o nome da cabine ("Inversor 1.1", "1.2"…); depois é só preencher as strings. Sem a potência do inversor, conta a da cabine dividida pelos inversores dela (calculado).</p>
-<p><strong>No lugar da aba.</strong> A chave marcada passa a ser lida do Nexus pela plataforma, pelo gêmeo, pelas Ligações e pelo coletor (quando ligado nele), e não mais da aba Equipamentos. Antes de marcar, veja a coluna "Diferença com a aba": é o que muda para eles.</p>
+<p><strong>Vale na Sala.</strong> O Nexus é a fonte: a usina que difere da aba Equipamentos só no que o de-para corrige (strings, kWp pelo Registro mestre, cabine pelo Fracttal) passa a valer pelo Nexus sozinha, na Sala de controle, no tempo real, no gêmeo e nas Ligações, em cerca de 1 minuto. A usina vale inteira ou nada. A que tem outra diferença segue com a aba, e o bloco do alto e o aviso do Salvar dizem o que acertar.</p>
 <p><strong>Ligar pela aba.</strong> Liga cada chave da aba à usina pela Usina Fractall dela e traz a estrutura das usinas que ainda não têm. A usina que já tem algo gravado à mão fica como está.</p>
 <p><strong>Refazer a visão.</strong> A visão no formato da aba é refeita a cada gravação desta tela; o botão refaz quando o nome, o cliente ou a potência mudaram no Registro mestre.</p>
     {% endcall %}</div>
@@ -59,6 +59,7 @@
   </div>
 </div>
 
+{% with aba='equipamentos' %}{% include "cadastro/_metas_equip_abas.html" %}{% endwith %}
 {% if aviso %}<div class="cad-aviso cad-aviso--{{ aviso.tom }}" role="status"><i class="ph ph-{{ 'check-circle' if aviso.tom == 'ok' else 'x-circle' }}"></i><div>{{ aviso.texto }}</div></div>{% endif %}
 {% if erro_livro %}<div class="cad-aviso cad-aviso--{{ 'alerta' if livro_velho else 'critico' }}" role="alert"><i class="ph ph-database"></i><div>
   <strong>{{ 'Mostrando a última leitura boa da estrutura; para gravar, a leitura precisa voltar.' if livro_velho else 'Não consegui ler a estrutura no banco: nada se grava sem saber o que já está lá.' }}</strong> {{ erro_livro }}</div></div>
@@ -66,6 +67,19 @@
   Sem a <span class="gc-dado">GRIDCO_SQL_TOKEN</span>, as chaves do supervisório e a estrutura ficam só para ver.</div></div>{% endif %}
 {% if erro_aba %}<div class="cad-aviso cad-aviso--alerta" role="alert"><i class="ph ph-table"></i><div><strong>Não consegui ler a aba Equipamentos.</strong>
   {{ erro_aba }}. As sugestões de chave e o "Trazer da aba" ficam sem ela.</div></div>{% endif %}
+{# a virada para o Nexus como fonte única (24/11/2026): quantas usinas já valem pelo Nexus e o que falta nas outras #}
+{% if virada.com_chave %}<details class="eq-ref eq-ref--alto eq-virada"{% if virada.pendentes or virada.fora_do_nexus %} open{% endif %}>
+  <summary><span class="gc-status gc-status--{{ 'ok' if not virada.pendentes else 'alerta' }}">Vale pelo Nexus na Sala</span>
+    <b>{{ virada.vale }}</b> de {{ virada.com_chave }} usinas{% if virada.pendentes %} · <b>{{ virada.pendentes|length }}</b> ainda pela aba Equipamentos: o que falta em cada uma{% endif %}{% if virada.fora_do_nexus %} · {{ virada.fora_do_nexus|length }} chave{{ 's' if virada.fora_do_nexus|length > 1 }} da aba fora do Nexus{% endif %}
+    <span class="mudo">{% if virada.rodando %}· conferindo agora{% elif virada.conferida_em %}· conferido {{ virada.conferida_em }}{% endif %}</span></summary>
+  {% if virada.erro %}<p class="eq-virada-erro">A última conferência falhou ({{ virada.erro }}); a próxima abertura tenta de novo.</p>{% endif %}
+  {% if virada.pendentes %}<div class="cad-rolagem"><table class="cad-tabela">
+    <thead><tr><th>Usina que segue com a aba</th><th>O que falta para valer pelo Nexus</th></tr></thead>
+    <tbody>{% for u in virada.pendentes %}<tr><td><a href="{{ url_for('torre_base.equipamentos', usina=u.id, **volta) }}">{{ u.titulo }}</a></td>
+      <td>{% if u.motivos %}{{ u.motivos[:3]|join('; ')|truncate(420) }}{% else %}<span class="mudo">conferindo</span>{% endif %}</td></tr>{% endfor %}</tbody>
+  </table></div>{% endif %}
+  {% if virada.fora_do_nexus %}<p class="eq-virada-fora"><strong>Chaves da aba que o Nexus ainda não tem</strong> (a Sala as lê da aba): {{ virada.fora_do_nexus|join(', ') }}.</p>{% endif %}
+</details>{% endif %}
 {% if auto.fora %}<details class="eq-ref eq-ref--alto">
   <summary>{{ auto.fora|length }} chave{{ 's' if auto.fora|length > 1 }} da aba não liga{{ 'm' if auto.fora|length > 1 }} sozinha{{ 's' if auto.fora|length > 1 }} pela aba</summary>
   <div class="cad-rolagem"><table class="cad-tabela">
@@ -113,7 +127,8 @@
     {# o alto da usina: só o que não se repete embaixo (o nome está na lista e na Usina Supervisório; a potência, nos
        quadros do editor) #}
     <p class="eq-meta eq-meta--alto">{{ u.cliente or 'sem cliente' }}{% if u.codigo %} · <span class="gc-dado">{{ u.codigo }}</span>{% endif %} · {{ u.cidade or 'cidade —' }}{% if u.uf %}/{{ u.uf }}{% endif %}{% if u.status %} · {{ u.status }}{% endif %}{% if u.equipe %} · equipe {{ u.equipe }}{% endif %}
-      · <a href="{{ url_for('torre_base.cad_usina', id_=u.id) }}">abrir a ficha no Registro mestre</a></p>
+      {# a ficha do Registro mestre é só do administrador (o setor Performance abre esta tela desde 25/11/2026) #}
+      {% if session.get('admin') %}· <a href="{{ url_for('torre_base.cad_usina', id_=u.id) }}">abrir a ficha no Registro mestre</a>{% endif %}</p>
 
     {# Fontes de dados (17/11/2026): ligar a fonte que ainda não chega em usina nenhuma e os cartões das que chegam #}
     <section class="cad-secao eq-fontes" id="fontes">

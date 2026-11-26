@@ -8,6 +8,7 @@ Banco falso (tests/pg_falso.py); a carga inicial é a planilha inventada de test
 (o repositório é público: nada real aqui)."""
 import io
 import json
+from datetime import date, timedelta
 
 import pytest
 from pg_falso import ApiPGFalsa
@@ -173,7 +174,10 @@ def test_incluir_e_retirar_ficam_no_historico(carga, cliente):
     adm = _como(cliente, "admin@gridco.com.br", admin=True)
     prova = dict(motivo="Pedido do cliente", prova_texto="E-mail do cliente com o pedido.")
     st, r = _editar(adm, item_tipo="obrigacao", evento="inclusao", cliente="Beta GD", **prova,
-                    valores={"tipo": "Reajuste", "descricao": "Reajuste combinado", "status": "Não iniciado", "vencimento": "2026-12-01"})
+                    valores={"tipo": "Reajuste", "descricao": "Reajuste combinado", "status": "Não iniciado",
+                             # longe do alerta de 7 dias A PARTIR DE HOJE: com a data fixa 01/12/2026 o tom virou "alerta"
+                             # sozinho em 25/11/2026 (bomba-relógio)
+                             "vencimento": (date.today() + timedelta(days=120)).isoformat()})
     assert st == 200
     oid = r["item_ids"][0]
     d = adm.get("/t/comando/contratos/dados.json").get_json()

@@ -17,7 +17,8 @@
    - O DIA (13/11/2026, o dono: "como faço pra ver os gráficos de ontem ?"): Hoje, Ontem ou uma data até 40 dias atrás, no
      topo fixo da janela (.cos-inv-dias). Vale para a curva da usina, a de cada inversor e as strings e MPPT do detalhe, que
      vêm do histórico gravado na Ronda COS (45 dias, `scada/entradas/<logger>/<modbus>?dia=`). Num dia que passou não há
-     ponta ao vivo; o estado e as entradas de AGORA continuam ao vivo. Escondido no SunOP, que não tem série gravada.
+     ponta ao vivo; o estado e as entradas de AGORA continuam ao vivo. Vale para o SunOP desde 25/11/2026 (a série dele
+     é gravada pela Ronda COS desde 13/11), sem as strings, que o SunOP não guarda.
    - O ZOOM NO HORÁRIO (13/11/2026, o dono: "quero poder dar zoom nos graficos, da usina, dos inversores, das strings.."):
      um trecho só para todo gráfico da janela (.cos-inv-zoom: "−", "+", "Dia inteiro" e o trecho; o arraste, a roda com
      Ctrl, Shift + arrastar e a pinça estão no static/cos/inversores.js). Trocar o dia volta ao dia inteiro. #}

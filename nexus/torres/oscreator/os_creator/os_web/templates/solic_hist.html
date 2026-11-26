@@ -10,6 +10,13 @@
    servidor já tem na memória (rotas_solic._lista). #}
 {% block conteudo %}
 <section class="spc spc-hist">
+  {# a mesma barra de visões do Histórico de OS (25/11/2026): daqui se volta a ele, como de lá se chega aqui #}
+  <div class="fl-seg spc-hist-visoes" role="group" aria-label="Visão">
+    <a href="/os/historico?modo=criadas">Histórico Geral</a>
+    <a href="/os/historico?modo=atribuidas">Atribuídas a mim</a>
+    <a href="/os/historico?modo=cos">Visão COS</a>
+    <a class="on" href="/os/solicitacao/historico" aria-current="page">Solicitações</a>
+  </div>
   {% include "_solic_nav.html" %}
   <div class="spc-hist-topo">
     <label class="spc-hist-c"><span class="spc-rot">Criado por</span><select id="hs_pessoa" data-busca="1"></select></label>
@@ -37,7 +44,8 @@
   </div>
   <div class="spc-tbl-wrap">
     <table class="spc-tbl">
-      <thead><tr><th>Nº</th><th>Cliente</th><th>Usina</th><th>Ativo</th><th>Descrição</th><th>Criada em</th><th>Status</th><th>OS ligada</th></tr></thead>
+      {# quem pediu, o ativo, a descrição, quando foi pedida, a OS gerada e quando ela foi criada (Levi, 25/11/2026) #}
+      <thead><tr><th>Nº</th><th>Criado por</th><th>Cliente</th><th>Usina</th><th>Ativo</th><th>Descrição</th><th>Solicitada em</th><th>Status</th><th>OS gerada</th><th>OS criada em</th></tr></thead>
       <tbody id="hs_corpo"></tbody>
     </table>
   </div>

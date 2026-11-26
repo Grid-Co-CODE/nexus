@@ -115,6 +115,82 @@
     if (b) porTecnico(b.dataset.por);
   });
 
+  // escolher as usinas que o técnico vê (24/11/2026, Levi: "clicar no técnico e escolher as usinas, que ele vai ver"): a
+  // janela com as usinas em operação por cliente, as dele já marcadas (as dele fora de operação também, para poder tirar),
+  // a busca e o Salvar, que grava de uma vez (o servidor confere tudo de novo, dentro da trava)
+  function escolherUsinas(tr) {
+    var tpl = document.getElementById("tu-usinas");
+    if (!tpl) return;
+    corpo.innerHTML = "";
+    corpo.appendChild(tpl.content.cloneNode(true));
+    corpo.querySelector("[data-us-nome]").textContent = tr.dataset.nome;
+    corpo.querySelector("input[name=pessoa_id]").value = tr.dataset.escolherUsinas;
+    var dele = {};
+    (tr.dataset.usinasDele || "").split(",").filter(Boolean).forEach(function (i) { dele[i] = true; });
+    var lista = corpo.querySelector("[data-us-lista]"), conta = corpo.querySelector("[data-us-conta]");
+    var porCliente = {}, ordem = [];
+    (dados.usinas || []).forEach(function (u) {
+      if (!u.op && !dele[String(u.id)]) return;
+      if (!porCliente[u.cliente]) { porCliente[u.cliente] = []; ordem.push(u.cliente); }
+      porCliente[u.cliente].push(u);
+    });
+    // as que ele já tem vêm primeiro (o cliente delas no alto e, dentro dele, as marcadas): com 190 usinas na lista, a
+    // pessoa abria a janela e não via as dele sem rolar (a prova de 24/11/2026)
+    function antes(lista_, marca) {
+      return lista_.map(function (x, i) { return [marca(x) ? 0 : 1, i, x]; })
+        .sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; }).map(function (x) { return x[2]; });
+    }
+    function eDele(u) { return dele[String(u.id)]; }
+    ordem = antes(ordem, function (cli) { return porCliente[cli].some(eDele); });
+    ordem.forEach(function (cli) { porCliente[cli] = antes(porCliente[cli], eDele); });
+    ordem.forEach(function (cli) {
+      var g = document.createElement("fieldset");
+      g.className = "tu-us-grupo";
+      g.dataset.cliente = sem(cli);
+      var lg = document.createElement("legend");
+      lg.textContent = cli;
+      g.appendChild(lg);
+      porCliente[cli].forEach(function (u) {
+        var l = document.createElement("label");
+        l.className = "tu-us-item";
+        l.dataset.nome = sem(u.nome + " " + cli);
+        var c = document.createElement("input");
+        c.type = "checkbox"; c.name = "usina"; c.value = u.id; c.checked = !!dele[String(u.id)];
+        l.appendChild(c);
+        l.appendChild(document.createTextNode(" " + u.nome + (u.op ? "" : " (fora de operação)")));
+        g.appendChild(l);
+      });
+      lista.appendChild(g);
+    });
+    function contar() {
+      var n = lista.querySelectorAll("input:checked").length;
+      conta.textContent = n + (n === 1 ? " usina marcada" : " usinas marcadas");
+    }
+    lista.addEventListener("change", contar);
+    contar();
+    corpo.querySelector("[data-us-busca]").addEventListener("input", function (ev) {
+      var q = sem(ev.target.value).trim();
+      lista.querySelectorAll(".tu-us-grupo").forEach(function (g) {
+        var algum = false;
+        g.querySelectorAll(".tu-us-item").forEach(function (l) {
+          l.hidden = q && l.dataset.nome.indexOf(q) < 0;
+          algum = algum || !l.hidden;
+        });
+        g.hidden = !algum;
+      });
+    });
+    abrir();
+  }
+  document.querySelectorAll("tr[data-escolher-usinas]").forEach(function (tr) {
+    tr.addEventListener("click", function (ev) {
+      if (ev.target.closest("a, button, form, input, label")) return;
+      escolherUsinas(tr);
+    });
+    tr.addEventListener("keydown", function (ev) {
+      if (ev.target === tr && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); escolherUsinas(tr); }
+    });
+  });
+
   // as abas Por usina e Por técnico trocam na própria página (17/10/2026: o filtro não recarrega, a aba também não)
   var abaAgora = (new URL(location.href)).searchParams.get("ver") === "tecnico" ? "tecnico" : "usina";
   document.querySelectorAll(".cn-abas a[data-aba]").forEach(function (a) {
@@ -148,13 +224,5 @@
       i.type = "hidden"; i.name = "v_ver"; i.value = abaAgora;
       f.appendChild(i);
     }
-  });
-  // os números do topo: "Todas" troca as contas de em operação pelas do cadastro inteiro
-  document.addEventListener("filtro-local", function (ev) {
-    var st = window.FiltroLocal && window.FiltroLocal["tu-f"] && window.FiltroLocal["tu-f"].estado;
-    if (!st) return;
-    document.querySelectorAll("[data-tu-numeros] [data-op][data-todas]").forEach(function (e) {
-      e.textContent = e.getAttribute(st.todas ? "data-todas" : "data-op");
-    });
   });
 })();

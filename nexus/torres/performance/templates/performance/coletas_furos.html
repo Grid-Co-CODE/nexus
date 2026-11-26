@@ -13,7 +13,7 @@
 <div class="gc-titulo-explica"><h1 class="titulo-pagina">Furos de coleta</h1>
 {% call explica('Entenda esta tela', termos=True) %}
   {{ termo('Para que serve') }}<dd>Mostra, usina por usina, os dias sem dado de geração, de IPOA ou de GHI no BD_Performance
-    e no BD_Thopen, para a equipe coletar o que falta ou dizer por que falta.</dd>
+    ou no BD_Thopen (a troca no alto escolhe qual), para a equipe coletar o que falta ou dizer por que falta.</dd>
   {{ termo('De onde vem') }}<dd>Os BDs vêm do banco, da última subida da coleta (a hora está abaixo dos números). De
     novembro em diante, as paradas vêm das Ocorrências do COS, só as que têm "Geração parou" = sim, inclusive as em
     aberto. As de outubro ficaram como a analista de Performance mapeou, com as OS do Fracttal e os tickets.</dd>
@@ -21,8 +21,10 @@
     furo. Zero enquanto os outros inversores geraram também é furo. Parada com 6 horas ou mais entre 6h e 18h explica o
     dia. A OS 16493 e o cliente E1 ficam de fora. Na Ultragaz, valor acima de 5 vezes a mediana é coleta equivocada.</dd>
   {{ termo('A tira do mês') }}<dd>Um quadrado por dia, pela causa: verde, completo (todo o dado no dia: validado
-    automático) ou validado pela equipe; azul, justificado por queda; roxo, furo com falha de comunicação no COS (a usina
-    gerava e o dado não veio: resolver). Sem justificativa no COS: vermelho, a usina toda sem dado; laranja, parcial (um
+    automático), validado pela equipe, ou com parte da usina parada por uma queda que justifica e o resto com dado; azul,
+    a usina toda justificada por queda; roxo, furo com falha de comunicação da usina no COS (a usina gerava e o dado não
+    veio: resolver); rosa, a falha de comunicação que o COS registrou só nos inversores com furo, com o resto da
+    geração com dado. Sem justificativa no COS: vermelho, a usina toda sem dado; laranja, parcial (um
     inversor ou alguns); traço azul embaixo, o COS tem uma queda curta no dia, que não justifica; vazado, falta só o IPOA
     ou o GHI. Passe o mouse para ver a ocorrência e de que hora a que hora. A legenda fica fixa no alto da lista, conta os
     dias de cada cor e o clique filtra. Kanban: uma coluna por causa, a usina na causa que mais tem dias.</dd>
@@ -53,6 +55,9 @@
 <p class="fr-carregando mudo" id="fr-carregando">Lendo os furos…</p>
 
 <div id="fr-corpo" hidden>
+  {# a troca de BD vale para a tela toda (Levi, 24/11/2026: "separar BD performance e BD operações. Para isso é bem
+     direcionado"): cada equipe vê o seu #}
+  <div class="fr-bds" id="fr-bds" role="group" aria-label="Qual BD"></div>
   <p class="mudo fr-fontes"><span id="fr-completude"></span><span id="fr-fontes"></span></p>
 
   <div class="fr-barra">
@@ -71,7 +76,7 @@
   </div>
 
   <details class="fr-dobra-cli" id="fr-dobra-cli" open>
-    <summary><i class="ph ph-caret-right" aria-hidden="true"></i><h2 class="ui-kicker">Tamanho do furo por cliente <span class="fr-kicker-nota">dias com furo pendente, somando as usinas, nas cores da legenda. Clique para filtrar.</span></h2></summary>
+    <summary><i class="ph ph-caret-right" aria-hidden="true"></i><h2 class="ui-kicker"><span id="fr-cli-titulo">Peso do furo por cliente</span> <span class="fr-kicker-nota">dias com furo pendente ÷ (usinas × dias verificados), nas cores da legenda. Clique para filtrar.</span></h2></summary>
     <div class="fr-clientes" id="fr-clientes" role="group" aria-label="Filtrar por cliente"></div>
   </details>
 

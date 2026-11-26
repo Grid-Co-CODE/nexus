@@ -202,7 +202,7 @@ def mundo25(tmp_path, monkeypatch):
     L.limpar_cache()
 
 
-def pagina(c, url="/t/performance/clima", **consulta):
+def pagina(c, url="/t/campo/clima", **consulta):
     r = c.get(url, query_string=consulta or None)
     assert r.status_code == 200
     return r.get_data(as_text=True)

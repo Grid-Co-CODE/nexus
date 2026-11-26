@@ -16,6 +16,10 @@
   programação semanal, da Confiabilidade e da Gerencial; as regras são as do relatório executivo do painel do PCM.</p>
 {% if erro_fonte %}<p class="aviso">Não consegui ler a Gestão PCM agora ({{ erro_fonte }}): as listas de cliente, cluster e
   usina ficam vazias até ela voltar.</p>{% endif %}
+{# a cópia do relatório atrás da do painel do PCM (24/11/2026, `pcm/copias_pcm.py`): a W47 deu 55% aqui e 57% lá #}
+{% if copias_pcm %}<p class="aviso" role="status"><b>O relatório do Nexus está diferente do relatório do PCM</b>
+  ({{ copias_pcm|map(attribute='do_pcm')|join(', ') }}): os números daqui podem diferir dos do painel do PCM até as duas
+  cópias voltarem a ser iguais (o caminho está no CLAUDE.md do relatório executivo).</p>{% endif %}
 
 <div class="rp-tela">
   <div class="rp-esq">

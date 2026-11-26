@@ -49,9 +49,17 @@ PADRAO = {
     "zeladoria": (("", "Limpeza de módulos", 5), ("", "Roçada e vegetação", 5), ("", "Desobstrução de vala e drenagem", 5)),
     # o que os setores pedem ao supervisor de campo
     "supervisao campo": (("", "Inspeção na usina", 2), ("", "Informação de campo", 1), ("", "Retorno de OS", 2),
-                         ("", "Foto ou evidência", 1)),
+                         ("", "Foto ou evidência", 1),
+                         # a demanda que sai do chamado de Garantias para o supervisor da usina (24/11/2026, Levi:
+                         # "Podemos criar um tema de acompanhamento de chamado. E aí o supervisor pode responder até 3
+                         # dias úteis"); é o tema que a Nova demanda do chamado já traz escolhido (`TEMA_DO_CHAMADO`)
+                         ("", "Acompanhamento de chamado", 3)),
     "supervisor de contrato": (("", "Comunicação ao cliente", 2), ("", "Informação do contrato", 3)),
 }
+
+
+# o tema que a Nova demanda do chamado de Garantias já traz escolhido: o setor do supervisor de campo e o nome do padrão
+TEMA_DO_CHAMADO = ("", "Acompanhamento de chamado")
 
 
 def chave(nome) -> str:

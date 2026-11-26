@@ -115,7 +115,27 @@ def _abrir_sessao(jwt: str, email: str, prox: str, conta: dict | None = None):
             session["conta"]["email"] = email
     except Exception:                                   # noqa: BLE001 — perfil é enfeite; a porta não trava por ele
         session["conta"] = {"nome": email or sessao.email_do_jwt(jwt) or "Usuário", "email": email, "perfil": ""}
+    if _pede_json():
+        return jsonify({"ok": True})
     return redirect(_destino_local(prox))
+
+
+def _pede_json() -> bool:
+    """O pop-up de login do Nexus (static/reentrar.js, 24/11/2026) entra por aqui quando só a sessão do Fracttal do OS
+    Creator caiu (quem entrou no Nexus pela senha de administrador ou pela Microsoft) e pede a resposta em JSON."""
+    return "application/json" in (request.headers.get("Accept") or "")
+
+
+@bp.route("/api/sessao")
+def api_sessao():
+    """{"ok": true} quando a sessão do Fracttal deste navegador vale: o "Já entrei em outra aba" do pop-up de login confere
+    por aqui antes de fechar. Sem a sessão, {"ok": false} (e não o 401 do portão: quem pergunta é o próprio pop-up)."""
+    if not session.get("jwt"):
+        return jsonify({"ok": False})
+    try:
+        return jsonify({"ok": bool(api.is_logged_in())})
+    except Exception:                                    # noqa: BLE001 — Fracttal fora: o pop-up segue aberto
+        return jsonify({"ok": False})
 
 
 @bp.route("/login", methods=["GET", "POST"])
@@ -138,9 +158,13 @@ def login():
         try:
             api.fracttal_login(email, senha)              # grava o JWT na sessão da requisição (sessao._save_jwt)
         except api.FracttalError as e:
+            if _pede_json():
+                return jsonify({"ok": False, "erro": str(e)}), 401
             return _tela_login(erro=str(e), email=email, prox=prox, status=401)
         jwt = sessao.jwt_atual()
         if not jwt:
+            if _pede_json():
+                return jsonify({"ok": False, "erro": "Login sem token de sessão. Tente de novo."}), 401
             return _tela_login(erro="Login sem token de sessão. Tente de novo.", email=email, prox=prox, status=401)
         return _abrir_sessao(jwt, email, prox)
     # A tela abre no FORMULARIO. Ate 21/09 ela redirecionava sozinha para a tela do Fracttal
@@ -1177,5 +1201,7 @@ def os_detalhe(wid, folio=None):
         return render_template("erro.html", conta=_conta(), aba="hist", mensagem=msg), 404
     status = request.args.get("status") or ""
     template = "os_detalhe_conteudo.html" if parcial else "os_detalhe.html"
+    from .insp_web import pai_de_origem      # o "Abrir chamado" só na OS de origem (25/11/2026)
     return render_template(template, conta=_conta(), aba="hist", d=det, wid=wid, status=status, parcial=parcial,
-                           status_cor=STATUS_COR.get(status), fmt=api.fmt_data_br, duracao=api.duracao_os)
+                           status_cor=STATUS_COR.get(status), fmt=api.fmt_data_br, duracao=api.duracao_os,
+                           pode_chamado=pai_de_origem(det.get("tipo")))

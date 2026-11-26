@@ -118,9 +118,12 @@ def oss(linhas: list[dict], usinas: dict, cos: dict | None, agora: datetime) -> 
 
 
 def criadores_cos(base: str, sessao, ler_pessoal) -> dict:
-    """{"nomes", "codigos", "pessoas", "erro"}: quem está hoje no setor COS (a última decisão de cada pessoa no livro
-    `nexus_setores`), pelo nome e pelo código no Fracttal (`ler_pessoal`, o pessoal guardado 1 h). Guardado 10 min. Sem o
-    setor, vazio (nada sai por COS)."""
+    """{"nomes", "codigos", "pessoas", "erro", "setor_por_codigo", "setor_por_nome"}: quem está hoje no setor COS (a última
+    decisão de cada pessoa no livro `nexus_setores`), pelo nome e pelo código no Fracttal (`ler_pessoal`, o pessoal
+    guardado 1 h). Guardado 10 min. Sem o setor, vazio (nada sai por COS).
+    Desde 25/11/2026 a mesma conta diz o setor de TODA pessoa com setor ({código ou nome: nome do setor}, os setores
+    excluídos fora), para o filtro "Criado por (setor)" da Aprovação de OS (Levi: "criado por, aí bota entre parênteses
+    setor, aí performance, engenharia, chamados e assim por diante"): sem ler nada a mais."""
     v = _COS["v"]
     if v is not None and time.time() - _COS["t"] < TTL_COS_S:
         return v
@@ -128,17 +131,38 @@ def criadores_cos(base: str, sessao, ler_pessoal) -> dict:
     st = S.ler(base, sessao)
     sid = {x["setor_id"] for x in S.ativos(st.get("setores") or []) if x["setor_id"] == SETOR_COS}
     quem = {str(fid) for fid, s in S.vigentes(st.get("decisoes") or []).items() if s in sid}
+    nome_do_setor = {x["setor_id"]: x["nome"] for x in S.ativos(st.get("setores") or [])}
+    setor_de = {str(fid): nome_do_setor[s] for fid, s in S.vigentes(st.get("decisoes") or []).items() if s in nome_do_setor}
     p = ler_pessoal() or {}
     codigos = p.get("codigos") or {}
     nomes, cods = set(), set()
+    por_cod, por_nome = {}, {}
     for x in p.get("pessoas") or ():
         if str(x.get("id")) in quem:
             nomes.add(_norm(x.get("nome")))
             cods.add(_norm(codigos.get(x.get("id"))))
+        s = setor_de.get(str(x.get("id")))
+        if s:
+            if _norm(codigos.get(x.get("id"))):
+                por_cod[_norm(codigos.get(x.get("id")))] = s
+            if _norm(x.get("nome")):
+                por_nome[_norm(x.get("nome"))] = s
     v = {"nomes": nomes - {""}, "codigos": cods - {""}, "pessoas": len(quem),
-         "erro": st.get("erro") or p.get("erro") or ""}
+         "erro": st.get("erro") or p.get("erro") or "", "setor_por_codigo": por_cod, "setor_por_nome": por_nome}
     _COS.update(t=time.time(), v=v)
     return v
+
+
+def setor_do_criador(linha: dict, cos: dict | None) -> str:
+    """O setor de quem criou a OS (a conta de `criadores_cos`), pelo código da pessoa no Fracttal e, sem ele, pelo nome;
+    "" para quem não tem setor no Nexus ou antes da 1ª conta."""
+    if not cos:
+        return ""
+    cod, nome = _norm(linha.get("code_create_by")), _norm(linha.get("created_by"))
+    por_cod, por_nome = cos.get("setor_por_codigo") or {}, cos.get("setor_por_nome") or {}
+    if cod and cod in por_cod:
+        return por_cod[cod]
+    return por_nome.get(nome, "") if nome else ""
 
 
 def cos_guardado() -> dict | None:

@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+{% block titulo %}E-mails automáticos{% endblock %}
+{% block conteudo %}
+{% from "_explica.html" import explica %}
+{# o gráfico dos envios por dia (30 dias, em ENVIOS): uma coluna por dia, empilhada pela situação; a escala é a do próprio
+   tipo (o avulso e o aviso de PT têm volumes muito diferentes). O "data-tip" é a dica do mouse e do teclado. #}
+{% macro grafico(dias, grande=False) %}
+{%- set mx = dias|map(attribute='total')|max -%}
+<div class="em-graf{% if grande %} em-graf--grande{% endif %}" role="group" aria-label="Envios por dia nos últimos {{ dias|length }} dias: {{ dias|sum(attribute='total') }} no total">
+  <div class="em-graf-teto"><span>{% if mx %}{{ mx }} por dia{% else %}nenhum envio{% endif %}</span></div>
+  <div class="em-colunas">
+  {%- for x in dias %}
+    {%- set partes = [] %}
+    {%- for g, rot in (('enviado', 'enviado'), ('teste', 'em teste'), ('falhou', 'falha'), ('barrado', 'barrado')) %}{% if x[g] %}{% set _ = partes.append(x[g] ~ ' ' ~ (rot if x[g] == 1 or g == 'teste' else ('enviados' if g == 'enviado' else ('falhas' if g == 'falhou' else 'barrados')))) %}{% endif %}{% endfor %}
+    {%- set tip = x.dia.strftime('%d/%m') ~ ': ' ~ (partes|join(', ') if partes else 'nenhum envio') %}
+    <span class="em-dia" data-tip="{{ tip }}"{% if grande %} tabindex="0" aria-label="{{ tip }}"{% else %} aria-hidden="true"{% endif %}>
+      {%- if x.total %}<span class="em-pilha" style="height:{{ (x.total * 100 / mx)|round(1) }}%">
+        {%- for g in ('barrado', 'falhou', 'teste', 'enviado') %}{% if x[g] %}<i class="em-s em-s--{{ g }}" style="flex-grow:{{ x[g] }}"></i>{% endif %}{% endfor -%}
+      </span>{% endif -%}
+    </span>
+  {%- endfor %}
+  </div>
+  <div class="em-graf-eixo"><span>{{ dias[0].dia.strftime('%d/%m') }}</span><span>hoje</span></div>
+</div>
+{%- endmacro %}
+{% macro cartao(x) %}
+    <li><a class="em-cartao{% if x.ligado == false %} em-cartao--desligado{% endif %}" href="{{ raiz }}/t/base/emails-automaticos/{{ x.tipo }}">
+      <span class="em-cartao-cab"><b>{{ x.nome }}</b>
+        <span class="em-pills">{% if x.ligado is none %}<span class="mudo">—</span>{% elif x.ligado %}<span class="cn-pill cn-ok">Ligado</span>{% else %}<span class="cn-pill cn-alerta">Desligado</span>{% endif %}{% if x.modo == 'teste' %}<span class="cn-pill em-sit em-sit--info">Teste</span>{% endif %}</span></span>
+      <span class="em-fluxo">
+        <span><i class="ph ph-lightning" aria-hidden="true"></i><span><small>Quando</small>{{ x.gatilho }}</span></span>
+        <i class="ph ph-arrow-right em-fluxo-seta" aria-hidden="true"></i>
+        <span><i class="ph ph-users" aria-hidden="true"></i><span><small>Para</small>{{ x.destino }}</span></span>
+      </span>
+      {% if x.dias %}{{ grafico(x.dias) }}{% else %}<span class="em-graf-sem">{{ 'O Nexus ainda não mandou este e-mail.' if x.nexus else 'O App ainda não publica os envios deste e-mail.' }}</span>{% endif %}
+      <span class="em-cartao-pe">
+        <span class="gc-num">{% if x.enviados is none %}<span class="mudo">—</span>{% else %}{{ x.enviados }} {{ 'enviado' if x.enviados == 1 else 'enviados' }} em {{ dias }} dias{% if x.falhas %} · <b class="ruim">{{ x.falhas }} {{ 'falha' if x.falhas == 1 else 'falhas' }}</b>{% endif %}{% if x.desligados %} · {{ x.desligados }} {{ 'barrado' if x.desligados == 1 else 'barrados' }}{% endif %}{% endif %}</span>
+        <span class="mudo">Último: {{ hora(x.ultimo) }}</span>
+      </span>
+      {%- set partes = [] %}{% if x.criado %}{% set _ = partes.append('criado pela tela') %}{% endif %}{% if x.tipo.startswith('nx_app_') %}{% set _ = partes.append('espera o App de Campo entregar o evento') %}{% endif %}{% if x.regra %}{% set _ = partes.append('regra do Nexus') %}{% elif x.origem %}{% set _ = partes.append('regra: ' ~ x.origem) %}{% endif %}
+      {% if partes or x.pendente or x.critico %}<span class="em-cartao-nota">{% if x.critico %}<span>e-mail de segurança</span>{% endif %}{% for p in partes %}<span>{{ p }}</span>{% endfor %}{% if x.pendente %}<b class="atencao">regra nova a confirmar</b>{% endif %}</span>{% endif %}
+    </a></li>
+{%- endmacro %}
+{% macro legenda() %}
+<ul class="em-legenda" aria-label="Legenda do gráfico">
+  <li><i class="em-s em-s--enviado"></i>Enviado</li><li><i class="em-s em-s--teste"></i>Em teste</li>
+  <li><i class="em-s em-s--falhou"></i>Falha</li><li><i class="em-s em-s--barrado"></i>Barrado (desligado)</li>
+</ul>
+{%- endmacro %}
+{# Base › E-mails automáticos (24/11/2026; nexus/torres/base/emails_tela.py; a leitura em nexus/campo/emails_app.py e a
+   regra em nexus/campo/emails_controle.py): o que o App de Campo manda sozinho por e-mail, para quem, se saiu, e o
+   controle de cada tipo (ligar e desligar, modo teste, destinatários), só administrador. #}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<div class="campo-nativa em-tela">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">Base{% if t %} · E-mails automáticos{% endif %}</p>
+      <div class="gc-titulo-explica"><h1 class="cn-titulo">{% if t %}{{ t.nome }}{% else %}E-mails automáticos{% endif %}</h1>
+        {% call explica('Entenda esta tela') %}
+          <p><b>O que é.</b> Os e-mails que o App de Campo manda sozinho, pelo endereço naoresponda@. O App publica no banco o
+          que cada um é e cada envio; o Nexus mostra e controla. A pessoa aparece pelo nome do cadastro (o livro guarda só
+          um código, nunca o e-mail).</p>
+          <p><b>Como vale a regra.</b> Cada mudança feita aqui é uma linha a mais no livro do controle, cifrada e assinada.
+          O App relê a cada 5 minutos e aplica a mais nova de cada tipo. Sem nenhuma regra do Nexus, ele segue com as
+          configurações dele no Azure (o "App Setting").</p>
+          <p><b>O que cada escolha faz.</b> Desligado: o App não manda e registra "desligado". Teste: manda só para a lista,
+          sem cópia e com "[Teste]" no assunto. Normal com lista: soma a lista ao destino padrão do App, ou o substitui.
+          Lista vazia não muda nada.</p>
+          <p><b>Como se conta.</b> Enviados e falhas contam envios, não destinatários: um aviso para três pessoas é um
+          envio. Os números são dos últimos {{ dias }} dias.</p>
+          <p><b>Do Nexus.</b> Desde 25/11/2026 o próprio Nexus também manda e-mail, pela mesma caixa e com a mesma
+          credencial do App: o de teste, os criados aqui (Novo e-mail: o texto, o que o Nexus já calcula, para quem pelo papel
+          no Registro mestre e a agenda) e, aos poucos, os do App. O e-mail novo nasce desligado: veja a prévia e ligue na
+          Regra. Só o servidor envia.</p>
+          <p><b>Como ler o gráfico.</b> Cada coluna é um dia (de Brasília), dos últimos 30 até hoje, com os envios
+          empilhados pela situação: enviado, em teste, falha e barrado (o e-mail estava desligado). A altura é a do
+          próprio e-mail: o número no alto é o máximo num dia. Passe o mouse num dia para ver as contas.</p>
+        {% endcall %}
+      </div>
+      <p class="cn-pergunta">{% if t %}{{ t.gatilho }} · Padrão {{ 'do Nexus' if t.nexus else 'do App' }}: {{ t.destino }}{% else %}Que e-mail o App manda sozinho, para quem, e saiu?{% endif %}</p></div>
+  </div>
+
+  {% if aviso %}<div class="cn-erro cn-ok-aviso" role="status">{{ aviso }}</div>{% endif %}
+  {% if erro %}<div class="cn-erro" role="alert"><b>Não li os livros do App agora ({{ erro }}).</b> Os tipos aparecem sem os números.</div>
+  {% elif d.fonte == 'semanal' %}<div class="cn-erro cn-aviso" role="status">O App ainda não publicou o livro de todos os envios: por enquanto só o e-mail semanal da Segurança tem números.</div>
+  {% elif d.fonte == 'nenhum' %}<div class="cn-erro cn-aviso" role="status">O App ainda não publicou nenhum envio no banco.</div>{% endif %}
+  {% if erro_ctl %}<div class="cn-erro" role="alert"><b>Não li o livro do controle agora ({{ erro_ctl }}).</b> As regras do Nexus não aparecem e nada pode ser gravado até a leitura voltar.</div>{% endif %}
+
+  {% if t %}
+  <p class="em-volta"><a class="cn-link" href="{{ raiz }}/t/base/emails-automaticos"><i class="ph ph-arrow-left" aria-hidden="true"></i> Todos os e-mails</a></p>
+  <dl class="em-resumo">
+    <div><dt>{{ 'No Nexus agora' if t.nexus else 'No App agora' }}</dt><dd>{% if t.ligado is none %}<span class="mudo">o App ainda não diz</span>{% elif t.ligado %}<span class="cn-pill cn-ok">Ligado</span>{% else %}<span class="cn-pill cn-alerta">Desligado</span>{% endif %}{% if t.modo == 'teste' %} <span class="cn-pill em-sit em-sit--info">Teste</span>{% endif %}{% if t.origem %}<small>regra: {{ t.origem }}</small>{% endif %}</dd></div>
+    <div><dt>Enviados em {{ dias }} dias</dt><dd class="gc-num">{{ t.enviados if t.enviados is not none else '—' }}</dd></div>
+    <div><dt>Falhas em {{ dias }} dias</dt><dd class="gc-num{% if t.falhas %} ruim{% endif %}">{{ t.falhas if t.falhas is not none else '—' }}</dd></div>
+    <div><dt>Último envio</dt><dd>{{ hora(t.ultimo) }}</dd></div>
+  </dl>
+
+  {% if t.tipo == 'nx_teste' %}
+  <h2 class="ins-sub">Mandar um teste</h2>
+  <form class="em-form em-form--curto" method="post" action="{{ raiz }}/t/base/emails-automaticos/nx_teste/mandar">
+    <input type="hidden" name="codigo" value="{{ codigo }}">
+    <label class="em-grupo"><span class="gc-rotulo">Para</span>
+      <input class="gc-campo" type="email" name="para" required value="{{ meu_email }}" placeholder="um e-mail da Grid"></label>
+    <div class="em-acoes"><button class="gc-btn gc-btn--primario" type="submit">Mandar o teste</button></div>
+  </form>
+  {% elif modelo %}
+  <h2 class="ins-sub">O e-mail</h2>
+  <dl class="em-modelo">
+    <div><dt>Assunto</dt><dd>{{ modelo.assunto }}</dd></div>
+    <div><dt>Quando</dt><dd>{{ t.gatilho }}</dd></div>
+    <div><dt>Como sai</dt><dd>{{ 'Um por Responsável UFV, com as usinas dele' if modelo.envio == 'por_responsavel' else 'Um e-mail só' }}{% if modelo.pular_vazio %} · quem não tem pendência não recebe{% endif %}</dd></div>
+    <div><dt>Para</dt><dd>{{ t.destino }}</dd></div>
+  </dl>
+  <div class="em-acoes em-acoes--modelo">
+    <a class="gc-btn gc-btn--primario" href="{{ raiz }}/t/base/emails-automaticos/{{ t.tipo }}/previa">Ver a prévia</a>
+    <a class="gc-btn gc-btn--contorno" href="{{ raiz }}/t/base/emails-automaticos/{{ t.tipo }}/editar">Editar</a>
+    <form method="post" action="{{ raiz }}/t/base/emails-automaticos/{{ t.tipo }}/mandar-agora" data-em-confirma="Mandar este e-mail agora, para todos? A regra vale: desligado não sai.">
+      <input type="hidden" name="codigo" value="{{ codigo }}"><button class="gc-btn gc-btn--contorno" type="submit">Mandar agora</button></form>
+    <form method="post" action="{{ raiz }}/t/base/emails-automaticos/{{ t.tipo }}/excluir" data-em-confirma="Excluir este e-mail? Ele não sai mais; o que já saiu continua no registro.">
+      <input type="hidden" name="codigo" value="{{ codigo }}"><button class="gc-btn gc-btn--fantasma" type="submit">Excluir</button></form>
+  </div>
+  {% endif %}
+
+  <h2 class="ins-sub">{{ 'Regra' if t.nexus else 'Regra do Nexus' }}</h2>
+  <p class="em-efeito">{% if t.regra %}Vale desde {{ hora(t.regra.alterado_em) }}: <b>{{ efeito(t.regra, quem) }}</b>.{% if t.pendente and not t.nexus %} <span class="cn-pill em-sit em-sit--alerta">o App ainda não confirmou</span>{% endif %}{% else %}{{ 'Sem regra: vale o destino padrão do e-mail.' if t.nexus else 'Sem regra do Nexus: o App segue as configurações dele.' }}{% endif %}</p>
+  {% if erro_form %}<div class="cn-erro" role="alert">{{ erro_form }}</div>{% endif %}
+  {% if sem_chave %}<div class="cn-erro" role="alert">Este Nexus não tem a NEXUS_PESSOA_HMAC: a regra iria sem assinatura e o App a descartaria. A edição fica fechada.</div>
+  {% else %}
+  <form class="em-form" method="post" action="{{ raiz }}/t/base/emails-automaticos/{{ t.tipo }}/regra" data-em-form
+        data-critico="{{ '1' if t.critico else '' }}">
+    <input type="hidden" name="codigo" value="{{ codigo }}">
+    <fieldset class="em-grupo"><legend class="gc-rotulo">Situação</legend>
+      <label class="gc-chip"><input type="radio" name="ligado" value="sim"{% if form.ligado %} checked{% endif %}> Ligado</label>
+      <label class="gc-chip"><input type="radio" name="ligado" value="nao"{% if not form.ligado %} checked{% endif %}> Desligado</label>
+    </fieldset>
+    <fieldset class="em-grupo"><legend class="gc-rotulo">Modo</legend>
+      <label class="gc-chip"><input type="radio" name="modo" value="normal"{% if form.modo != 'teste' %} checked{% endif %}> Normal</label>
+      <label class="gc-chip"><input type="radio" name="modo" value="teste"{% if form.modo == 'teste' %} checked{% endif %}> Teste</label>
+      <p class="gc-ajuda" data-em-ajuda-teste>No teste, o e-mail vai só para a lista abaixo, sem cópia e com "[Teste]" no assunto. Sem lista {{ quem }} manda para todos: a lista é obrigatória.</p>
+    </fieldset>
+    <div class="em-grupo"><span class="gc-rotulo">Destinatários a mais</span>
+      <ul class="em-dest" data-em-dest>
+        {%- for e in form.dest %}<li><input type="hidden" name="dest" value="{{ e }}"><span>{{ por_email.get(e) or e }}{% if por_email.get(e) %}<small>{{ e }}</small>{% endif %}</span>
+          <button type="button" class="gc-btn gc-btn--fantasma" data-em-tirar aria-label="Tirar {{ por_email.get(e) or e }}">Tirar</button></li>{% endfor -%}
+      </ul>
+      <div class="em-add">
+        <input class="gc-campo" type="text" data-lista="em-pessoas" data-em-novo autocomplete="off"
+               placeholder="Nome de uma pessoa ou o e-mail de uma caixa (como a do COS)" aria-label="Pessoa ou e-mail">
+        <button type="button" class="gc-btn gc-btn--contorno" data-em-incluir>Incluir</button>
+      </div>
+      <p class="gc-ajuda gc-ajuda--erro" data-em-erro-dest hidden></p>
+      <p class="gc-ajuda">Pessoas do cadastro e do Fracttal pelo nome; caixa digitada, só e-mail da Grid.</p>
+    </div>
+    <fieldset class="em-grupo" data-em-substitui><legend class="gc-rotulo">Com a lista, no modo normal</legend>
+      <label class="gc-chip"><input type="radio" name="substitui" value="nao"{% if not form.substitui %} checked{% endif %}> Somar ao padrão {{ 'do Nexus' if t.nexus else 'do App' }}</label>
+      <label class="gc-chip"><input type="radio" name="substitui" value="sim"{% if form.substitui %} checked{% endif %}> Substituir o padrão</label>
+    </fieldset>
+    <label class="em-grupo"><span class="gc-rotulo">Motivo da mudança</span>
+      <input class="gc-campo" type="text" name="motivo" maxlength="200" required minlength="8" value="{{ form.motivo }}"
+             placeholder="Ex.: TST de férias, o supervisor recebe no lugar">
+      <span class="gc-ajuda">Obrigatório. Vai em claro para o banco: sem e-mail e sem nome de pessoa (cite o papel).</span></label>
+    {% if t.critico %}
+    <label class="em-critico" data-em-critico hidden><input type="checkbox" name="confirmo" value="1">
+      <span><b>Desligar este e-mail.</b> {{ quem_deixa }} Confirmo que é isto.</span></label>
+    {% endif %}
+    <div class="em-acoes">
+      <button class="gc-btn gc-btn--primario" type="submit" name="acao" value="salvar">Publicar a regra</button>
+      {% if t.regra %}<button class="gc-btn gc-btn--contorno" type="submit" name="acao" value="padrao" data-em-padrao>Voltar ao padrão do App</button>{% endif %}
+    </div>
+  </form>
+  <script type="application/json" id="em-pessoas">{{ opcoes|tojson }}</script>
+  {% endif %}
+
+  <h2 class="ins-sub">Mudanças</h2>
+  {% if mudancas %}
+  <div class="cn-tab"><table>
+    <thead><tr><th class="em-esq">Quando</th><th class="em-esq">Quem</th><th class="em-esq">O que mudou</th><th class="em-esq">Motivo</th></tr></thead>
+    <tbody>{% for m in mudancas %}
+      <tr><td class="em-esq gc-num">{{ hora(m.quando) }}</td><td class="em-esq">{{ m.quem }}</td>
+        <td class="em-esq">{% if not m.vale %}<span class="cn-pill em-sit em-sit--critico">Não vale</span> <span class="mudo">{{ m.porque }}: {{ quem }} ignora esta linha</span>{% else %}{{ m.mudou|join(' · ') }}{% for e in m.entrou %}<span class="det">entrou {{ por_email.get(e) or e }}</span>{% endfor %}{% for e in m.saiu %}<span class="det">saiu {{ por_email.get(e) or e }}</span>{% endfor %}{% endif %}</td>
+        <td class="em-esq mudo">{{ m.motivo }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="cn-vazio">Nenhuma mudança deste e-mail pelo Nexus.</p>{% endif %}
+
+  <h2 class="ins-sub">Envios dos últimos {{ historico_dias }} dias</h2>
+  {% if t.dias %}<div class="em-graf-caixa">{{ legenda() }}{{ grafico(t.dias, grande=True) }}</div>{% endif %}
+  {% if envios %}
+  <div class="cn-tab"><table>
+    <thead><tr><th class="em-esq">Quando</th><th class="em-esq">Para quem</th><th class="em-esq">Referência</th><th>Situação</th><th class="em-esq">Erro</th></tr></thead>
+    <tbody>{% for e in envios %}
+      <tr><td class="em-esq gc-num">{{ hora(e.quando) }}</td>
+        <td class="em-esq">{{ e.quem }}{% if e.papel %}<span class="det">{{ e.papel }}</span>{% endif %}</td>
+        <td class="em-esq">{{ e.referencia or '—' }}</td>
+        <td><span class="cn-pill em-sit em-sit--{{ e.tom }}">{{ e.rotulo }}</span></td>
+        <td class="em-esq mudo">{{ e.erro or '' }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="cn-vazio">{% if t.nexus or d.fonte == 'todos' or (d.fonte == 'semanal' and t.tipo == 'seguranca_semanal') %}Nenhum envio deste e-mail nos últimos {{ historico_dias }} dias.{% elif t.nexus %}O Nexus ainda não mandou este e-mail.{% else %}O App ainda não publicou os envios deste e-mail.{% endif %}</p>{% endif %}
+
+  {% else %}
+  {% set comnum = d.tipos|selectattr('enviados', 'ne', none)|list %}
+  <div class="gc-numeros em-numeros">
+    <div><div class="r">Ligados</div><div class="v gc-num">{% if d.tem_tipos %}{{ d.tipos|selectattr('ligado')|list|length }}<small> de {{ d.tipos|length }}</small>{% else %}—{% endif %}</div>
+      <div class="d">{% if d.tem_tipos %}{{ d.tipos|selectattr('modo', 'eq', 'teste')|list|length }} em teste{% else %}o App ainda não diz{% endif %}</div></div>
+    <div><div class="r">Enviados em {{ dias }} dias</div><div class="v gc-num">{{ comnum|sum(attribute='enviados') if comnum else '—' }}</div><div class="d">envios, não pessoas</div></div>
+    <div><div class="r">Falhas em {{ dias }} dias</div><div class="v gc-num{% if comnum|sum(attribute='falhas') %} ruim{% endif %}">{{ comnum|sum(attribute='falhas') if comnum else '—' }}</div><div class="d">{% if comnum|sum(attribute='falhas') %}o App tenta de novo{% else %}nenhuma{% endif %}</div></div>
+    <div><div class="r">Regras do Nexus</div><div class="v gc-num">{{ d.tipos|selectattr('regra')|list|length }}</div><div class="d">{% if d.tipos|selectattr('pendente')|list %}{{ d.tipos|selectattr('pendente')|list|length }} a confirmar pelo App{% else %}as outras seguem o App{% endif %}</div></div>
+  </div>
+  <div class="em-cab-cartoes"><h2 class="ui-kicker">Os e-mails · envios por dia em {{ historico_dias }} dias</h2>{{ legenda() }}</div>
+  <ul class="em-cartoes">
+    {% for x in d.tipos %}{{ cartao(x) }}{% endfor %}
+  </ul>
+  <p class="mudo em-pe">"—" é o que o App ainda não diz. Clique num e-mail para ver os envios e mudar a regra.</p>
+
+  <div class="em-cab-cartoes em-cab-nexus"><h2 class="ui-kicker">Do Nexus · os e-mails que o próprio Nexus manda</h2>
+    <a class="gc-btn gc-btn--primario" href="{{ raiz }}/t/base/emails-automaticos/novo"><i class="ph ph-plus" aria-hidden="true"></i> Novo e-mail</a></div>
+  {% set e = nx_estado %}
+  {% if e.prova %}<div class="cn-erro cn-aviso" role="status">Cópia de prova: os e-mails do Nexus viram arquivos nesta máquina, nada sai.</div>
+  {% elif e.faltam %}<div class="cn-erro cn-aviso" role="status"><b>O Nexus ainda não tem como mandar e-mail:</b> falta {{ e.faltam|join(', ') }}. Cole em <a class="cn-link" href="{{ raiz }}/t/base/chaves-fontes">Base › Chaves das fontes</a> (aba Nexus, "E-mail do Nexus"), as mesmas do App de Campo.</div>
+  {% elif not e.nesta %}<div class="cn-erro cn-aviso" role="status">Esta máquina não envia os e-mails do Nexus (só o servidor envia: "E-mail do Nexus: enviar nesta máquina", em Base › Chaves das fontes). A lista mostra o que o servidor registrou.</div>
+  {% else %}<p class="mudo em-estado-envio">O Nexus envia por esta máquina{% if e.fila %} · {{ e.fila }} na fila{% endif %}{% if e.ultima.quando %} · última rodada {{ hora(e.ultima.quando) }}{% endif %}.</p>{% endif %}
+  {% if erro_ctl_nx %}<div class="cn-erro" role="alert">Não li as regras dos e-mails do Nexus agora ({{ erro_ctl_nx }}).</div>{% endif %}
+  <ul class="em-cartoes">
+    {% for x in nx.tipos %}{{ cartao(x) }}{% endfor %}
+  </ul>
+  {% endif %}
+</div>
+<style>
+  /* Base › E-mails automáticos (24/11/2026; cartões em 25/11, Levi: "Tô sentindo falta de uma coisa mais visual"): um
+     cartão por tipo, com quando sai, para quem e o gráfico dos envios por dia; cor só para a situação */
+  .em-numeros .v small{font-size:15px;font-weight:500;color:var(--mudo)}
+  .em-numeros .v.ruim{color:var(--critico)}
+  .em-cab-cartoes{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;margin:8px 0 12px}
+  .em-cab-cartoes .ui-kicker{margin:0}
+  .em-legenda{list-style:none;display:flex;flex-wrap:wrap;gap:6px 14px;margin:0;padding:0;font-size:12px;color:var(--tinta-2)}
+  .em-legenda li{display:flex;align-items:center;gap:6px}
+  .em-legenda .em-s{width:10px;height:10px;border-radius:3px;flex:none}
+  .em-cartoes{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+  .em-cartao{display:grid;gap:12px;height:100%;box-sizing:border-box;padding:16px;background:var(--superficie);
+    border:1px solid var(--linha);border-radius:var(--raio-md);color:inherit;text-decoration:none}
+  .em-cartao:hover{border-color:var(--linha-forte);background:var(--superficie-2)}
+  .em-cartao:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+  .em-cartao--desligado{border-left:3px solid var(--alerta-cheio)}
+  .em-cartao-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .em-cartao-cab b{font:600 15px/20px var(--font-sans);color:var(--tinta)}
+  .em-pills{display:flex;gap:6px;flex:none}
+  .em-fluxo{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:start;font-size:13px;
+    line-height:18px;color:var(--tinta-2)}
+  .em-fluxo > span{display:flex;gap:8px;min-width:0}
+  .em-fluxo > span > .ph{color:var(--verde-texto);font-size:17px;margin-top:1px;flex:none}
+  .em-fluxo small{display:block;font-size:11px;line-height:14px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--mudo)}
+  .em-fluxo-seta{color:var(--mudo);margin-top:14px}
+  .em-graf{display:grid;gap:4px}
+  .em-graf-teto,.em-graf-eixo{display:flex;justify-content:space-between;font-size:11px;line-height:14px;color:var(--mudo)}
+  .em-colunas{display:flex;align-items:flex-end;gap:2px;height:56px;border-bottom:1px solid var(--linha-forte)}
+  .em-graf--grande .em-colunas{height:140px;gap:4px}
+  .em-dia{flex:1 1 0;min-width:0;height:100%;display:flex;align-items:flex-end;border-radius:4px 4px 0 0;outline-offset:1px}
+  .em-dia:hover,.em-dia:focus-visible{background:var(--superficie-3)}
+  .em-dia:focus-visible{outline:2px solid var(--foco)}
+  .em-pilha{display:flex;flex-direction:column;gap:2px;width:100%;min-height:4px;border-radius:4px 4px 0 0;overflow:hidden}
+  .em-s{display:block;min-height:2px}
+  .em-s--enviado{background:var(--ok-cheio)}
+  .em-s--teste{background:var(--info-cheio)}
+  .em-s--falhou{background:var(--critico-cheio)}
+  .em-s--barrado{background:var(--mudo)}
+  .em-graf-sem{display:block;padding:18px 0;font-size:12.5px;color:var(--mudo);border-bottom:1px solid var(--linha)}
+  .em-graf-caixa{display:grid;gap:10px;margin:6px 0 16px;padding:14px 16px;background:var(--superficie);
+    border:1px solid var(--linha);border-radius:var(--raio-md)}
+  .em-cartao-pe{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;font-size:12.5px;color:var(--tinta-2)}
+  .em-cartao-nota{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:var(--mudo)}
+  .em-cartao-nota > span + span::before{content:"·";margin-right:10px}
+  .em-tip{position:fixed;z-index:60;pointer-events:none;padding:6px 9px;font-size:12px;line-height:16px;color:var(--tinta);
+    background:var(--superficie-3);border:1px solid var(--linha-forte);border-radius:var(--raio-tag);white-space:nowrap}
+  .ruim{color:var(--critico)}
+  .em-cab-nexus{margin-top:28px}
+  .em-estado-envio{margin:0 0 12px;font-size:12.5px}
+  .em-form--curto{max-width:520px}
+  .em-modelo{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 18px;margin:8px 0 12px}
+  .em-modelo dt{font-size:12px;color:var(--mudo)}
+  .em-modelo dd{margin:2px 0 0;font-size:13.5px;color:var(--tinta)}
+  .em-acoes--modelo{margin:0 0 18px}
+  .em-acoes--modelo form{margin:0}
+  .em-pe{margin:12px 0 0;font-size:12.5px}
+  .em-volta{margin:14px 0 0;font-size:13px}
+  .em-resumo{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin:14px 0 0;border-top:1px solid var(--linha);
+    border-bottom:1px solid var(--linha)}
+  .em-resumo > div{padding:10px 16px;border-left:1px solid var(--linha)}
+  .em-resumo > div:first-child{border-left:0;padding-left:0}
+  .em-resumo dt{font-size:12px;color:var(--mudo)}
+  .em-resumo dd{margin:3px 0 0;font:600 18px/24px var(--font-sans)}
+  .em-resumo dd small{display:block;font:400 12px/16px var(--font-sans);color:var(--mudo)}
+  .em-resumo dd.ruim{color:var(--critico)}
+  .atencao{color:var(--alerta);font-weight:600}
+  .cn-tab td.em-esq,.cn-tab th.em-esq{text-align:left}
+  .cn-tab .det{display:block;font-size:12px;color:var(--mudo)}
+  .em-sit--ok{color:var(--ok);background:var(--ok-suave)}
+  .em-sit--critico{color:var(--critico);background:var(--critico-suave)}
+  .em-sit--alerta{color:var(--alerta);background:var(--alerta-suave)}
+  .em-sit--info{color:var(--info);background:var(--info-suave)}
+  .em-sit--neutro{color:var(--mudo);background:var(--superficie-2)}
+  .cn-ok-aviso{color:var(--ok);background:var(--ok-suave);border-color:var(--ok)}
+  .em-efeito{margin:6px 0 10px;font-size:13.5px;color:var(--tinta-2)}
+  .em-form{display:grid;gap:16px;max-width:760px;padding:16px 0 4px;border-top:1px solid var(--linha)}
+  .em-grupo{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0;padding:0;border:0;min-width:0}
+  .em-grupo > .gc-rotulo,.em-grupo > legend{flex-basis:100%;padding:0;margin:0 0 2px}
+  .em-grupo > .gc-ajuda{flex-basis:100%;margin:0}
+  .em-grupo > .gc-campo{flex:1 1 100%}
+  .em-grupo .gc-chip input{accent-color:var(--verde)}
+  .em-dest{list-style:none;margin:0;padding:0;display:grid;gap:6px;flex-basis:100%}
+  .em-dest:empty::before{content:"Nenhum: vale o destino padrão do App.";font-size:13px;color:var(--mudo)}
+  .em-dest li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 10px;
+    border:1px solid var(--linha);border-radius:var(--raio-controle)}
+  .em-dest li span{display:grid;font-size:13.5px;color:var(--tinta);min-width:0;overflow-wrap:anywhere}
+  .em-dest li small{font-size:12px;color:var(--mudo)}
+  .em-add{display:flex;gap:8px;flex-basis:100%}
+  .em-add .gc-campo{flex:1;min-width:0}
+  .em-critico{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--critico);
+    border-radius:var(--raio-controle);background:var(--critico-suave);color:var(--tinta);font-size:13.5px}
+  .em-critico input{margin-top:3px;accent-color:var(--critico)}
+  .em-acoes{display:flex;flex-wrap:wrap;gap:10px}
+  @media (max-width:640px){
+    .em-cartoes{grid-template-columns:minmax(0,1fr)}
+    .em-fluxo{grid-template-columns:minmax(0,1fr)}
+    .em-fluxo-seta{display:none}
+    .em-add{flex-direction:column}
+    .em-resumo > div{border-left:0;padding-left:0}
+  }
+</style>
+<script src="{{ url_for('static', filename='lista-sugestoes.js') }}"></script>
+<script src="{{ url_for('static', filename='base-emails.js') }}"></script>
+{% endblock %}

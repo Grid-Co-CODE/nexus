@@ -326,3 +326,6 @@ body.os-form select.spc-sub-tipo:hover{color:var(--spc-tinta);border-bottom:1px 
 
 /* o selo com a cor do Fracttal no tema claro: a cor do dado com a luminosidade no teto (a mesma regra do .os-status) */
 :where(html[data-tema="claro"]) .spc-pill[style]{-webkit-text-fill-color:color-mix(in oklab,currentColor 50%,#000);-webkit-text-fill-color:oklch(from currentColor min(l,.46) c h)}
+
+/* a barra de visões do Histórico de OS no alto do Histórico de solicitações (25/11/2026): do tamanho dos botões, como lá */
+.spc-hist-visoes{align-self:flex-start;max-width:100%;overflow-x:auto}

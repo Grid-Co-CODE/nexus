@@ -297,7 +297,7 @@ def _rastrear(cli, p):
     # a cobertura não pode cair em silêncio: as 13 torres, o cadastro com fichas e o OS Creator embutido
     assert len(rs.visitados) >= 120, len(rs.visitados)
     for preciso in ("/t/base/usina/1", "/t/pessoas/colaborador/P-0001", "/t/os/inicio", "/os/", "/os/historico",
-                    "/os/static/abas.js", "/t/performance/clima/mapa", "/t/campo/rondas/avulsa"):
+                    "/os/static/abas.js", "/t/campo/clima", "/t/campo/rondas/avulsa"):
         assert p + preciso in rs.visitados, preciso
     return rs
 

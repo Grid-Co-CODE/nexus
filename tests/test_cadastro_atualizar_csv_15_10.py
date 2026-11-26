@@ -402,6 +402,24 @@ def test_responsavel_sem_ficha_nasce_supervisor_com_o_email_do_fracttal(srv_p):
     assert srv_p.titulo_de("pessoas", u.valores["responsavel_om"]) == "Dalton Neto"
 
 
+def test_o_supervisor_de_contrato_do_csv_e_o_gestor_de_contrato(srv_p):
+    """23/11/2026, Levi: "pode ligar, chama de Gestor de contrato". A coluna do CSV liga ao Gestor de contrato da ficha
+    pelo nome contido, como o Responsável O&M; quem não tem ficha ganha uma com o vínculo de gestor; célula vazia não
+    apaga."""
+    assert srv_p.criar("pessoas", {"nome": "Carla Mendes", "vinculo": "Colaborador de campo"}, "t").ok
+    cab, linhas = ic.ler_csv(_csv(["UFV-001;Brodowski;Carla Rocha Mendes", "UFV-002;Matões 100;Iara Bento Lima",
+                                   "UFV-003;Sem Gestor;"], "ID da usina;Nome;Supervisor de contrato"))
+    p = ic.proposta(linhas, srv_p, cab, [])
+    assert "Supervisor de contrato" not in p.get("sem_campo", [])
+    nova = next(m for m in p["pessoas"] if m["acao"] == "criar")
+    assert nova["formulario"]["nome"] == "Iara Bento Lima" and nova["formulario"]["vinculo"] == "Gestor de contrato"
+    ic.aplicar(p, srv_p, "teste")
+    us = {r.valores.get("id_bd"): r for r in srv_p.registros("usinas")}
+    assert srv_p.titulo_de("pessoas", us["UFV-001"].valores["gestor_contrato"]) == "Carla Mendes"
+    assert srv_p.titulo_de("pessoas", us["UFV-002"].valores["gestor_contrato"]) == "Iara Lima"
+    assert ic.proposta(linhas, srv_p, cab, [])["mudancas"] == []                 # de novo: nada
+
+
 def test_nome_de_duas_fichas_nao_liga_nem_cria(srv_p):
     for nome in ("Beto Lins Costa", "Beto Ramos Costa"):          # os dois têm o nome padrão "Beto Costa"
         assert srv_p.criar("pessoas", {"nome": nome, "vinculo": "Colaborador de campo"}, "t").ok

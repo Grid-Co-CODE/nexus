@@ -254,9 +254,9 @@ def test_o_painel_so_para_o_administrador(app, cliente, monkeypatch):
     monkeypatch.setattr(M, "ler", lambda forcar=False: {"eventos": [], "lido_em": time.time(), "erro": ""})
     monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.ENGENHARIA, "nome": "Engenharia"},
                                                "erro": ""})
-    assert "Trazer o histórico do app de ETM" not in _ms(cliente, ANA).get("/t/engenharia/etm").get_data(as_text=True)
+    assert "Trazer o histórico do app de ETM" not in _ms(cliente, ANA).get("/t/performance/etm").get_data(as_text=True)
     _admin(monkeypatch, ANA["email"])
-    html = _ms(cliente, ANA, admin=True).get("/t/engenharia/etm").get_data(as_text=True)
+    html = _ms(cliente, ANA, admin=True).get("/t/performance/etm").get_data(as_text=True)
     assert "Trazer o histórico do app de ETM" in html and "nexusRota('/os/_nexus/engenharia/etm/historico')" in html
 
 

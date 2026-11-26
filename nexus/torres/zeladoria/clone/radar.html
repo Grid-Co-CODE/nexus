@@ -13697,12 +13697,12 @@ function bindEventsPlanejadoAndamento(app){
    e manda para a Lixeira (o serviço ligado não é apagado). Tabela radar_fornecedores.ordens_servico. */
 function linhaParaOrdemServico(r){
   return { id: r.id, numero: r.numero, usinaId: r.usina_id, usinaTexto: r.usina_texto, servico: r.servico, data: r.data, fornecedor: r.fornecedor_texto, status: r.status || 'aberta',
-    concluidaEm: r.concluida_em, justificativa: r.justificativa, vinculo: r.vinculo, vinculoManual: !!r.vinculo_manual, observacao: r.observacao, tipoVistoria: r.tipo_vistoria || null, fracttal: r.fracttal || null,
+    concluidaEm: r.concluida_em, justificativa: r.justificativa, vinculo: r.vinculo, vinculoManual: !!r.vinculo_manual, observacao: r.observacao, fracttal: r.fracttal || null,
     excluido: !!r.excluido, excluidoEm: r.excluido_em, excluidoPor: r.excluido_por, criadoEm: r.criado_em, criadoPor: r.criado_por, atualizadoEm: r.atualizado_em, atualizadoPor: r.atualizado_por };
 }
 function ordemServicoParaLinha(o){
   return { id: o.id, numero: o.numero, usina_id: o.usinaId || null, usina_texto: o.usinaTexto || null, servico: o.servico || null, data: o.data || null, fornecedor_texto: o.fornecedor || null,
-    status: o.status || 'aberta', concluida_em: o.concluidaEm || null, justificativa: o.justificativa || null, vinculo: o.vinculo || null, vinculo_manual: !!o.vinculoManual, observacao: o.observacao || null, tipo_vistoria: o.tipoVistoria || null, fracttal: o.fracttal || null,
+    status: o.status || 'aberta', concluida_em: o.concluidaEm || null, justificativa: o.justificativa || null, vinculo: o.vinculo || null, vinculo_manual: !!o.vinculoManual, observacao: o.observacao || null, fracttal: o.fracttal || null,
     excluido: !!o.excluido, excluido_em: o.excluidoEm || null, excluido_por: o.excluidoPor || null, criado_em: o.criadoEm || undefined, criado_por: o.criadoPor || null,
     atualizado_em: o.atualizadoEm || null, atualizado_por: o.atualizadoPor || null };
 }
@@ -13991,9 +13991,15 @@ function descricaoVinculoOS(it){
    PCM também precisa finalizar no Fracttal. Só vale para OS concluída aqui: finalizada (status 3) /
    falta (ainda aberta ou em revisão lá) / cancelada / não conferida / não encontrada. */
 var OS_FINALIZACAO = { finalizada: 'Finalizada no Fracttal', falta: 'Falta finalizar no Fracttal', cancelada: 'Cancelada no Fracttal', naoConferida: 'Ainda não conferida no Fracttal', naoEncontrada: 'Não encontrada no Fracttal' };
-/* Tipo de vistoria (pedido do Analista, 2026-11-18): o Fracttal passou a dividir a OS em inicial/final.
-   Só as OS novas (e as que forem editadas) ganham essa informação; as antigas ficam sem tipo ("juntas"). */
-var OS_TIPO_VISTORIA = { inicial: 'Vistoria inicial', final: 'Vistoria final' };
+/* Tipo de vistoria (pedido do Analista, 2026-11-18 e 2026-11-24): o banco do Nexus ainda não tem uma
+   coluna própria pra isso (tentamos e travou o salvamento de toda OS, revertido em 2026-11-24), então
+   por enquanto é escrito no começo da própria Observação ("Vistoria inicial" / "Vistoria final", com
+   ou sem o resto da nota depois) e o card detecta e mostra como selo, igual antes. */
+var OS_VISTORIA_OBS_RE = /^\s*vistoria\s+(inicial|final)\s*[:\-–]?\s*/i;
+function osVistoriaDaObservacao(obs){
+  var m = OS_VISTORIA_OBS_RE.exec(obs || ''); if (!m) return null;
+  return { tipo: m[1].toLowerCase(), resto: obs.slice(m[0].length).trim() };
+}
 /* técnico responsável pela OS no Fracttal (quem cobrar); null = OS ainda não conferida */
 function osTecnicoOS(o){ var fr = o.fracttal; return fr && fr.encontrada ? (fr.tecnico || 'sem técnico no Fracttal') : null; }
 function osFinalizacaoFracttal(o, st){
@@ -14007,10 +14013,12 @@ function osCardHtml(o, st){
   var u = o.usinaId ? usinaById(o.usinaId) : null;
   var html = '<div class="card" data-os-card="' + esc(o.id) + '" style="padding:10px 12px;margin-bottom:8px;' + (st.col === 'sem' ? 'border-left:3px solid var(--critical);' : '') + '">';
   html += '<div style="display:flex;justify-content:space-between;gap:6px;align-items:baseline;"><b style="font-size:13px;">OS ' + esc(o.numero) + '</b><span class="cell-muted mono" style="font-size:11px;">' + fmtDate(o.data) + '</span></div>';
-  if (OS_TIPO_VISTORIA[o.tipoVistoria]) html += '<div style="margin-top:3px;"><span class="pill ' + (o.tipoVistoria === 'final' ? 'pill-good' : 'pill-info') + '" style="font-size:10.5px;">' + esc(OS_TIPO_VISTORIA[o.tipoVistoria]) + '</span></div>';
   html += '<div style="font-weight:600;font-size:12.5px;margin-top:2px;">' + esc(u ? u.usina : (o.usinaTexto || '—')) + ' <span class="cell-muted" style="font-weight:400;font-size:11px;">' + esc(u ? ((u.uf || '') + (u.cliente ? ' · ' + u.cliente : '')) : 'usina não encontrada') + '</span></div>';
   html += '<div style="font-size:12px;">' + esc(nomeServicoCurto(o.servico || '')) + ' · <span class="cell-muted">' + esc(o.fornecedor || '—') + '</span></div>';
-  if (o.observacao) html += '<div class="cell-muted" style="font-size:11px;margin-top:2px;line-height:1.35;">' + esc(o.observacao) + '</div>';
+  var vis = osVistoriaDaObservacao(o.observacao);
+  if (vis) html += '<div style="margin-top:3px;"><span class="pill ' + (vis.tipo === 'final' ? 'pill-good' : 'pill-info') + '" style="font-size:10.5px;">Vistoria ' + vis.tipo + '</span></div>';
+  var obsResto = vis ? vis.resto : (o.observacao || '');
+  if (obsResto) html += '<div class="cell-muted" style="font-size:11px;margin-top:2px;line-height:1.35;">' + esc(obsResto) + '</div>';
   var fr = o.fracttal, tec = osTecnicoOS(o);
   if (fr && fr.encontrada) html += '<div data-os-tecnico style="font-size:12px;margin-top:3px;">Técnico: <b>' + esc(tec) + '</b></div><div class="cell-muted" data-os-fr-info style="font-size:11px;margin-top:1px;">' + esc((fr.aberta_em ? 'aberta ' + fmtDate(fr.aberta_em) : '') + (OS_FR_STATUS[fr.status] ? (fr.aberta_em ? ' · ' : '') + OS_FR_STATUS[fr.status] + ' no Fracttal' : '')) + '</div>';
   var fin = osFinalizacaoFracttal(o, st);
@@ -14186,7 +14194,6 @@ function modalOSEditar(){
     '<div class="field"><label for="ose-usina">Usina *</label><select id="ose-usina"><option value="">— escolha —</option>' + opUsinas + '</select></div>' +
     '<div class="field-row"><div class="field"><label for="ose-servico">Serviço *</label><select id="ose-servico">' + opServ + '</select></div><div class="field"><label for="ose-fornecedor">Empresa / equipe</label><input id="ose-fornecedor" value="' + esc(o ? o.fornecedor || '' : '') + '"></div></div>' +
     (o ? '<div class="field"><label for="ose-vinculo">Serviço ligado</label><select id="ose-vinculo">' + opV + '</select></div>' : '') +
-    '<div class="field"><label for="ose-tipo-vistoria">Tipo de vistoria</label><select id="ose-tipo-vistoria"><option value=""' + (!o || !o.tipoVistoria ? ' selected' : '') + '>— não informado —</option><option value="inicial"' + (o && o.tipoVistoria === 'inicial' ? ' selected' : '') + '>Vistoria inicial</option><option value="final"' + (o && o.tipoVistoria === 'final' ? ' selected' : '') + '>Vistoria final</option></select></div>' +
     '<div class="field"><label for="ose-justificativa">Justificativa (se não tiver serviço)</label><input id="ose-justificativa" value="' + esc(o ? o.justificativa || '' : '') + '"></div>' +
     '<div class="field"><label for="ose-obs">Observação</label><input id="ose-obs" value="' + esc(o ? o.observacao || '' : '') + '"></div>' +
     '<div class="modal-actions"><button class="btn btn-ghost" id="btn-ose-cancelar">Cancelar</button><button class="btn btn-primary" id="btn-ose-salvar">Salvar</button></div></div></div></div>';
@@ -14201,7 +14208,7 @@ function onSalvarOSEditar(){
   var u = usinaById(usinaId), agora = new Date().toISOString();
   var dados = { numero: numero, data: data, usinaId: usinaId, usinaTexto: u ? u.usina : null, servico: servico, fornecedor: document.getElementById('ose-fornecedor').value.trim() || null,
     justificativa: document.getElementById('ose-justificativa').value.trim() || null, observacao: document.getElementById('ose-obs').value.trim() || null,
-    tipoVistoria: document.getElementById('ose-tipo-vistoria').value || null, atualizadoEm: agora, atualizadoPor: whoami() };
+    atualizadoEm: agora, atualizadoPor: whoami() };
   var selV = document.getElementById('ose-vinculo');
   if (o) {
     var mudouAlvo = o.usinaId !== usinaId || o.servico !== servico;

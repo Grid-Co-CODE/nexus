@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block titulo %}{{ 'Editar e-mail' if modelo_id else 'Novo e-mail' }}{% endblock %}
+{% block conteudo %}
+{% from "_explica.html" import explica %}
+{# Base › E-mails automáticos › Novo e-mail (25/11/2026; nexus/torres/base/emails_modelos_tela.py, a regra em
+   nexus/emails/modelos.py): um e-mail montado com dados do Nexus, para quem pelo papel, na agenda. Só administrador. #}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<div class="campo-nativa em-tela">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">Base · E-mails automáticos</p>
+      <div class="gc-titulo-explica"><h1 class="cn-titulo">{{ m.nome if modelo_id else 'Novo e-mail' }}</h1>
+        {% call explica('Entenda esta tela') %}
+          <p><b>O que é.</b> Um e-mail que o Nexus manda sozinho, montado com o que ele já calcula. Você escolhe o texto, o que
+          ele traz, para quem e quando. Nada aqui inventa número: cada fonte é uma conta que já aparece numa tela do Nexus.</p>
+          <p><b>Para quem.</b> Pelo papel no Registro mestre (o Responsável UFV, o supervisor de campo e o gestor de contrato
+          de cada usina; a TST e os setores de Base › Acessos), ou por e-mail. No "um por Responsável UFV", cada
+          responsável recebe só as usinas dele, e os papéis da usina valem para as usinas do grupo.</p>
+          <p><b>Como vale.</b> O e-mail novo nasce desligado. Salve, confira a prévia (e mande a prévia para você) e só então
+          ligue na Regra. O nome e o assunto aparecem no registro dos envios: sem nome de pessoa e sem e-mail neles. O
+          texto vai cifrado para o banco.</p>
+        {% endcall %}
+      </div>
+      <p class="cn-pergunta">O que este e-mail traz, para quem e quando?</p></div>
+  </div>
+  <p class="em-volta"><a class="cn-link" href="{{ raiz }}/t/base/emails-automaticos{% if modelo_id %}/{{ modelo_id }}{% endif %}"><i class="ph ph-arrow-left" aria-hidden="true"></i> {{ 'Voltar ao e-mail' if modelo_id else 'Todos os e-mails' }}</a></p>
+  {% if erro %}<div class="cn-erro" role="alert">{{ erro }}</div>{% endif %}
+
+  <form class="em-form" method="post" action="{{ raiz }}/t/base/emails-automaticos/modelo/salvar">
+    <input type="hidden" name="codigo" value="{{ codigo }}">
+    <input type="hidden" name="modelo_id" value="{{ modelo_id }}">
+    <label class="em-grupo"><span class="gc-rotulo">Nome do e-mail</span>
+      <input class="gc-campo" type="text" name="nome" required minlength="4" maxlength="80" value="{{ m.nome }}" placeholder="Ex.: Pendências das usinas"></label>
+    <label class="em-grupo"><span class="gc-rotulo">Assunto</span>
+      <input class="gc-campo" type="text" name="assunto" required minlength="4" maxlength="150" value="{{ m.assunto }}" placeholder="Ex.: Pendências das suas usinas hoje"></label>
+    <label class="em-grupo"><span class="gc-rotulo">Texto de abertura</span>
+      <textarea class="gc-campo em-texto" name="texto" maxlength="2000" rows="4" placeholder="Opcional: o que quem recebe precisa saber antes dos números">{{ m.texto }}</textarea></label>
+
+    <fieldset class="em-grupo"><legend class="gc-rotulo">O que ele traz</legend>
+      {% for f in fontes.values() %}
+      <label class="em-opcao"><input type="checkbox" name="fontes" value="{{ f.id }}"{% if f.id in m.fontes %} checked{% endif %}>
+        <span><b>{{ f.nome }}</b><small>{{ f.descricao }}</small></span></label>
+      {% endfor %}
+    </fieldset>
+
+    <fieldset class="em-grupo"><legend class="gc-rotulo">Como sai</legend>
+      {% for k, v in envios.items() %}<label class="gc-chip"><input type="radio" name="envio" value="{{ k }}"{% if m.envio == k %} checked{% endif %}> {{ v }}</label>{% endfor %}
+      <label class="em-opcao"><input type="checkbox" name="pular_vazio" value="1"{% if m.pular_vazio %} checked{% endif %}>
+        <span><b>Quem não tem pendência não recebe</b><small>vale quando o e-mail traz uma fonte</small></span></label>
+    </fieldset>
+
+    {% for campo, rot, lista, emails in (('para', 'Para', m.para, para_emails), ('cc', 'Em cópia', m.cc, cc_emails)) %}
+    <fieldset class="em-grupo"><legend class="gc-rotulo">{{ rot }}</legend>
+      {% for k, v in papeis.items() %}<label class="gc-chip"><input type="checkbox" name="{{ campo }}_papel" value="{{ k }}"{% if k in lista %} checked{% endif %}> {{ v }}</label>{% endfor %}
+      <input class="gc-campo" type="text" name="{{ campo }}_emails" value="{{ emails }}" placeholder="E-mails a mais, separados por vírgula (só da Grid ou de pessoas do cadastro)">
+    </fieldset>
+    {% endfor %}
+
+    <fieldset class="em-grupo"><legend class="gc-rotulo">Quando</legend>
+      <select class="gc-campo em-curto" name="freq">{% for k, v in freqs.items() %}<option value="{{ k }}"{% if m.agenda.freq == k %} selected{% endif %}>{{ v }}</option>{% endfor %}</select>
+      <input class="gc-campo em-curto" type="time" name="hora" value="{{ m.agenda.hora or '07:00' }}" aria-label="Hora (Brasília)">
+      <select class="gc-campo em-curto" name="dia" aria-label="Dia (semanal: da semana; mensal: do mês)">
+        {% for d in dias_semana %}<option value="{{ loop.index0 }}"{% if m.agenda.freq == 'semanal' and m.agenda.dia == loop.index0 %} selected{% endif %}>toda {{ d }}</option>{% endfor %}
+        {% for n in range(1, 29) %}<option value="{{ n }}"{% if m.agenda.freq == 'mensal' and m.agenda.dia == n %} selected{% endif %}>dia {{ n }} do mês</option>{% endfor %}
+      </select>
+      <label class="em-opcao"><input type="checkbox" name="uteis" value="1"{% if m.agenda.uteis %} checked{% endif %}><span><b>Só em dia útil</b><small>no "todo dia": não sai no sábado nem no domingo</small></span></label>
+      <p class="gc-ajuda">Hora de Brasília. O dia vale no semanal (o dia da semana) e no mensal (o dia do mês).</p>
+    </fieldset>
+
+    <div class="em-acoes"><button class="gc-btn gc-btn--primario" type="submit">{{ 'Salvar' if modelo_id else 'Criar (nasce desligado)' }}</button></div>
+  </form>
+</div>
+<style>
+  /* o editor de um e-mail do Nexus (25/11/2026): o mesmo formulário da Regra, com as opções em linhas */
+  .em-volta{margin:14px 0 0;font-size:13px}
+  .em-form{display:grid;gap:18px;max-width:820px;padding:16px 0 4px}
+  .em-grupo{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0;padding:0;border:0;min-width:0}
+  .em-grupo > .gc-rotulo,.em-grupo > legend{flex-basis:100%;padding:0;margin:0 0 2px}
+  .em-grupo > .gc-campo{flex:1 1 100%}
+  .em-grupo > .gc-ajuda{flex-basis:100%;margin:0}
+  .em-grupo > .em-curto{flex:0 1 auto;min-width:0}
+  .em-grupo input[type=checkbox],.em-grupo input[type=radio]{accent-color:var(--verde)}
+  .em-texto{resize:vertical;font:inherit}
+  .em-opcao{display:flex;gap:10px;align-items:flex-start;flex-basis:100%;padding:8px 10px;border:1px solid var(--linha);
+    border-radius:var(--raio-controle)}
+  .em-opcao input{margin-top:3px}
+  .em-opcao span{display:grid;gap:2px;font-size:13.5px;color:var(--tinta)}
+  .em-opcao small{font-size:12px;color:var(--mudo)}
+  .em-acoes{display:flex;flex-wrap:wrap;gap:10px}
+  @media (max-width:640px){
+    .em-grupo > .em-curto{flex:1 1 100%}
+  }
+</style>
+{% endblock %}

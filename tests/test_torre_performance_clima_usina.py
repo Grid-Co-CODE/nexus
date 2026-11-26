@@ -1,4 +1,4 @@
-"""Torre Performance -> Clima e risco: a página de UMA usina, /t/performance/clima/usina/<id> (07/10/2026): os alertas dela e a
+"""Torre Performance -> Clima e risco: a página de UMA usina, /t/campo/clima/usina/<id> (07/10/2026): os alertas dela e a
 irradiação diária da NASA POWER (gráfico dos últimos 30 dias e o mês até agora). Mundo inventado de `clima_mundo.py`; a NASA é uma
 sessão falsa (a série vai até 02/10 e o valor de cada dia é o seu número: 1,0 em 01/10, 2,0 em 02/10)."""
 import json
@@ -14,7 +14,7 @@ from clima_mundo import (A, AGORA, PUBLICADO_ATE, URL_INMET, Relogio, _mundo, ar
                          inmet, mundo_usina, pagina, texto, u)
 from clima_power import SessaoPower
 
-URL = "/t/performance/clima/usina/{}"
+URL = "/t/campo/clima/usina/{}"
 
 
 def usina_pagina(c, id_="1", **consulta):
@@ -222,8 +222,8 @@ def test_o_pedido_a_nasa_leva_a_janela_de_40_dias_e_a_coordenada_com_duas_casas(
 def test_a_tela_principal_nunca_chama_a_nasa(mundo_usina):
     c, _, _, power = mundo_usina
     pagina(c)
-    pagina(c, "/t/performance/clima", todas="1")
-    pagina(c, "/t/performance/clima", cliente="Cliente Y")
+    pagina(c, "/t/campo/clima", todas="1")
+    pagina(c, "/t/campo/clima", cliente="Cliente Y")
     assert power.pedidos == []
 
 
@@ -245,7 +245,7 @@ def test_usina_que_nao_existe_da_404_com_aviso_claro_e_link_de_volta(mundo_usina
     c, _, _, power = mundo_usina
     r = c.get(URL.format("999"))
     html = r.get_data(as_text=True)
-    assert r.status_code == 404 and "Usina não encontrada" in texto(html) and 'href="/t/performance/clima"' in html
+    assert r.status_code == 404 and "Usina não encontrada" in texto(html) and 'href="/t/campo/clima"' in html
     assert power.pedidos == []
 
 
@@ -270,9 +270,9 @@ def test_usina_sem_coordenada_da_aviso_claro_e_nao_chama_nenhuma_fonte(mundo_usi
 
 def test_o_link_de_volta_guarda_o_filtro_de_cliente(mundo_usina):
     c, _, _, _ = mundo_usina
-    assert 'href="/t/performance/clima"' in usina_pagina(c, "1")
-    assert 'href="/t/performance/clima?cliente=Cliente+X"' in usina_pagina(c, "1", cliente="Cliente X")
-    assert 'href="/t/performance/clima"' in usina_pagina(c, "1", cliente="Inventado")
+    assert 'href="/t/campo/clima"' in usina_pagina(c, "1")
+    assert 'href="/t/campo/clima?cliente=Cliente+X"' in usina_pagina(c, "1", cliente="Cliente X")
+    assert 'href="/t/campo/clima"' in usina_pagina(c, "1", cliente="Inventado")
 
 
 def test_sem_cadastro_a_pagina_responde_e_diz_o_que_falta(app, logado):

@@ -1,8 +1,17 @@
 # CLAUDE.md — PCM (programação semanal e Gestão PCM)
 
 A programação semanal do PCM dentro do Nexus. O desenho e as etapas estão em
-`docs/superpowers/specs/2026-09-30-pcm-no-nexus-design.md`; leia antes de mexer. A tela Gestão PCM (acompanhamento das
+`docs/superpowers/specs/2026-09-30-pcm-no-nexus-design.md`; leia antes de mexer. A lógica inteira em poucas páginas
+(quem roda o quê e quando, o motor, as marcas que os relatórios leem e as duas contas de confiabilidade) está em
+`LOGICA.md`, desta pasta. A tela Gestão PCM (acompanhamento das
 manutenções) tem seção própria abaixo.
+
+**Toda mudança na programação chega aos relatórios do PCM** (Levi, 24/11/2026: "Todas as mudanças que a gente fizer na
+programação semanal e tudo mais, tem que se refletir nos relatórios do PCM também. A gente tem que garantir que isso
+seja feito"). Regra nova do motor ou do robô entra como MARCA no dado (`foraDoPlano`, `bo`, o status), que todos os
+relatórios leem, nunca como conta solta num só deles; e o que o Nexus tem de cópia do PCM (o motor, o executivo) é
+conferido contra o PCM de agora pelo `copias_pcm.py`, que avisa na tela até a cópia ser atualizada. Mexeu no motor ou
+num relatório do PCM? Atualize a cópia daqui no mesmo trabalho.
 
 **Regra de ouro:** o sistema atual segue no ar e intocado até o Nexus bater número a número com ele. Isso vale para o
 gerador no PC do programador do PCM, o robô do GitHub, o painel pcm.gridco.com.br e o `banco_dados.json` que o App de Campo lê.
@@ -64,6 +73,8 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `telas.py` | as telas, penduradas na torre PCM: cada rota é uma função no alto do módulo (testável sozinha), e o `registrar_pcm(bp)` só as liga ao bp da torre, com o mesmo endereço e endpoint (08/11/2026: eram 25 funções dentro dele) |
 | `relatorios/` | **os quatro relatórios do PCM** na Central de emissão (14/10/2026): diário, recuperação da tarde, fechamento da semana e alerta da programação, cópia do Python do PCM, com a emissão automática nos horários de lá; regras e prova no `relatorios/CLAUDE.md` |
 | `relatorio_exec/` | **o Relatório executivo do PCM** na Central de emissão (14/10/2026): Interno Grid, Cliente e Abertura da Semana, CÓPIA do `js/relatorio_exec.js` do painel (hash conferido no teste), com o gestao_pcm.json, o banco_dados.json e o confiabilidade.json servidos ao lado e a Gerencial aberta pelo servidor (`NEXUS_PCM_MPAS_SENHA`, o "MPA/MPS atrasadas"); na estrutura de toda a Central (os tipos no bloco "Relatório Gerencial PCM", o período e o escopo na coluna, a folha à direita); regras e como atualizar no `relatorio_exec/CLAUDE.md` |
+| `copias_pcm.py` | a **conferência das cópias do PCM** (24/11/2026): a cada 6 h, por trás, compara o motor e o executivo daqui com os arquivos do PCM de agora (o repositório público) e diz quais ficaram atrás; o Gerar a semana e o executivo avisam. Sem conferência (rede fora), não avisa nada. Prova: `tests/test_pcm_copias.py` |
+| `insights_pcm.py` | **Insights do PCM** (`/t/pcm/insights`, 25/11/2026): o que pede ação agora, em cinco frases (religamento aberto há mais de 7 dias, MPM do mês vencida, handover vencido, OS parada pela conta do Radar de Backlog e OS que rolou 5 semanas ou mais), com as regras da planilha de controle semanal do PCM e a lista curta no cartão; o que já mora noutra tela não se repete. Ver a seção "Insights do PCM" |
 | `acompanhamento/` | **o Acompanhamento do PCM** (14/10/2026, PCM → Acompanhamento PCM): as cinco abas do painel de acompanhamento do PCM O&M (MPA, MPS, Radar de Backlog, Mapa e One Page) com as estruturas de lá e o desenho do Nexus, montadas com as fontes que o Nexus já usa (Gestão PCM, banco_dados, Gerencial, cadastro) e a curadoria da reunião de PCM no livro `nexus_pcm_curadoria` (cifrado); a coordenada da usina não sai do servidor; regras e prova no `acompanhamento/CLAUDE.md` |
 | `motivos.py` | **os motivos das tarefas e a lista do backoffice** (16/10/2026, seção abaixo): o livro `nexus_pcm_motivos` (cadastro, marcas, backoffice; cifrado), o `Fora_da_programacao.json` da rodada e do repositório do PCM |
 | `atribuicoes.py` | **os técnicos por usina** (17/10/2026, seção abaixo): o livro `nexus_pcm_atribuicoes` (decisões que só acrescentam, vale a última de cada usina × pessoa × papel; apoio com datas; cada linha assinada para o App) |
@@ -73,6 +84,25 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `tecnicos_usina.py` | a visão da tela Técnicos por usina: o cadastro do banco, o nome da usina que vai ao App (`_fracttal`), a evidência de campo (rondas, fechamentos, programação), os avisos, os filtros em cascata, a carga inicial pela regra da equipe, a reemissão (de uma usina e o Reenviar tudo) e a comparação com a foto do App |
 | `inventario/` | **o inventário do almoxarifado** (26/10/2026, em construção): `estoque.py` é o adaptador do estoque do Fracttal, a única porta de leitura e gravação de saldo, régua e peça; `contas.py` são as contas (situações, contado efetivo, substituição, janela de aprovação; puro); `leitura.py` lê as contagens do App e o estado de cada uma pelos eventos; `revisao.py` é a aba Inventário (a lista, a contagem aberta com o Sistema × Contado × Δ e a revisão do PCM), com as rotas em `__init__.py`; `gravacao.py` grava o lote aprovado no Fracttal em segundo plano, por sessão de ajuste; `regua.py` é a régua de mínimo e máximo e `curadoria.py` o fora do catálogo (com `fotos_app.py`, a rota assinada que recebe as fotos do App); a auditoria é o `revisao.montar_auditoria`; `ponte_os.py` é a ponte com o login do Fracttal (as rotas de `/os/_nexus/inventario`, a ÚNICA porta de tudo o que lê ou grava no Fracttal: o lote, gravar, continuar, encerrar, a régua acordada, cadastrar a peça); o livro `nexus_almoxarifado_inventario` (eventos, régua e curadoria) é o `nexus/dados/fato_inventario.py`. As seções abaixo |
 | `motor/` | **cópia idêntica** do motor do PCM: **não edite** (mudança de regra entra no repositório do PCM e é copiada; veja o `README.md` de lá); hoje a do `4b0d9ee` (13/11/2026: a corretiva não é mais forçada acima dos 70% do dia e a tarefa cortada pela capacidade não some; antes, a do `cb8239c`, 23/10/2026: a MPM da última semana do mês vai para os dias livres antes de ser forçada no dia da usina) |
+
+## Insights do PCM (`insights_pcm.py`, `templates/pcm/insights.html`; 25/11/2026)
+
+A base de ideias é a planilha "PCM - Controle Semanal" do time (`controle_semanal.py` do PCM, num PC), pedida na reunião
+do PCM de 24/11. O desenho é do Levi: "Menos é mais. Vamos tentar ser diretos e ter informações bem direcionadas, fáceis
+de leitura. Não precisa ficar enchendo de KPI. Se a informação se repete, a gente mantém só uma informação."
+- **Cinco cartões, uma frase cada** (a palavra do nível, o número, o pior caso e a lista que abre no cartão): religamento
+  aberto há mais de 7 dias (Agir), MPM do mês vencida e aberta, usina com handover vencido, OS parada e OS que rolou 5
+  semanas ou mais (Atenção). Sem nada, o cartão diz "Em dia".
+- **Um número só no Nexus:** a OS parada é a conta do Radar de Backlog (`acompanhamento.dados.backlog`, mais de 25 dias, e
+  a lista fica lá) e a rolagem a do Acompanhamento (`rolagens`). Ficam fora porque já moram noutra tela: MPA/MPS
+  atrasadas, o backlog detalhado, a carga por supervisor e as usinas que pedem atenção; o Resumo e o Plano por tipo da
+  planilha são KPI; o Plano de Ação Drone é outro assunto.
+- **As regras dos três novos são as da planilha:** aberta = tarefa aberta de OS fora de Finalizados e Verificação; dias =
+  o `dias` da Gestão PCM (atraso contra a data programada); usina de teste e OS do backoffice (`bo`) fora. Conferido em
+  25/11 contra a planilha de 24/11: 90 religamentos abertos (o pior, 77 dias), 12 usinas com handover, 13 rolagens.
+- **As observações do time** (a coluna amarela da planilha) vão na conversa da OS: cada OS do cartão leva a
+  `/t/comando/conversa/os/<OS>`.
+- Provar: `tests/test_pcm_insights.py` e a tela numa cópia de prova (1366 e 375 px).
 
 ## O nome do cliente é o do cadastro do Nexus (`clientes.py`; 18/10/2026)
 
@@ -415,13 +445,23 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
   linhas `responsavel` de hora em hora, e o novo põe o certo de volta (a briga de nomes: cerca de 10 linhas por hora
   num livro que só cresce, e o App trocando o nome da usina a cada volta).
 - **A tela** (PCM → Técnicos por usina), no estilo da tela de PT do Campo (Levi, 17/10: "quero que a tabela seja no
-  mesmo estilo de PT e APR"; usa o `campo.css`): os números do topo (usinas, sem técnico, pessoas de campo, apoios,
-  com aviso), as abas Por usina, Por técnico e, com a foto do App, Comparação com o App (outra página: as duas
-  primeiras trocam na própria página só onde a seção delas está; na Comparação o link navega, 18/10/2026, o Levi
-  clicava em Por usina ali e a tela não voltava; `tests/test_pcm_tecnicos_js.py`), os chips das situações (com
-  técnico, sem técnico, com aviso) e a linha que abre o detalhe com o histórico e o "Pôr técnico" (Levi, 17/10, 2ª
-  rodada: a coluna Cliente antes da Usina, sem a Região de campo; os técnicos um embaixo do outro, sem borda; sem o
-  botão "Técnico" na célula). Veem os setores PCM e
+  mesmo estilo de PT e APR"; usa o `campo.css`): as abas Por usina, Por técnico, Histórico e, com a foto do App,
+  Comparação com o App (as duas primeiras trocam na própria página só onde a seção delas está; Histórico e Comparação
+  são outra página e o link navega, 18/10/2026, o Levi clicava em Por usina ali e a tela não voltava;
+  `tests/test_pcm_tecnicos_js.py`), os chips das situações (com técnico, sem técnico, com aviso) e a linha que abre o
+  detalhe (o "Em campo (30 dias)", o "Pôr técnico" e o "Ver no Histórico"). **A revisão de 24/11/2026** (Levi; prova em
+  `tests/test_pcm_tecnicos_revisao_24_11.py`): os números grandes do topo saíram ("os KPIs podem sumir", repetiam os
+  chips); o "lido às" vai no "!"; a tabela com a usina e, embaixo, o cliente e a equipe, sem a coluna Cliente e sem a
+  coluna Em campo ("Não precisa ficar aparecendo toda hora", ficou no detalhe); o X de tirar o técnico só aparece ao
+  passar o mouse (ou no foco do teclado; no toque, meio apagado); **no Por técnico, o clique na linha abre a janela das
+  usinas** (as em operação e as que ele já tem, com busca): o Salvar (`/usinas-do-tecnico`,
+  `tecnicos_usina.pedidos_do_tecnico`) grava num `decidir_varias` só, dentro da trava, as novas como fixo e o tirar das
+  desmarcadas; a que continua marcada não muda (o apoio guarda as datas); usina fora do cadastro recusa tudo. **O
+  Histórico** (`?ver=historico`, `historico_geral`) é TODAS as decisões de todas as usinas, no modelo A do Histórico de
+  OS (`filtros-os.js`: busca, De, Até, ação, cliente, usina, técnico, quem decidiu e origem, em seleção múltipla; os
+  mesmos filtros pelo endereço, no servidor). **A Comparação com o App** vem por grupo (`GRUPOS_APP`: sem código, sem
+  nome do Fracttal, usina que o App não reconhece, pessoa que o App não reconhece, só no App, só no Nexus), cada um com
+  o que fazer e a lista, no lugar da lista única de antes ("é só uma lista gigante"). Veem os setores PCM e
   Responsáveis UFV; põe e tira quem `pode_programar`; a **carga inicial** (só administrador, só com o livro vazio) é a
   regra da equipe do App aplicada ao cadastro do Nexus, só nas usinas EM OPERAÇÃO (cada pessoa de campo recebe as
   usinas em operação com o mesmo `equipe_id`; medido em 17/10: a regra dava 53 de 227 usinas fora de operação). Ao lado de cada usina, sem gravar nada: quem rondou
@@ -436,8 +476,8 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
   lida do FIM (a semana em curso está entre as do arquivo do robô, no fim do fato) e a evidência guardada por 10 min:
   3,3 s fria, 0,02 a 0,06 s quente. Visão por técnico. Sem o
   cadastro do banco, a tela abre com o aviso e nada grava.
-- **O Reenviar tudo ao App** (05/11/2026, quem `pode_programar`, como o Reenviar de uma usina): a faixa âmbar abaixo dos
-  números diz quantas ligações, de quantas usinas, têm o nome do Fracttal ou o código da pessoa mudado; o botão
+- **O Reenviar tudo ao App** (05/11/2026, quem `pode_programar`, como o Reenviar de uma usina): a faixa âmbar acima das
+  abas diz quantas ligações, de quantas usinas, têm o nome do Fracttal ou o código da pessoa mudado; o botão
   confirma e reemite todas num `decidir_varias` só (uma gravação do livro, origem `reemissao`), com as regras de
   sempre (`tecnicos_usina._reemissoes`, a mesma conta do de uma usina: só as que mudaram, só usina do cadastro, e sem o
   nome ou o código de hoje vai o gravado). **A conta é conferida dentro da trava** (revisão de 05/11/2026): os dois
@@ -544,6 +584,26 @@ as preventivas do mês seguinte, relatório mensal aos clientes no 5º dia útil
 MPS do semestre, MPA do ano, nova usina e saída de contrato...), e a página HTML de lá marcava o feito num `estado.json`
 que nunca recebeu marca (vazio desde 17/08). **Não montar por enquanto** (Levi, 11/10/2026: "Não acho que valha a pena
 montar essa torre agora, vou falar com o time de PCM"): a tela segue placeholder no menu até ele decidir.
+
+## OS fora do App (`fora_do_app.py`, `templates/pcm/fora_do_app.html`, `/t/pcm/os-fora-do-app`; 24/11/2026)
+
+Levi, 24/11/2026, no chat do App de Campo: "Eu quero uma lista de todos os técnicos que estão fazendo OS pelo computador" (um
+técnico fechou 11 de 11 OS direto no Fracttal, sem abrir o App em duas semanas); aprovou a medição fixa por semana e mandou a
+tela para cá. Decisões dele no mesmo dia: fica no PCM, logo depois do Acompanhamento PCM no menu; mostra só os técnicos de
+campo, com o "Mostrar todos"; veem o PCM e a Supervisão Campo (`do_setor`) e os administradores.
+- **A medição é do App** (v381; contrato em `app-campo-docs/_propostas/v381-fonte/contrato_fora_do_app_nexus.md`): `GET
+  <base>/app/nexus/fora-do-app?semanas=8` com a chave das Sugestões (`NEXUS_APP_RELATOS_CHAVE`). Concluída = tarefa em status 2
+  ou 3 no Fracttal com o fim na semana; pelo App = a OS de que o App fechou alguma tarefa, ou a de ronda; fora = o resto (o
+  computador e o app do Fracttal não se separam). O App mede de madrugada e refaz a semana corrente e a anterior. Campo novo
+  ou outro formato se pede ao chat do App de Campo.
+- **O Nexus não guarda a medição:** lê a rota numa cópia de 10 minutos, na memória, como as Sugestões e os relatos de
+  segurança (o dado é do App, e a tela só mostra). A versão do contrato que não é a 1 vira erro na tela, não número.
+- **Técnico de campo** = quem tem usina hoje nos Técnicos por usina (papel executa), casado pelo código do e-mail
+  (`codigo_da_pessoa`); quem vem do App sem e-mail só aparece no "Mostrar todos". Sem ler os Técnicos por usina, mostra todos
+  e diz.
+- **Na tela:** a semana (a mais nova por padrão), os totais dos técnicos de campo, a lista pelos que mais fecham fora (o %
+  em vermelho a partir de 50, laranja a partir de 20), a semana anterior ao lado e, em cada um, as OS fora com o link do
+  card da OS. Prova: `tests/test_pcm_fora_do_app_24_11.py` (o App de mentira).
 
 ## Almoxarifado (`almoxarifado.py`, `templates/pcm/almoxarifado.html`, `/t/pcm/pecas`; 25/10/2026)
 
@@ -2311,8 +2371,9 @@ Antes de ligar a `NEXUS_FAMA_APP`: os técnicos das usinas da FAMA com o "execut
   `status.json` (`fama`) e numa linha do log, só com contagens; a tela Gerar mostra cada motivo das que ficaram fora.
 - **Achados da prova com o motor de verdade (11/11/2026):** com a duração vazia, a preventiva da FAMA sem sigla e sem par
   na Lista de Prioridades saía com `dur_h` NaN e a rodada inteira quebrava (`alloc_diurno`): por isso 1,5 h, o último
-  recurso do próprio motor (`_estimate_h_sem_fracttal`). O motor gera sempre a semana da próxima segunda: o `--semana` da
-  linha de comando não pega nele (ele lê o próprio "--semana" como valor) e o Nexus tira o `PCM_WEEK_FORCE` do ambiente.
+  recurso do próprio motor (`_estimate_h_sem_fracttal`). Até 24/11/2026 o motor gerava sempre a semana da próxima segunda (o
+  `--semana` lia o próprio "--semana" como valor); corrigido no motor (README dele), e o Nexus segue tirando o
+  `PCM_WEEK_FORCE` do ambiente.
 - **O que segue aberto na fase 2** (da revisão de 11/11/2026; o resto foi feito em 13/11):
   - a vencida segue a regra do Fracttal (`_fila_elegivel`): a corretiva volta sempre; a preventiva, pela sigla (MPS e
     MPA sempre; MPM só no mês da semana); a preventiva da FAMA sem periodicidade no título, vencida, fica fora (13 das 91

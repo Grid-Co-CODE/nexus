@@ -93,7 +93,11 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
         assert ST.das_do_setor(SID.PERFORMANCE) == ST.das_do_setor({"id": SID.PERFORMANCE, "nome": "Performance e Dados"}) \
             == {f"relatorios/{t}" for t in RELATORIOS} | {"comando/caixa-de-entrada", "comando/contratos",
                                                           "performance/equipe", "campo/equipe",
-                                                          "performance/coletas/recoleta", "performance/limitacoes"}
+                                                          "performance/coletas/recoleta", "performance/limitacoes",
+                                                          "performance/etm",
+                                                          # Metas e equipamentos (e a aba Metas) da Base, do setor
+                                                          # Performance desde 25/11/2026 (as Metas vieram da Performance)
+                                                          "base/equipamentos", "base/metas"}
         # a Recoleta pelas fontes é do setor Performance desde 17/11/2026 (Levi: "so quem e do setor Performance")
         # e as Limitações de potência, desde 19/11/2026 (mudaram para a Performance e ganharam a tela de painel)
         # a Caixa é de todos (03/11); o Quadro da equipe da Performance (04/11); o Mapa de equipe (08/11/2026) é dos
@@ -106,7 +110,8 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
         assert ST.das_do_setor(SID.PCM) == ({f"relatorios/pcm-{t}" for t in ("diario", "tarde", "semanal", "alerta", "executivo")}
                                           | {"pcm/acompanhamento", "pcm/gerar", "pcm/quadro", "pcm/fora-da-programacao",
                                              "pcm/tecnicos-por-usina", "pcm/pecas", "comando/caixa-de-entrada", "comando/contratos",
-                                             "campo/equipe"})
+                                             "campo/equipe",
+                                             "pcm/os-fora-do-app"})      # a OS fora do App (24/11/2026), do PCM
         # o Gerar e o Quadro têm dois donos: o PCM e os supervisores (Levi, 16/10/2026: "tanto PCM quanto supervisores!
         # Vou criar um setor de Responsáveis UFV"), pelo setor_id (04/11/2026: pelo nome, o "Responsável UFV" do banco não
         # casava com o "Responsáveis UFV" do código)

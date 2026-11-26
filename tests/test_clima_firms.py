@@ -222,31 +222,10 @@ def test_sem_a_nasa_a_camada_some_e_a_usina_sem_alerta_fica_verde_nas_fontes_lid
     assert m["faltando"] == [V.NOME_LONGO["firms"]]
 
 
-def test_a_pagina_do_mapa_tem_a_camada_a_legenda_e_a_citacao(tmp_path, monkeypatch, leituras_mapa):
-    from test_torre_performance_mapa import nova_app
-    _, c = nova_app(tmp_path)
-    monkeypatch.setattr(V, "agora", lambda: REF_MAPA)
-    leituras_mapa(avisos=avisos_mapa(), focos=focos_mapa(foco_mapa(1.0, ALFA)), risco=risco_mapa(risco_baixo()),
-                  firms=firms_mapa(nasa_a(3.0, DELTA, frp=25.0), nasa_a(2.0, TETA, frp=3.0)))
-    html = c.get("/t/performance/clima/mapa").get_data(as_text=True)
-    assert '<g class="mp-nasa"><path class="mp-na mp-na-fraco"' in html and 'class="mp-na mp-na-forte"' in html
-    assert "data-camada" not in re.search(r'<g class="mp-nasa"[^>]*>', html).group(0)   # o atributo das camadas de fundo esconderia
-    # o contorno rosa nas usinas com fogo a até 5 km: a Delta (forte, 25 MW) e a Teta (fraco, 3 MW); a Alfa (foco do INPE) não
-    assert html.count('class="mp-anel-nasa mp-anel-nasa--forte"') == 1 and html.count('class="mp-anel-nasa mp-anel-nasa--fraco"') == 1
-    t = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html))
-    # a chave da lateral é curta (27/10/2026, "ainda tem mt informação aqui"): o nome curto e as forças numa linha, com a faixa
-    # no balão; o nome por extenso fica no balão do título, no "!" e no rodapé (a citação, abaixo)
-    assert "Fogo em 24 h · NASA" in t and "2 detecções a até 25 km das usinas nas últimas 24 h, 2 a até 5 km" in t
-    assert 'title="20 MW ou mais"' in html and 'title="abaixo de 5 MW"' in html and "a até 5 km" in t
-    assert "Fogo das últimas 24 h: Fire Information for Resource Management System, sistema da NASA (NASA FIRMS)." in t
-    assert "Dados e imagens do FIRMS, parte do Earth Science Data and Information System (ESDIS) da NASA." in t
-    # o botão "Focos" liga e desliga as camadas de fogo: a da NASA e o contorno das usinas vão junto
-    css = (__import__("pathlib").Path(M.__file__).resolve().parents[2] / "static" / "clima-mapa.css").read_text(encoding="utf-8")
-    assert ".mp-sem-focos .mp-nasa,.mp-sem-focos .mp-anel-nasa{display:none}" in css
+# a página do Mapa de risco saiu em 24/11/2026 (Levi: "Mapa de risco pode tirar"); a camada segue no modelo, acima
 
 
 # ── a lista e a página da usina ──────────────────────────────────────────────────────────────────────────────────────
-
 def test_a_lista_mostra_o_fogo_da_nasa_na_atencao_e_explica_a_forca(mundo_lista):
     from clima_mundo import pagina, texto
     c, _sessao, _app = mundo_lista
@@ -274,6 +253,6 @@ def mundo_lista(tmp_path, monkeypatch):
 def test_a_pagina_da_usina_diz_o_fogo_das_ultimas_24_h(mundo_lista):
     from clima_mundo import texto
     c, _sessao, _app = mundo_lista
-    t = texto(c.get("/t/performance/clima/usina/4").get_data(as_text=True))
+    t = texto(c.get("/t/campo/clima/usina/4").get_data(as_text=True))
     assert "Fogo nas últimas 24 h, satélites da NASA" in t and "o mais perto a 2,0 km, às 13:00 (VIIRS NOAA-20" in t
-    assert "Nenhum fogo a até 5 km nas últimas 24 h" in texto(c.get("/t/performance/clima/usina/1").get_data(as_text=True))
+    assert "Nenhum fogo a até 5 km nas últimas 24 h" in texto(c.get("/t/campo/clima/usina/1").get_data(as_text=True))

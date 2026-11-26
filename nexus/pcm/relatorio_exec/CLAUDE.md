@@ -8,10 +8,13 @@ disponível para o cliente, é só para a organização mesmo!", e por isso ela 
 ## O que é
 
 - **CÓPIA**, não reescrita: `relatorio_exec.js` e `relatorio_exec.css` são os do repositório do PCM
-  (`fillipefigueiro-source/gridco-pcm-data`; iguais ao `main` de lá em 14/10/2026, `e6cdab4`); `gpv_cel.css` são as
+  (`fillipefigueiro-source/gridco-pcm-data`; o JS é o do `1065897`, 16/11/2026, com o backoffice fora (09/11) e a
+  preventiva sempre no plano (16/11), trazido em 24/11/2026; o CSS é o de 14/10, `e6cdab4`); `gpv_cel.css` são as
   linhas 86 a 92 do `css/preventivas.css` de lá (as células coloridas que a folha usa); `painel_pcm.js` são os trechos do
   `js/app.js` e do `js/preventivas.js` que o relatório chama (o escopo do login, a situação de cada MPA/MPS e a Fila da
   Gerencial), copiados linha a linha pelo `ferramentas/copiar_painel_pcm.py`, com a faixa de cada um no comentário.
+  A única diferença do JS para o do PCM (24/11/2026): o comentário que diz quem decidiu ("decisão do <nome>") vira
+  "decisão do PCM" (`para_a_copia`), porque o repositório do Nexus é público; copie sempre por ele.
   **Não edite nenhum deles**: o `tests/test_relatorios_pcm_executivo.py` confere o hash de cada um (`COPIAS` no
   `__init__.py`, com o fim de linha normalizado).
   - Por que cópia: no PCM o relatório roda inteiro no navegador (~1.300 linhas, com o formato de número e de data do
@@ -59,6 +62,13 @@ disponível para o cliente, é só para a organização mesmo!", e por isso ela 
   painel.
 
 ## Como atualizar quando o PCM mudar o relatório
+
+Quem avisa que o PCM mudou é a **conferência das cópias** (`nexus/pcm/copias_pcm.py`, 24/11/2026): a cada 6 h ela
+compara cada arquivo daqui com o do PCM de agora e, se algum ficou diferente (para trás ou para a frente), a tela do
+executivo diz "O relatório do Nexus está diferente do relatório do PCM". Caso que a criou: o JS ficou de 14/10 a 24/11 sem o backoffice e a regra da
+preventiva, e a W47 da Athon dava 55% aqui e 57% no painel (PA Leste 01, uma preventiva fora da planilha). A outra
+diferença daquele print (MA Leste 01, PA Norte 01) era só o horário do dado: o painel estava aberto desde a manhã.
+
 
 1. Copie de novo o `js/relatorio_exec.js`, o `css/relatorio_exec.css` e as linhas das `.gpv-cel` do
    `css/preventivas.css` (o `gpv_cel.css`).

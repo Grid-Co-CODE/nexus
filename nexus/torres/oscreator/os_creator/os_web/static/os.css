@@ -649,6 +649,12 @@ body.os-sem-topo .os-recolher svg{transform:rotate(180deg)}
   font-size:13px;white-space:nowrap;cursor:pointer}
 .fl-seg button:hover{color:var(--fl-txt)}
 .fl-seg button.on{background:var(--fl-azul);color:var(--fl-sobre-azul)}
+/* a visão que é outra página (as Solicitações, 25/11/2026): um link com a cara do botão */
+.fl-seg a{display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:7px;color:var(--fl-mudo);font-size:13px;
+  white-space:nowrap;text-decoration:none}
+.fl-seg a:hover{color:var(--fl-txt)}
+.fl-seg a.on{background:var(--fl-azul);color:var(--fl-sobre-azul)}
+.fl-seg a:focus-visible{outline:2px solid var(--fl-azul);outline-offset:2px}
 .fl-campo{position:relative;display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:10px;
   background:var(--fl-campo);border:1px solid var(--fl-campo-borda);color:var(--fl-mudo);font-size:13px;white-space:nowrap;min-width:0}
 .fl-campo:hover{border-color:var(--fl-campo-borda-hover)}
@@ -1046,3 +1052,31 @@ html.os-sala{zoom:1.5}
 :where(html[data-tema="claro"]) .os-sug-topo{background:var(--osc-sucesso-suave, rgba(86,102,16,.08));border-color:var(--osc-sucesso-borda, rgba(86,102,16,.35));color:var(--osc-texto, #1e293b)}
 :where(html[data-tema="claro"]) .os-sug-topo.alerta{background:var(--osc-alerta-suave);border-color:var(--osc-alerta-borda)}
 :where(html[data-tema="claro"]) .os-sug-topo .os-sug-falta{color:var(--osc-alerta)}
+
+/* o pop-up de login (nexus/static/reentrar.js, 24/11/2026) quando o OS Creator está aberto sozinho, sem a casca do Nexus
+   por cima (que tem o dela): as mesmas classes, nas cores do OS Creator */
+.nx-reentrar{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;padding:16px;
+  background:color-mix(in srgb,var(--bg) 70%,transparent)}
+.nx-reentrar-caixa{width:min(400px,100%);max-height:calc(100vh - 32px);overflow:auto;display:grid;gap:12px;padding:20px 22px;
+  background:var(--card);border:1px solid var(--card-b);border-radius:12px;color:var(--txt)}
+.nx-reentrar-t{margin:0;display:flex;align-items:center;gap:8px;font-size:16px;font-weight:600}
+.nx-reentrar-d{margin:0;font-size:13px;line-height:19px;color:var(--muted2)}
+.nx-reentrar-d b{color:var(--txt)}
+.nx-reentrar-form{display:grid;gap:10px}
+.nx-reentrar-form[hidden],.nx-reentrar-ms[hidden],.nx-reentrar-erro[hidden]{display:none}
+.nx-reentrar-l{display:grid;gap:4px}
+.nx-reentrar .gc-rotulo{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.nx-reentrar .gc-campo{width:100%;background:var(--input);border:1px solid var(--input-b);border-radius:8px;padding:9px;
+  color:var(--txt);font-size:13px}
+.nx-reentrar .gc-campo:focus{outline:none;border-color:var(--verde)}
+.nx-reentrar-erro{margin:0;font-size:12.5px;line-height:17px}         /* a cor é a do .os-erro */
+.nx-reentrar-bts,.nx-reentrar-ms{display:flex;gap:8px;flex-wrap:wrap}
+.nx-reentrar .gc-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid transparent;
+  border-radius:8px;padding:9px 14px;font-weight:700;font-size:13px;cursor:pointer;text-decoration:none}
+.nx-reentrar .gc-btn--primario{flex:1;background:var(--btn);color:var(--btn-txt)}
+.nx-reentrar .gc-btn--contorno{background:var(--sec);color:var(--sec-txt);font-weight:500}
+.nx-reentrar .gc-btn:disabled{opacity:.6;cursor:default}
+.nx-reentrar-pe,.nx-reentrar-nota{margin:0;font-size:12px;line-height:17px;color:var(--muted)}
+.nx-reentrar-pe a,.nx-reentrar-link{color:var(--verde)}
+.nx-reentrar-link{border:0;background:none;padding:0;font:inherit;text-decoration:underline;cursor:pointer}
+.nx-reentrar a:focus-visible,.nx-reentrar button:focus-visible{outline:2px solid var(--verde);outline-offset:2px}

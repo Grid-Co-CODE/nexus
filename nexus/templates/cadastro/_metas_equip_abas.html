@@ -1,0 +1,7 @@
+{# Base › Metas e equipamentos (25/11/2026; Levi: "Eu gostaria que fossem um só, escrito metas e equipamentos. E a pessoa
+   clica, ela vai poder ver as metas das usinas, vai poder ver os equipamentos das usinas e vai poder fazer o de para
+   ali"): as duas abas, em cima das duas páginas. `aba` = "equipamentos" | "metas". #}
+<nav class="gc-subabas" aria-label="Metas e equipamentos">
+  <a href="{{ url_for('torre_base.equipamentos') }}"{% if aba == 'equipamentos' %} aria-current="page"{% endif %}>Equipamentos das usinas e de-para</a>
+  <a href="{{ url_for('torre_base.metas') }}"{% if aba == 'metas' %} aria-current="page"{% endif %}>Metas das usinas</a>
+</nav>

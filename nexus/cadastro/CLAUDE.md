@@ -2,7 +2,7 @@
 
 O registro mestre do Nexus: usinas, clientes, pessoas, equipes, regiões de campo e listas, com os mesmos dados do
 BD_Operações (a região de campo vem da estrutura de O&M de 10/2026), mas editáveis numa tela. As telas ficam nas torres
-Base (Registro mestre, Clientes, Equipes, Equipamentos das usinas, Qualidade do cadastro) e Pessoas
+Base (Registro mestre, Clientes, Equipes, Equipamentos das usinas, Metas das usinas, Qualidade do cadastro) e Pessoas
 (Colaboradores Operação). A tela Importar do Excel saiu em 14/10/2026 (Levi: "Tire 'Importar do Excel' do módulo base"):
 `/t/base/importar` leva ao Registro mestre, sem importar nada; a importação segue por comando (abaixo). Desde 15/10/2026 o
 BD_Operações novo exporta CSV, e o Registro mestre tem **Atualizar pelo CSV** (`importar_csv.py`, seção própria abaixo).
@@ -142,6 +142,11 @@ caso que criou cada uma (as três primeiras são decisões do Levi no mesmo dia)
   SUN2000-330KTL-H1" → "SUN2000-250KTL-H1"; "250 kW / 275 kVA" → "250"; "575 Wp" → "575" NÃO é resumo), é marcado na
   prévia para a pessoa decidir a coluna. Em 15/10: 48 marcas (fabricante dos módulos 11, concessionária 10, modelo do
   inversor 9...).
+- **"Supervisor de contrato" = o Gestor de contrato da ficha** (23/11/2026, Levi: "pode ligar, chama de Gestor de
+  contrato"): a coluna do CSV liga ao `gestor_contrato` pelo nome contido, como o Responsável O&M, e quem não tem ficha
+  ganha uma com o vínculo "Gestor de contrato" (`VINCULO_DA_REF`). Até então a coluna ficava de fora e o gestor seguia
+  o da importação do .xlsx de 07/10: no CSV de 23/11, 188 de 258 usinas tinham outro supervisor de contrato, e dois
+  supervisores de campo ainda apareciam como gestores. Célula vazia não apaga (6 usinas sem supervisor no CSV de 23/11).
 - Link do mapa que não é endereço (11 usinas com coordenada em graus no lugar do link) fica de fora, listado.
 - As 19 colunas sem campo no Nexus (Mobilizado?, Impeditivo, Próximo passo, Pessoas a contratar, os kits...) ficam de
   fora e a prévia as lista.
@@ -421,7 +426,119 @@ cadastrando?" ("Pede"). O caso: um técnico do piloto da localização ficou num
   instalou".
 Prova: `tests/test_base_acessos_nexus_field.py`.
 
+## E-mails automáticos (24/11/2026; `/t/base/emails-automaticos`, `torres/base/emails_tela.py`, `campo/emails_app.py`, `campo/emails_controle.py`)
+
+Levi, pela sessão do App: "Gostaria de poder controlar esses e-mails automáticos ou ter pelo menos um controle! E gostaria
+que estivesse no Nexus"; aqui: "Só admin". O App de Campo manda pelo Microsoft Graph (naoresponda@) sete tipos:
+`pt_aviso`, `luvas_tst`, `auditoria_diaria`, `seguranca_semanal`, `seguranca_relato`, `encaminhamento` e `avulso` (o
+envio de teste do `email_avulso.json`). Até 24/11 os destinatários eram só App Settings do Azure.
+
+**A tela** (só administrador): no alto, os números (ligados de 7 e quantos em teste, enviados e falhas em 7 dias, as
+regras do Nexus e as a confirmar); embaixo, UM CARTÃO por tipo (25/11/2026, Levi: "Tô sentindo falta de uma coisa mais
+visual"): o nome, ligado e teste, o Quando → Para (o PAPEL que recebe), o gráfico dos envios por dia em 30 dias, os
+números de 7 dias, o último envio e a nota (e-mail de segurança, de onde vem a regra, "regra nova a confirmar" enquanto o
+App não publicar os Tipos com a hora da regra). **O gráfico** (`emails_app.por_dia`): uma coluna por dia de Brasília,
+contada em ENVIOS (o aviso para três pessoas é 1, no dia da 1ª linha dele), empilhada pela situação nas cores do
+semáforo (enviado `--ok-cheio`, teste `--info-cheio`, falha `--critico-cheio`, barrado `--mudo`; a ordem passou no
+validador do dataviz nos dois temas, e o contraste baixo no claro é compensado pela legenda, a dica e a tabela); a escala
+é a do próprio tipo (o avulso e o aviso de PT têm volumes muito diferentes) e o teto diz o máximo por dia. Sem o livro
+que conta o tipo, o cartão diz que o App ainda não publica os envios, sem gráfico (não é "nenhum envio"). A dica do
+mouse (`base-emails.js`) diz o dia e as situações; no cartão, que é um link, as colunas ficam fora do teclado, e na
+página do tipo o gráfico grande passa dia a dia. O clique abre o tipo: a regra que vale, o formulário, as Mudanças
+(tiradas das próprias linhas do livro: quem, o que mudou, quem entrou e saiu da lista, o motivo; a linha que não
+confere aparece como "Não vale"), o gráfico grande e os envios de 30 dias com a pessoa pelo nome (o código HMAC do livro trocado pelo nome do Registro mestre, do
+Fracttal, do cadastro do App ou, para a caixa das regras, o próprio e-mail; o código nunca vai à tela).
+
+**O contrato com o App** (fechado em 24/11/2026 com a sessão "App de campo sub"; a sessão Nexus de Base e Comando aceitou
+com 5 ajustes: o Envios intocado, nenhum e-mail aberto, regra só por acréscimo, o formato da cifra e da assinatura, o
+motivo em claro). O lado do App está no ar desde a v380 (24/11, 12:45). O texto do App:
+`CONTRATO_email_controle_nexus.md` na pasta App_Campo do PCM.
+- **O que o App publica**, de hora em hora aos :25, troca integral, em DOIS LIVROS PRÓPRIOS (a única mudança da v380 sobre
+  o combinado: o `sync-xlsx` troca o livro inteiro, e uma aba nova no `email_app_campo` apagaria o "Envios" a cada
+  publicação): `email_tipos_app_campo · Tipos` (Tipo, Nome, Gatilho, Destino padrão = o papel, Ligado sim/não, De onde
+  vem a regra Nexus/App Setting, Modo, Enviados 7d em ENVIOS, Falhas 7d, Último envio e Regra do Nexus em, ISO UTC) e
+  `email_todos_envios_app_campo · Todos os envios` (1 linha = 1 destinatário de 1 envio, 30 dias: ID `<quando>|<8
+  hex>|<n>`, Tipo, Referência, Destinatário (HMAC), Papel, a cópia como "cópia", Quando, Via, Situação enviado | falhou |
+  desligado | teste, Tentativas vazia, Erro sem e-mail). O Todos os envios nasce no 1º envio depois da v380 (livro vazio
+  não sobe). O `email_app_campo · Envios` (o semanal, que a Segurança lê) segue igual, e a tela o usa enquanto o Todos os
+  envios não existir. Catálogo: `envio_email_app` (fato) e `email_tipos_app_campo` (conhecida, apoio).
+- **O que o Nexus escreve**: `nexus_email_controle · fato_email_regra` (fato `regra_email_app`, livro `so_cresce`),
+  SÓ ACRÉSCIMO, 1 linha = 1 mudança com o estado inteiro do tipo: tipo, ligado ("sim"/"não"), modo (normal/teste),
+  destinatarios, substitui_padrao ("sim"/"não"; "não" com lista vazia), alterado_por (HMAC do e-mail de quem mudou; vazio
+  pela senha de administrador), alterado_em (ISO UTC com segundos, "2026-11-24T16:05:28Z"), motivo, assinatura. Vale,
+  por tipo, a válida de `alterado_em` mais recente; no empate, a de baixo. Sem nenhuma válida, o App Setting.
+- **A cifra da lista**: AES-256-GCM, chave HKDF-SHA256 SEM sal de 32 bytes da NEXUS_PESSOA_HMAC (os bytes UTF-8 do texto),
+  info `nexus:email:controle/v1` (`cifra.aead_derivada`), dado associado `nexus/email-controle/<tipo>`, valor "cf1:" +
+  base64url sem "=" do nonce de 12 bytes com a cifra e a tag (`cifra.cifrar_com`). O texto aberto é a lista JSON dos
+  e-mails, minúsculos, sem repetição; vazio = lista vazia. A cifra de um tipo copiada para outro não abre.
+- **A assinatura**: chave = HMAC-SHA256(NEXUS_PESSOA_HMAC, "nexus:email:controle"); assinatura = HMAC-SHA256(chave,
+  "tipo|ligado|modo|destinatarios|substitui_padrao|alterado_em"), hex minúsculo, com o `destinatarios` como gravado.
+- **A linha que não vale no App**: assinatura errada, cifra que não abre, ligado, modo ou substitui fora do domínio, tipo
+  fora dos 7. O App relê a cada 5 min (a leitura que falha mantém a última boa: o controle nunca segura um aviso) e diz
+  no `/health` (`emailControle`: as regras sem e-mail, `lidas`, `invalidas`, `lido_em`).
+- **Como o App aplica**: desligado não manda e grava "desligado"; teste COM lista manda só à lista, sem cópia, com
+  "[Teste] " no assunto (teste SEM lista funciona como normal, por isso a tela exige a lista); normal com lista soma ao
+  padrão sem repetir ou, com `substitui_padrao` "sim", manda só à lista, sem cópia. Lista vazia não muda nada.
+
+**As regras da edição** (`emails_controle.publicar`; nada grava quando recusa):
+- Só administrador; POST só da própria página (`de_outro_site`) e com o código do formulário da sessão.
+- Sem a NEXUS_PESSOA_HMAC nada grava (a linha iria sem assinatura e o App a descartaria), nem com a leitura do livro
+  falhando (a gravação troca o livro inteiro, relido sob trava antes).
+- Motivo obrigatório (8 a 200 letras), em claro: recusado com e-mail ou com o nome de uma pessoa do cadastro ou do
+  Fracttal (o nome inteiro ou o primeiro e o último).
+- Destinatário: pessoa do cadastro ou do Fracttal pelo nome (a lista de sugestões) ou caixa digitada só de
+  @gridco.com.br / @gridco.com; até 30. Modo teste exige a lista.
+- Desligar `pt_aviso`, `seguranca_semanal` ou `seguranca_relato` (`emails_app.CRITICOS`) pede a confirmação, que diz quem
+  deixa de saber (`QUEM_DEIXA_DE_SABER`).
+- A mesma regra de novo não grava ("Nada mudou"); a lista em outra ordem é a mesma. "Voltar ao padrão do App" publica
+  ligado, normal e lista vazia (o livro não apaga linha).
+- A linha nova vence também pela hora: no mesmo segundo da anterior, sai um segundo depois. Depois de gravar, a própria
+  linha é conferida pela conta de leitura.
+- **Quem edita: só administrador** (Levi, 25/11/2026: "Só administrador edita a regra"; o gestor não edita).
+
+**Os e-mails que o próprio Nexus manda** (25/11/2026; Levi: "a informação do app de campo tem que chegar para o Nexus e o
+Nexus passa essa informação para os e-mails"): a seção "Do Nexus" da mesma tela, com o teste, os e-mails criados na tela
+(Novo e-mail, a prévia, o "Mandar agora") e os avisos que o App vai entregar ao Nexus. A regra deles mora noutro livro
+(`nexus_email_regras`), no mesmo formato. O caminho inteiro: `nexus/emails/CLAUDE.md`.
+
+**Prova**: `tests/test_base_emails_controle.py` (a linha do Nexus conferida pela conta do App reescrita no teste, sem
+nada do Nexus; a linha do teste do App aberta no Nexus; o empate; as recusas; o histórico; a tela publicando, recusando
+outro site e o teste sem lista, a confirmação do crítico, só administrador; o catálogo) e
+`tests/test_base_emails_automaticos.py` (a leitura: a conta por envio, os números do Tipos sem o Todos os envios, o
+"a confirmar", o semanal de reserva). Em 24/11/2026, além disso, as funções do App tiradas do `function_app.py` da v380
+(`_email_regras`, `_email_controle`) rodaram sobre linhas do Nexus: com a chave real, a linha publicada pela tela na
+cópia de prova deu `lidas 1, invalidas 0` e o PT em teste só para a lista, com "[Teste]". Na cópia de prova a regra vai
+para um arquivo (`NEXUS_EMAIL_CONTROLE_ARQUIVO`); sem ele, a trava da cópia barra a gravação no banco. Depois de publicar
+no servidor: o `/health` do App (`https://gridco-campo-mw.azurewebsites.net/api/health`, `emailControle`) tem de mostrar
+a regra, com `lidas` > 0 e `invalidas` 0, em até 5 minutos.
+
 ## Equipamentos das usinas (`estrutura_usina.py`, `telas_equipamentos.py`, `/t/base/equipamentos`; 13/10/2026)
+
+### Metas e equipamentos, do setor Performance (25/11/2026)
+
+Levi: "Expõe as 43 usinas de fora para o time de Performance!"; "equipamento das usinas e metas. Eu gostaria que fossem um
+só, escrito metas e equipamentos. E a pessoa clica, ela vai poder ver as metas das usinas, vai poder ver os equipamentos
+das usinas e vai poder fazer o de para ali [...] o que a gente atualizar no de para vai atualizar na sala de controle.
+Essa é a regra."
+
+- **Um item no menu**, "Metas e equipamentos" (a `Tela("equipamentos")` renomeada; o endereço é o mesmo). As Metas das
+  usinas (`/t/base/metas`) ficam por dentro (`dentro_de`), e as duas páginas têm as mesmas abas em cima
+  (`cadastro/_metas_equip_abas.html`): "Equipamentos das usinas e de-para" | "Metas das usinas". O de-para segue dentro
+  dos Equipamentos (as Fontes de dados e o Equipamento Supervisório da tabela dos inversores, desde 17/11/2026).
+- **Quem abre e grava**: o administrador e quem tem a tela liberada no setor (`telas_equipamentos.pode_abrir`): o dono é
+  o setor Performance (`do_setor`), e Base → Acessos pode marcá-la para outro setor. Até 25/11/2026 era só administrador
+  (o `_tela` do cadastro, que segue valendo nas outras telas da Base). Portão por setor desligado não abre para quem não é
+  administrador. A ficha do Registro mestre e o "De-para completo" da plataforma seguem só do administrador (o link da
+  ficha some para os outros).
+- **As usinas de fora, à vista do time**: o bloco "Vale pelo Nexus na Sala" (aberto quando há pendência) diz "N de M
+  usinas · X ainda pela aba Equipamentos: o que falta em cada uma", com até três motivos por usina e o link que abre a
+  usina. Em 25/11/2026: 82 de 125 pelo Nexus, 43 pela aba.
+- **A regra do de-para na Sala**: o Salvar da usina grava a estrutura e, com a usina pronta (só diferença que o de-para
+  corrige, kWp da UFV a menos de 5% da aba, todas as chaves da aba no Nexus), marca a usina inteira "no lugar da aba"
+  (`valer_prontas`); a plataforma relê a visão em ~60 s e a Sala de controle passa a mostrar o que se salvou aqui. A usina
+  que não fica pronta segue com a aba, e o aviso do Salvar diz o que falta (é a lista do bloco de cima).
+- Prova: `tests/test_base_metas_e_equipamentos_25_11.py` (o item do menu, as abas, o setor Performance abrindo e o Salvar
+  dele valendo na Sala, outro setor e o portão desligado de fora).
 
 > Desde 05/11/2026 o guia "Como funciona" e a dica do (!) antigo ficam juntos na exclamação amarela do título (`explica`, `_explica.html`); o guia deixou de ser uma seção do painel vazio.
 
@@ -625,12 +742,31 @@ de entender para você, quando eu for fazer não vou entender nada".
   no `dim_supervisorio`: o **nome de exibição** (`usina_exibicao`, o "Usina" da aba: nasce dela ao ligar e no Trazer da
   aba; vazio = o do Registro mestre), a **chave da usina** (`principal`, uma por usina: a 1ª ligada; o Trazer da aba a
   passa para a chave que tem a UFV na aba; desligá-la passa para a 1ª das que ficam) e a marca **no lugar da aba**
-  (`substitui_aba`, nasce desmarcada: marcar é decisão). As marcadas saem numa **visão no formato da aba**
+  (`substitui_aba`, nasce desmarcada; desde 24/11/2026 quem marca é o Nexus, abaixo). As marcadas saem numa **visão no formato da aba**
   (`aba_equipamentos`: as colunas da aba, com os IDs no fim), refeita a cada gravação da tela com o que ela sabe do
   Registro mestre e das Ligações (`info`: nome, cliente, potência real/contratual, 1º nome do Fracttal); só regrava se
   mudou. A UFV e as UG saem na chave da usina, com "Usina Supervisório" vazia quando a chave é o próprio nome de
   exibição (como 103 das 146 UFV da aba); o inversor sai sempre com a chave e com "Inversor " na frente se o nome não
   começar assim (os leitores só contam o que começa). Inversor sem chave não sai.
+- **O Nexus é a fonte única: a usina pronta passa a valer sozinha (24/11/2026; Levi: "A ideia é usarmos só o do Nexus
+  [...] o mais simples possível dentro do Nexus"; "OK" para a virada).** Caso: a Petrolina 2 (23/11) salvou 13 → 12
+  strings e a Sala de controle seguiu com 13, porque a marca "No lugar da aba" ficava escondida nas chaves recolhidas.
+  A caixa saiu da tela (a coluna virou "Vale na Sala", só leitura) e a pergunta do de-para das fontes também. Quem marca
+  é `estrutura_usina.valer_prontas`: a MESMA regra do de-para (`_marcar`: a usina inteira, só diferença da regra; a que
+  não passa fica com a aba), mais uma trava: **o kWp da usina no Registro mestre a mais de 5% do da aba segura a usina**
+  (`KWP_USINA_TOLERANCIA`; a Sala passaria a usar o do Registro, e o PR mudaria junto: Diamantino pela metade, Linhares 1
+  ×3, Cambé −15%, as Araçoiaba da Serra trocadas). Roda (1) ~2 min depois de o Nexus subir (`_virar_ao_subir`, pelo
+  `record_once` da torre Base; não há outra rotina que rode sozinha), (2) em fundo ao abrir a tela, no máximo a cada 10
+  min, e (3) no Salvar da Base, só a usina salva, na hora. O `salvar_usina` nunca desmarca pelo que a tela manda (a tela
+  aberta antes da conferência mandaria "não"). O Salvar diz "Vale pelo Nexus na Sala..." ou "ainda vale pela aba ...
+  porque: ...", e o bloco do alto da tela conta "Vale pelo Nexus na Sala: N de M usinas", lista as que seguem com a aba
+  com o motivo e as chaves da aba que o Nexus nem tem. A medida a seco de 24/11/2026 (o banco real, o Registro e as
+  Ligações do PC, com o código novo): 23 → 82 usinas valendo pelo Nexus (59 viram), 43 seguem com a aba (cabines, nome
+  no Fracttal, usinas agrupadas, as 5 do kWp); o que a Sala vê mudar nas 59: strings em 25 inversores (a Petrolina 2),
+  o kWp da usina pelo Registro em 19 (até −2,9%, Assis) e o "N de Inversores" da UFV em 12. Prova:
+  `tests/test_base_equipamentos_depara.py` (o Salvar que vira, o que segue com a aba e por quê, a tela velha que não
+  desmarca, a conferência de todas sem regravar, o kWp longe do Registro). O passo seguinte é acertar as 43 e as chaves
+  que faltam até a aba não ser mais lida.
 - **Os leitores trocam as linhas das chaves da visão** (tiram da aba as de UFV, UG e inversor dessas chaves, pela chave
   efetiva "Usina Supervisório" ou, sem ela, "Usina", e põem as da visão; o resto segue da aba): a **plataforma**
   (`plataforma/estrutura_nexus.py`: o cadastro, o mapa do "Usina Fractall" e a disponibilidade; relê sozinha quando a
@@ -892,6 +1028,38 @@ de entender para você, quando eu for fazer não vou entender nada".
   236 strings, potência fechando com a real, os 10 ativos pelo nome, salvar duas vezes = "Nada mudou") e Ipixuna do
   Pará 1 à mão (chave digitada, 2 cabines, 8 inversores gerados, distribuir fechando 6.804 kWp, nome repetido recusado),
   no celular sem rolagem lateral e no tema claro.
+
+## Metas das usinas (protótipo de 25/11/2026; `/t/base/metas`, `torres/base/metas_tela.py`, `performance/metas_pvsyst.py`)
+
+Levi, 24/11/2026: "É por eles [os PVsyst] que a gente preenche as metas [...] das usinas que não são da Thopen [...] a
+ideia seria a gente anexar esses PVSys e já preencher automático na meta". Nasceu na Performance e veio para a Base no
+mesmo dia ("metas das usinas tem que estar na parte de base"); `/t/performance/metas...` responde 308 para cá.
+
+- **As usinas são as do Registro mestre** (Levi: "essas usinas [...] são de acordo com o registro mestre"), menos as da
+  Thopen (a Thopen manda a própria meta, no banco): 164 em 25/11/2026. A lista se DIGITA (`<input list>` + `<datalist>`,
+  regra de ouro do Levi: "Sempre que for fazer [...] um filtro, ele tem que ser digitável"); o ano também. Nome repetido
+  entre clientes ganha o cliente no rótulo. O kWp da conferência é o do Registro mestre (o real; sem ele, o contratual).
+- **A meta de agora** (o que a tabela mostra, em valores limpos): a salva no Nexus para a usina e o ano; sem ela, a da aba
+  Info Mensal do BD_Performance; sem as duas, vazia. A linha da Info Mensal casa pelo nome (`chave_nome`: sem acento,
+  romano = número) ou, sem ele, pelo nome da usina em Base > Equipamentos (a "Usina" das chaves dela), se for um só. Medido
+  em 25/11/2026: 23 pelo nome, 27 pelos Equipamentos (Ibirapuã 1 = "Ibirapuã I", Matões 100 = "MTS100"); as outras 114 não
+  têm meta na aba (Faro, Elis, as que vão mobilizar). A tela diz a linha quando o nome difere. Lida uma vez, 10 min.
+- **Editar** abre as células, do tamanho do número (Levi, vendo as caixas abertas com o valor miúdo embaixo: "é mais fácil
+  ter um botão de editar"). Digita-se em pt-BR, PR em %; colar do Excel (tabulação/quebra) espalha para a direita e para
+  baixo; texto que não é número fica como estava e é dito. O que muda contra a meta de agora fica com borda (e "Antes: X"
+  no título) e conta "N valores a salvar". Cancelar volta à meta de agora.
+- **Anexar PVsyst**: lê "Balances and main results" e o resumo P50/P70/P90 (kWh ou MWh: Iramaia II vem em kWh, Gravatá em
+  MWh) e abre a tabela já para editar. A usina é a do projeto/arquivo quando clara (o PDF da Iramaia anexado com outra
+  usina aberta vai para a Iramaia, e a tela diz); sem ela, a que estava aberta. A conta: P50 = E_Grid; P90 = P50 × (P90 ÷
+  P50 do ano); P75 = P50 − (P50 − P90) × 0,6745 ÷ 1,2816; PR do mês; IPOA = GlobInc; GHI = GlobHor (ano 1, sem degradação;
+  sem P90 no relatório, P90 e P75 vazios). kWp do PVsyst > 5% fora do Registro mestre pede confirmação no Salvar.
+- **Salvar**: o P50 é obrigatório nos 12 meses. Cada Salvar entra no registro: quem, quando, origem ("PVsyst", "PVsyst
+  editado", "Info Mensal" salva sem mexer, "manual") e cada valor de quanto para quanto; na 1ª vez, contra a meta que a
+  tela mostrava (a da Info Mensal). A lista "Metas salvas" mostra o registro legível ("mar · PR 82,0% → 75,0%").
+- **Onde fica**: `<pasta de dados>/metas_pvsyst/metas.json` (`{"versao": 2, "metas": {"<usina_id>|<ano>": ...}}`) +
+  `pdf/<sha>.pdf`. O 1º formato (por nome, das 01:40 à ida para a Base) é lido sem o Abrir e não se perde. NÃO é livro
+  do banco (livro é para sempre: o formato espera a validação); a Sala de controle e o Gerencial seguem com a Info Mensal.
+- Prova: `tests/test_performance_metas_pvsyst_25_11.py` (Registro mestre e Info Mensal de mentira; o texto do PDF dublado).
 
 ## As listas montadas uma vez por versão (`telas._lista`, `cadastro/_lista_linhas.html`; 19/10/2026)
 

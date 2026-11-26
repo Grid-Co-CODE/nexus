@@ -215,7 +215,7 @@ def _valor(evento: str, valor):
             raise Recusada("Escolha a etiqueta da lista")
         return _int(i), bool(lig), f"etiqueta {nome(ETIQUETAS, i)} {'ligada' if lig else 'desligada'}"
     if evento in ("acompanhamento", "finalizado"):
-        rot = "em acompanhamento" if evento == "acompanhamento" else "finalizado pela Engenharia"
+        rot = "em acompanhamento" if evento == "acompanhamento" else "finalizado pela Performance"
         return None, bool(valor), (rot if valor else f"não mais {rot}")
     raise Recusada("Essa marcação não existe na tela ETMs")
 
@@ -235,7 +235,7 @@ def marcar(os_: dict, evento: str, valor, usuario, pode: bool) -> dict:
     acompanhamento e finalizado: liga ou desliga. Devolve {"aviso", "evento"}."""
     if evento not in EVENTOS:
         raise Recusada("Essa marcação não existe na tela ETMs")
-    quem = AC._quem(usuario, pode, "marca a OS de ETM")
+    quem = AC._quem(usuario, pode, "marca a OS de ETM", dono="da Performance")
     valor_id, ligado, aviso = _valor(evento, valor)
     if not _int(os_.get("wid")):
         raise Recusada("OS sem o id do Fracttal: recarregue a página")
@@ -254,7 +254,7 @@ def finalizar_lote(oss: list[dict], usuario, pode: bool) -> dict:
     """O "Finalizar pela Engenharia" de várias OS de uma vez (o botão do quadro da usina nas Estações em Aberto, como no
     app): só as que o livro relido agora ainda tem sem diagnóstico nem o finalizado; uma gravação só. Devolve
     {"feitas", "ja"} com os números das OS."""
-    quem = AC._quem(usuario, pode, "finaliza as OS de ETM")
+    quem = AC._quem(usuario, pode, "finaliza as OS de ETM", dono="da Performance")
     cofre = AC._cofre()
     feitas, ja, novos = [], [], []
     with _TRAVA:

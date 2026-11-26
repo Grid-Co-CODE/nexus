@@ -80,7 +80,16 @@ RENOMEADAS = {"performance/relatorio": "relatorios/relatorio",
               "contratos/acessos": "base/acessos-clientes",
               # 16/11/2026: a Usinas saiu do Comando para a Usinas 360° (Levi: "Usinas sai de comando e vai para Usinas
               # 360 abaixo de Visão do responsável!"); o endereço antigo responde 308 (nexus/torres/comando, `bp_usinas`)
-              "comando/usinas": "campo/usinas"}
+              "comando/usinas": "campo/usinas",
+              # 24/11/2026: as ETMs saíram da Engenharia para a Performance (Levi: "a parte de ETM agora vem para
+              # performance"); o endereço antigo responde 308 (nexus/torres/engenharia, `etm_mudou`)
+              "engenharia/etm": "performance/etm",
+              # 24/11/2026: o Clima e risco foi para a Usinas 360° (Levi: "clima e risco vai para usinas 360"); o Mapa de
+              # risco saiu sem tela nova (o mapa é o do Mapa de equipe, que tem os setores dele)
+              "performance/clima": "campo/clima",
+              # 25/11/2026: as Metas das usinas foram para a Base (Levi: "metas das usinas tem que estar na parte de
+              # base"); o endereço antigo responde 308 (nexus/torres/performance, `metas_mudou`)
+              "performance/metas": "base/metas"}
 # A torre que saiu do menu e só guarda os endereços antigos (nexus/torres/contratos: cada um responde um
 # redirecionamento para a tela nova). O portão deixa passar: sem isto, quem não é administrador recebia a recusa no
 # endereço salvo, em vez de chegar à tela nova, que tem o portão dela.
@@ -439,7 +448,7 @@ def liberadas_do_menu() -> set[str] | None:
 
 def _tela_do_caminho(caminho: str):
     """(torre_id, chave da tela ou None) de um caminho `/t/<torre>/...`; (None, None) fora das torres. A tela é a de id
-    mais longo que casa (o "clima/mapa" da Performance tem barra no id)."""
+    mais longo que casa (o "coletas/recoleta" da Performance tem barra no id)."""
     if not caminho.startswith("/t/"):
         return None, None
     partes = caminho[3:].split("/", 1)
@@ -456,7 +465,7 @@ def _tela_do_caminho(caminho: str):
 # chamados, performance etc"): o Quadro da Performance e a tela do chamado de Garantias a abrem, e quem tem uma dessas
 # telas abre a página e as rotas dela (classificar), sem ganhar o resto da Engenharia (o Quadro, a OS de ETM).
 PAGINA_DA_OS = re.compile(r"^/t/engenharia/equipe/os/\d+(/[a-z_]+)?$")
-TELAS_DA_PAGINA_DA_OS = ("engenharia/equipe", "performance/equipe", "chamados/garantias")
+TELAS_DA_PAGINA_DA_OS = ("engenharia/equipe", "performance/equipe", "chamados/garantias", "performance/etm")
 
 
 def pode(caminho: str, telas: set[str]) -> bool:

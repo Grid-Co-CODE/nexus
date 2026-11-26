@@ -286,6 +286,22 @@ referência curta citada: CAB2 → Cabine 2); várias no mesmo dia, uma por linh
 `registros` e `os` dizendo quais. A normalizada sem relato não entra (o dia fica sem comentário do Nexus, e a
 Plataforma usa a linha dela). O nome da coluna não é "comentario": é nome proibido na governança (`PROIBIDAS`, texto
 pessoal), e o relato não é texto pessoal. Mexe em `nexus/dados/` (catálogo e `explica.py`): o pedido sai da área do COS.
+**Quem ganha o comentário** (`entra_no_comentario`, 25/11/2026 à tarde): **todas as usinas, em todo dia a partir de
+01/10/2026** (`COMENTARIOS_DESDE`, o começo da memória), de toda ocorrência normalizada que tocou o sol do dia, também a
+que começou antes (a 16956 de Ribeirão Cascalheiras, de 09/09 a 12/11, leva o relato em 01/10 e a continuação depois).
+Antes era a Aparecida (ADT100) desde sempre, as outras usinas só com a ocorrência que começou a partir de 10/11 e a
+operação assistida a partir de 01/11. O relatório de outubro da Thopen saiu com o comentário em branco (Pharma II,
+Santana do Ipanema) ou errado (Inhapi: "Desligamento Cabine 2" no que a Ronda COS tem como QGBT 2 e SKID 2), porque sem a
+linha do Nexus a Plataforma monta o comentário sozinha, e só do desligamento. O dono: "Sim, subir hoje". Medido em 25/11:
+1.092 dias novos (842 de outubro e 250 de 01 a 09/11), em 81 usinas. ⚠ A linha só chega à Plataforma com a usina ligada (`usina_id`): Pacaembu (Areia Branca), Nova Iguaçu,
+Rondonópolis, Monte Aprazível, Aparecida do Taboado 3 e Sol Maior não estão no Registro mestre, e as chaves delas no
+de-para estão ignoradas desde 04/10 ("fora da operação da Grid"). Prova: `tests/test_cos_normalizacoes_banco.py`.
+**A aberta no comentário** (`aberta_entra_no_comentario`, 25/11/2026, o dono: "Sim, nível 1"): entra só a aberta que
+para a geração (desligamento de usina, cabine, SKID, QGBT ou inversor; atuação de proteção; falta da concessionária; ou a
+"geração parou?" = sim), como "Inversor 2.7 desligado desde 12/07 às 06:00, em atendimento pelo COS." (o nome sai do que
+o COS citou ou, sem isso, da tag: `_citados_dos_codigos`). A falha de comunicação, a string, o ventilador, o tracker, a
+estação, o relé e a sem tipo ficam fora: foi a repetição delas na Mandaguaçu que tirou as abertas em 09/11. Medido em
+25/11: 15 das 72 abertas da Thopen, 258 dias. Normalizada, a linha da aberta dá lugar ao relato.
 
 - **De onde:** `GET <Andamento>/api/normalizacoes?desde=&limite=` (contrato `versao: 1`, a mesma chave `X-Nexus-Chave`). A
   API é **incremental**: devolve `cursor` e `mais`. O Nexus guarda em memória (`nexus/cos/normalizacoes.py`) desde o
@@ -440,7 +456,8 @@ Ignora esse monitoramento que já existe no nexus" (a Performance › Tempo real
   nova (`fresca`): um número parado não infla o total. `kw` nulo é "—", nunca zero.
 - **A curva** (`monitoramento.curva`): das 05h às 19h, no mesmo eixo para todas; a escala vai de zero ao máximo da
   própria usina (a plataforma não guarda o kWp, e um teto inventado mentiria); onde falta amostra a linha quebra, sem
-  ponte. O SunOP não grava série: a usina dele vem "sem curva". Uma série por linha, sem legenda; o traço é o
+  ponte. A série do SunOP é gravada pela Ronda COS desde 13/11/2026 (`SUNOP-<código>`); a planta ainda sem amostra vem
+  "sem curva". Uma série por linha, sem legenda; o traço é o
   `--verde-texto` (3:1 de contraste nos dois temas, pelo validador do dataviz). A dica do mouse mostra o kW de cada horário
   (`static/cos/monitoramento.js`).
 - **Ao vivo:** a página pede `?parcial=1` a cada 30 s pelo `nexusPedir` e troca só o corpo (`_monitoramento_corpo.html`),
@@ -456,6 +473,31 @@ Ignora esse monitoramento que já existe no nexus" (a Performance › Tempo real
   também na tela normal). Clicar no cartão abre a janela dos inversores (`cos/_inversores.html`,
   `static/cos/inversores.js`): a curva da usina e a de cada inversor, o estado de cada um ao vivo de 3 em 3 s, e "aberto
   no COS" no inversor com ocorrência (`MO.abertas_de_inversor`). **Quem lê, desde 12/11/2026 à tarde, é o SERVIDOR do Nexus** (o dono: "o monitoramento do nexus ainda não ta igual do prototipo, corrija"): a janela pede `/t/cos/monitoramento/ronda-api/scada/monitoramento` e `.../scada/curva/<loggers>?dia=`, os mesmos caminhos da API da Ronda COS, e a rota `monitoramento_ronda_api` lê o Andamento (`/api/nexus/geracao/scada` e `/scada-curva`, a chave de máquina) com `AND.ler_ao_vivo`: 2 s de cópia para o ao vivo (60 s para a curva) e um pedido só por leitura no ar, então dez pessoas com a janela aberta são uma leitura a cada 2 s. Sem login da Ronda COS; o portão de setores dá a rota a quem vê o Monitoramento (ela mora debaixo dele). Com `NEXUS_COS_API_URL`, o navegador volta a ler a API direto, com o login da pessoa.
+- **O SunOP na janela e a contagem dele** (25/11/2026, o print do dono da aba Athon: "0 de N inversores" nos dez cartões
+  e a janela sem gráfico). A contagem era o `CALC.InvsDisponivel` do portal, que vem ZERADO nas dez plantas (medido: a
+  Capitão Poço com os 14 inversores gerando); a Ronda COS passou a contar os inversores que responderam, no mesmo sentido
+  do SCADA. A janela, que parava num aviso para o SunOP, lê os inversores pela rota `sunop/monitoramento` (o Andamento
+  `/api/nexus/geracao/sunop`, 15 s de cópia, `AND.TTL_SUNOP_AO_VIVO_S`; o portal é lido uma vez por minuto lá) e a curva
+  de cada um pelo `scada/curva/SUNOP-<código>` de sempre. O laço do SunOP é de 20 s e só roda com cartão do SunOP na tela;
+  `vivo` é a frota JUNTA (SCADA e SunOP), então a grade (a marca de inversor desligado, o "N/N inversores") e a janela
+  tratam as duas igual. O estado do inversor do SunOP vem pronto da Ronda COS: em 0 kW com a usina gerando é "desligado";
+  em 0 kW com alarme no portal, "em falha". O SunOP não guarda as strings: o detalhe mostra só a curva do inversor, e a
+  janela nem pede o histórico delas. O dia e o zoom valem para ele (a série gravada).
+- **Curva ou barras** (25/11/2026, o pedido do cliente: escolher entre a curva de hoje e as barras, "para comparar o
+  desempenho dos inversores"): o seletor "Curva de hoje | Barras por inversor" fica no alto da tela normal
+  (`[data-cos-vista-sel]`, fora do corpo trocado a cada 30 s; só com o ao vivo dos inversores, `cos_api`). A escolha vai
+  no `<html data-cos-vista>` (o CSS esconde a curva e a linha do máximo, ou as barras) e no `localStorage`
+  (`nexus.cos.monitoramento.vista`), por pessoa; quem nunca escolheu fica na curva, e o videowall também. As barras são
+  desenhadas no navegador a partir da leitura ao vivo (`barrasDaUsina`, `desenharBarras` no `inversores.js`): uma por
+  inversor, na ordem da usina, o kW de agora (ou a fração da nominal quando todos a têm), a cor do estado e a linha
+  tracejada da mediana dos que estão gerando, sem limiar inventado. Testes no node: `test_cos_inversores_js.py`.
+  **Na janela da usina também** (25/11/2026, o dono com a janela da Altair 5 aberta: "aqui tinha que ter a visualização em
+  barra também"): o bloco "Cada inversor" tem Curvas | Barras, a MESMA escolha do alto da tela (trocar na janela troca a
+  tela). Nas barras, um gráfico grande com uma coluna por inversor na ordem da usina, o eixo na unidade do que se compara e
+  a mediana tracejada; o clique na coluna abre o inversor. O que se compara: **Agora (kW)**, ao vivo, ou **Energia do
+  trecho** (`energiaDaSerie`: a curva GRAVADA de 5 em 5 min, cada ponto vale 5 min, nunca a ponta de 3 s), no dia inteiro
+  ou no trecho do zoom; num dia que passou, só a energia e sem a cor do estado de agora. Com a nominal de todos, a energia
+  vira kWh por kW. Nas barras, as curvas de cada inversor não são desenhadas (a grade está escondida).
 - **O detalhe de um inversor** (13/11/2026, o dono: "clicar num inversor e ver o gráfico individual desse inversor,
   junto com o gráfico das strings dele, individual ou em grupo, por exemplo por MPPT"): na janela da usina, o inversor é
   botão e troca o corpo pelo detalhe (`.cos-inv-det` no `cos/_inversores.html`; "Voltar à usina" e o Esc voltam, com o

@@ -64,7 +64,7 @@
 
   {# o responsável vai ao servidor (Levi, 18/10/2026: "quero apenas por responsável da UFV"); cliente e busca filtram na
      página, sem recarregar #}
-  <form class="cn-barra-filtros apq-filtros" method="get" data-apq-filtros data-fs>
+  <form class="cn-barra-filtros apq-filtros" method="get" data-apq-filtros data-fo>
     {# cada rótulo junto do seu campo: quando a linha quebra, o par desce junto #}
     <span class="apq-filtro"><label class="gc-rotulo" for="apq-responsavel">Responsável O&amp;M</label>
     <select class="gc-campo" id="apq-responsavel" name="responsavel" onchange="this.form.submit()">
@@ -86,12 +86,30 @@
     <select class="gc-campo" id="apq-cliente" name="cliente" onchange="this.form.submit()">
       <option value="">Todos</option>{% for c in clientes %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}
     </select></span>
+    {# o tipo de tarefa e a etiqueta de quem pediu (25/11/2026, o Otávio, pelo Levi: "Tipo por Handouver, MPA/MPS [...] e
+       também de quem solicitou, por exemplo: Performance, COS etc"): listas de marcar, como o Cliente do Histórico de OS #}
+    <span class="apq-filtro"><label class="gc-rotulo" for="apq-tipo">Tipo de tarefa</label>
+    <select class="gc-campo" id="apq-tipo" name="tipo" multiple>
+      {% for t in opcoes_tipo %}<option value="{{ t }}"{% if sem_acento(t) in tipos_marcados %} selected{% endif %}>{{ t }}</option>{% endfor %}
+    </select></span>
+    <span class="apq-filtro"><label class="gc-rotulo" for="apq-etiqueta">Etiqueta</label>
+    <select class="gc-campo" id="apq-etiqueta" name="etiqueta" multiple>
+      {% for e in opcoes_etiqueta %}<option value="{{ e }}"{% if sem_acento(e) in etiquetas_marcadas %} selected{% endif %}>{{ e }}</option>{% endfor %}
+    </select></span>
+    {# quem criou a OS, pelo setor dele no Nexus (25/11/2026, Levi: "criado por, aí bota entre parênteses setor, aí
+       performance, engenharia, chamados e assim por diante"): o COS, que não é etiqueta no Fracttal, entra por aqui #}
+    <span class="apq-filtro"><label class="gc-rotulo" for="apq-criado">Criado por (setor)</label>
+    <select class="gc-campo" id="apq-criado" name="criado" multiple>
+      {% for c in opcoes_criado %}<option value="{{ c }}"{% if sem_acento(c) in criados_marcados %} selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select></span>
     <span class="apq-filtro"><label class="gc-rotulo" for="apq-busca">Buscar</label>
-    <input class="gc-campo apq-busca" id="apq-busca" type="search" name="q" value="{{ busca }}" data-apq-busca placeholder="OS, UFV ou técnico" autocomplete="off"></span>
+    <input class="gc-campo apq-busca" id="apq-busca" type="search" name="q" value="{{ busca }}" data-apq-busca placeholder="OS, UFV, técnico ou tarefa" autocomplete="off"></span>
     <a class="cn-link cn-barra-fonte" href="{{ url(csv='1') }}" data-apq-csv>Exportar CSV</a>
   </form>
-  {# o filtro suspenso (10/11/2026, Levi: "a estrutura de filtros usando como referência os filtros de histórico de OS, um filtro suspenso e simples"): o campo-filtros.js monta o botão Filtros, o painel com o Aplicar e as etiquetas com as listas deste formulário #}
-  <script src="{{ url_for('static', filename='campo-filtros.js') }}"></script>
+  {# os filtros no padrão do Histórico de OS (25/11/2026, Levi: "no estilo histórico de os do os creator web, com o mesmo
+     estilo e funcionalidade"; era o cartão suspenso de 10/11, o campo-filtros.js): o static/filtros-os.js monta a barra
+     com a busca, o painel com as listas digitáveis, o Aplicar e as etiquetas com as <select> deste formulário #}
+  <script src="{{ url_for('static', filename='filtros-os.js') }}"></script>
 
   <div class="apq-lote" role="region" aria-label="Aprovar várias OS de uma vez">
     <p class="apq-lote-total"><b class="gc-num">{{ n_os }}</b> OS esperando aprovação{% if usina_id %} na {{ usina_nome }}{% elif responsavel %} nas usinas de {{ responsavel }}{% endif %}{% if tecnico %} executadas por {{ tecnico }}{% endif %}{% if not (usina_id or responsavel or tecnico) %}, a fila inteira{% endif %}</p>
