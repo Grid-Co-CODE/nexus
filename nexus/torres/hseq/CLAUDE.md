@@ -1,7 +1,7 @@
 # CLAUDE.md — Segurança · HSEQ
 
 Torre do menu "Segurança · HSEQ". Telas vivas: a **Mesa da Segurança** (a primeira, 24/10/2026), **Extintores** (com o
-relatório de cada cliente e usina em PDF e Excel, a foto diária dos fora do em dia e as tratativas, desde 24/11/2026), **EPI e EPC** (com o mesmo relatório, desde 23/11/2026), **APR e PT** (09/10/2026), **Colaboradores** (05/11/2026, as pessoas do cadastro e a documentação de segurança de cada uma) e **Incidentes** (24/11/2026, os relatos de segurança do App de Campo). Riscos da semana e DSS
+relatório de cada cliente e usina em PDF e Excel, a foto diária dos fora do em dia e as tratativas, desde 24/11/2026, e o que mudou nos atrasados, desde 25/11/2026), **EPI e EPC** (com o mesmo relatório, desde 23/11/2026), **APR e PT** (09/10/2026), **Colaboradores** (05/11/2026, as pessoas do cadastro e a documentação de segurança de cada uma) e **Incidentes** (24/11/2026, os relatos de segurança do App de Campo). Riscos da semana e DSS
 ainda são placeholder (a view com a mesma rota vence a genérica). As contas moram em `nexus/hseq/`; a view e o
 template, aqui.
 
@@ -418,6 +418,31 @@ Prova: `tests/test_hseq_tratativas.py` (o cliente pelo ID e nada em claro, o que
 cada linha, o histórico, quem só vê, a caixa, o catálogo) e os de Extintores com a tabela nova. Conferido no navegador
 em 25/11/2026 com os dados dos testes (fictícios): a 1440 px a tabela tem 1.178 px, e a 375 px a página não passa da
 largura.
+
+**O que mudou nos atrasados** (25/11/2026, a entrega 3 do mockup aprovado pela Segurança: "São pendências novas, ou as
+antigas mais as novas?"; `nexus/hseq/extintores_mudou.py`, rota `/t/hseq/extintores/mudou`, pedaço
+`_extintores_mudou.html`). Uma seção fechada embaixo da tabela (visão Tabela), com dois cartões:
+- **O que mudou:** a data de início (dd/mm/aaaa, 7 dias atrás por padrão, até 90; o fim é hoje) e os filtros da tela.
+  Os atrasados no início → os de hoje; **antigos** (estavam e continuam), **novos** (estão hoje e não estavam: venceram
+  no período), **resolvidos** (estavam e não estão mais), e as listas dos novos e dos antigos com o código, a usina e a
+  validade que venceu.
+- **Atrasados por dia:** barras empilhadas em SVG feito no servidor, os antigos embaixo e os novos em cima, cores pelas
+  classes do `hseq.css` (o novo é o `--critico` com transparência: não há token de vermelho claro).
+- **De onde vem cada dia:** hoje, a tela de agora; o dia com foto, a foto diária (`extintores_historico.estado_em`); o
+  dia sem foto depois da 1ª foto é lacuna (sem barra, só o contorno; o início que cai nela usa a última foto antes, e a
+  seção diz); antes da 1ª foto (24/11/2026), **estimado** pela validade de hoje (atrasado na data X se a recarga ou o
+  hidrostático venceu antes de X), escrito no número e com asterisco e tracejado na barra, e os resolvidos "—" (a
+  estimativa não vê o extintor recarregado depois). O "!" da tela explica antigos, novos, resolvidos e o estimado.
+- **Os filtros nos dias de foto:** o código da foto liga ao extintor de hoje; o que saiu da tela (excluído) liga pela
+  usina dele.
+- **Página leve:** a página da tabela não lê a foto; a seção busca o pedaço só ao abrir (e na troca da data). Medido no
+  banco real em 25/11/2026: a foto lida em 0,35 s, a conta em 15 ms (7 dias) a 45 ms (90 dias), com a tela já quente.
+Prova: `tests/test_hseq_extintores_mudou.py` (antigos, novos e resolvidos pela foto, a lacuna, o início sem foto, o
+estimado, os filtros nos dias de foto, os 90 dias, a escala das barras, a seção que só lê ao abrir, os números da tela).
+
+**O CSS fecha cada bloco** (`tests/test_hseq_css.py`, 25/11/2026). Ao juntar a `main` no pedido 44, o conflito no fim do
+`hseq.css` perdeu a chave que fechava o `@media (max-width:640px)` dos cartões do celular: a tela Incidentes e o resto
+que vinha depois só valiam até 640 px. O teste conta as chaves de cada `hseq*.css`.
 
 **A foto diária dos extintores** (24/11/2026, a entrega 1 do mockup de Extintores aprovado pela Segurança: "hoje o Nexus
 só guarda a última conferência de cada extintor, então não dá para saber o que estava vencido num dia passado";

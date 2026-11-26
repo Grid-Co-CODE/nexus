@@ -1,0 +1,50 @@
+{# O que mudou nos atrasados e os atrasados por dia (25/11/2026, a entrega 3 do mockup aprovado pela Segurança): o
+   pedaço que a seção de baixo da tabela de Extintores busca quando abre (`extintores_mudou`). A conta é de
+   `nexus/hseq/extintores_mudou.py`; o "estimado" (antes da 1ª foto diária) vai escrito no número e na barra. #}
+{% if erro %}<p class="cn-t-critico">Não consegui ler a foto diária dos extintores agora ({{ erro }}). Tente de novo em instantes.</p>
+{% elif r %}{% set est = r.estimado %}{% set fmt = '%d/%m/%Y' %}
+<div class="hs-mudou-fila">
+  <section class="hs-mudou-cartao hs-mudou-comp" aria-labelledby="hs-mudou-t">
+    <h3 id="hs-mudou-t">O que mudou nos atrasados</h3>
+    <p class="hs-mudou-q">São pendências novas, ou as antigas mais as novas?</p>
+    <form class="hs-mudou-sel" method="get" action="{{ url_for('torre_hseq.extintores_mudou') }}">
+      <label><span class="gc-rotulo">De</span><input class="gc-campo" name="de" value="{{ r.de.strftime(fmt) }}" placeholder="dd/mm/aaaa" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" inputmode="numeric" maxlength="10" aria-describedby="hs-mudou-ate"></label>
+      <span class="hs-mudou-ate" id="hs-mudou-ate">até hoje, {{ r.hoje.strftime(fmt) }}</span>
+      <button type="submit" class="gc-btn gc-btn--ui gc-btn--contorno">Comparar</button>
+    </form>
+    {% if r.de_usado != r.de %}<p class="hs-dlg-nota">{{ r.de.strftime(fmt) }} ficou sem foto: a comparação parte da última foto antes dele, de {{ r.de_usado.strftime(fmt) }}.</p>{% endif %}
+    <div class="hs-mudou-big">
+      <div><b>{{ r.n_inicio }}</b>{% if est %}<span class="hs-est">estimado</span>{% endif %}<span>atrasados em {{ r.de_usado.strftime('%d/%m') }}</span></div>
+      <span class="hs-mudou-seta" aria-hidden="true">→</span>
+      <div><b class="cn-t-critico">{{ r.n_hoje }}</b><span>atrasados hoje</span></div>
+    </div>
+    <dl class="hs-mudou-lin">
+      <div><dt><span class="hs-bola hs-bola--critico" aria-hidden="true"></span>Continuam atrasados (antigos)</dt><dd class="cn-t-critico">{{ r.antigos|length }}</dd></div>
+      <div><dt><span class="hs-bola hs-bola--novo" aria-hidden="true"></span>Venceram depois de {{ r.de_usado.strftime('%d/%m') }} (novos)</dt><dd class="hs-novo">{{ r.novos|length }}</dd></div>
+      <div><dt><span class="hs-bola hs-bola--ok" aria-hidden="true"></span>Resolvidos no período</dt><dd class="cn-t-ok">{{ '—' if r.resolvidos is none else r.resolvidos }}</dd></div>
+    </dl>
+    {% if est %}<p class="hs-dlg-nota">Estimado: a 1ª foto diária é {{ 'de ' ~ r.primeira_foto.strftime(fmt) if r.primeira_foto else 'de hoje em diante' }}. Antes dela, o número sai da validade de hoje, que não mostra o que foi resolvido.</p>{% endif %}
+    {% for nome, lista in (('novos', r.novos), ('antigos', r.antigos)) if lista %}
+    <details class="hs-mudou-lista"><summary class="gc-btn gc-btn--ui gc-btn--contorno">{% set n = lista|length %}{% if n == 1 %}Ver o {{ nome[:-1] }}{% elif nome == 'novos' %}Ver a lista dos {{ n }} novos{% else %}Ver os {{ n }} antigos{% endif %}</summary>
+      <table><thead><tr><th>Código</th><th>Usina</th><th>Validade</th></tr></thead><tbody>
+      {% for x in lista %}<tr><td class="m" title="{{ x.codigo }}">{{ x.codigo }}</td><td>{{ x.usina }}</td><td>{% if x.vence %}{{ x.vence_qual }} {{ x.vence.strftime(fmt) }}{% else %}—{% endif %}</td></tr>{% endfor %}
+      </tbody></table>
+    </details>
+    {% endfor %}
+  </section>
+  <section class="hs-mudou-cartao hs-mudou-graf" aria-labelledby="hs-graf-t">
+    <h3 id="hs-graf-t">Atrasados por dia</h3>
+    <p class="hs-mudou-leg"><span><i class="hs-leg-antigo"></i>já estavam atrasados no início</span><span><i class="hs-leg-novo"></i>novos no período</span>{% if g.barras|selectattr('como', 'equalto', 'estimado')|list %}<span><i class="hs-leg-est"></i>estimado</span>{% endif %}{% if g.barras|selectattr('como', 'equalto', 'lacuna')|list %}<span><i class="hs-leg-lacuna"></i>dia sem foto</span>{% endif %}</p>
+    <svg class="hs-graf" viewBox="0 0 {{ g.largura }} {{ g.altura }}" role="img" aria-label="Atrasados por dia de {{ r.de.strftime(fmt) }} a {{ r.hoje.strftime(fmt) }}">
+      {% for m in g.marcas %}<line class="hs-graf-grade" x1="{{ g.esq }}" x2="{{ g.largura - 4 }}" y1="{{ m.y }}" y2="{{ m.y }}"/><text class="hs-graf-eixo" x="{{ g.esq - 6 }}" y="{{ m.y + 3 }}" text-anchor="end">{{ m.v }}</text>{% endfor %}
+      {% for b in g.barras %}<g class="hs-graf-dia{{ ' hs-graf-est' if b.como == 'estimado' }}"><title>{{ b.dia.strftime(fmt) }}: {% if b.total is none %}sem foto neste dia{% else %}{{ b.total }} atrasados ({{ b.antigos }} antigos, {{ b.novos }} novos){% if b.como == 'estimado' %}, estimado{% endif %}{% endif %}</title>
+        {% if b.total is none %}<rect class="hs-graf-lacuna" x="{{ b.x }}" y="{{ g.base - 14 }}" width="{{ b.w }}" height="14"/>
+        {% else %}<rect class="hs-graf-antigo" x="{{ b.x }}" y="{{ b.ya }}" width="{{ b.w }}" height="{{ b.ha }}"/><rect class="hs-graf-novo" x="{{ b.x }}" y="{{ b.yn }}" width="{{ b.w }}" height="{{ b.hn }}"/>
+          {% if g.com_total %}<text class="hs-graf-total" x="{{ b.meio }}" y="{{ b.yn - 4 }}" text-anchor="middle">{{ b.total }}{{ '*' if b.como == 'estimado' }}</text>{% endif %}{% endif %}
+        {% if b.rotulo %}<text class="hs-graf-eixo" x="{{ b.meio }}" y="{{ g.base + 14 }}" text-anchor="middle">{{ b.dia.strftime('%d/%m') }}</text>{% endif %}</g>{% endfor %}
+      <line class="hs-graf-base" x1="{{ g.esq }}" x2="{{ g.largura - 4 }}" y1="{{ g.base }}" y2="{{ g.base }}"/>
+    </svg>
+    {% if g.barras|selectattr('como', 'equalto', 'estimado')|list and g.com_total %}<p class="hs-dlg-nota">* estimado pela validade de hoje.</p>{% endif %}
+  </section>
+</div>
+{% endif %}
