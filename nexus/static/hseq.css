@@ -302,7 +302,8 @@
 .hs-bola--alerta{background:var(--alerta)}
 .hs-bola--info{background:var(--info)}
 .hs-bola--ok{background:var(--ok)}
-.hs-clientes th.hs-esq,.hs-clientes td.hs-esq{text-align:left}
+.hs-clientes > thead > tr > th:nth-child(2),.hs-clientes > thead > tr > th:nth-child(6),
+.hs-clientes > tbody > tr.cn-linha > td:nth-child(2),.hs-clientes > tbody > tr.cn-linha > td:nth-child(6){text-align:left}
 .hs-clientes td:first-child{width:36px}
 .hs-clientes .hs-status{align-items:center;text-align:center}
 .hs-us-resp{white-space:normal}
@@ -350,11 +351,14 @@
   .hs-clientes.cn-expande > tbody > tr.cn-linha > td{background:none}
   .hs-clientes.cn-expande > tbody > tr.cn-linha[aria-expanded="true"]{background:var(--superficie-2)}
   .hs-clientes > tbody > tr.cn-linha > td:first-child{grid-row:1;grid-column:1;width:auto;padding-top:4px}
-  .hs-clientes > tbody > tr.cn-linha > td.ext-usina{grid-row:1;grid-column:2;padding-left:0}
-  .hs-clientes > tbody > tr.cn-linha > td.hs-acoes{grid-row:1;grid-column:3;width:auto}
-  .hs-clientes > tbody > tr.cn-linha > td[data-r]:not(:first-child):not(.ext-usina){grid-column:2 / 4;display:flex;gap:10px;align-items:baseline}
-  .hs-clientes > tbody > tr.cn-linha > td[data-r]:not(:first-child):not(.ext-usina)::before{content:attr(data-r);flex:0 0 92px;
-    font-size:12px;color:var(--mudo)}
+  .hs-clientes > tbody > tr.cn-linha > td:nth-child(2){grid-row:1;grid-column:2;padding-left:0}
+  .hs-clientes > tbody > tr.cn-linha > td:last-child{grid-row:1;grid-column:3;width:auto}
+  .hs-clientes > tbody > tr.cn-linha > td:nth-child(n+3):not(:last-child){grid-column:2 / 4;display:flex;gap:10px;align-items:baseline}
+  .hs-clientes > tbody > tr.cn-linha > td:nth-child(n+3):not(:last-child)::before{flex:0 0 92px;font-size:12px;color:var(--mudo)}
+  .hs-clientes > tbody > tr.cn-linha > td:nth-child(3)::before{content:"Extintores"}
+  .hs-clientes > tbody > tr.cn-linha > td:nth-child(4)::before{content:"Última inspeção"}
+  .hs-clientes > tbody > tr.cn-linha > td:nth-child(5)::before{content:"Status"}
+  .hs-clientes > tbody > tr.cn-linha > td:nth-child(6)::before{content:"Evolução"}
   .hs-clientes > tbody > tr.ext-us{padding-left:24px}
   .hs-clientes .hs-status{align-items:flex-start;text-align:left;min-width:0}
   .hs-clientes .hs-evol{min-width:0}
