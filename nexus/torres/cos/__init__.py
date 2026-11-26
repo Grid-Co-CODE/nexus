@@ -715,6 +715,88 @@ def monitoramento_ronda_api(caminho):
     return resp
 
 
+# ── O nome de campo do inversor (26/11/2026) ───────────────────────────────────────────────────────────────────────
+# O dono, com o detalhe do INV02 do Altair 1 aberto: "o operador so iria precisar renomear o nome do inversor e do Nº de
+# série, buscando os dados de um novo". A janela pede aqui (a sessão do Nexus, na mesma origem) e o Nexus repassa ao
+# Andamento, que repassa à API da Ronda COS, que grava e decide (o nome segue o S/N, a troca de lugar, os 409). Daqui: a
+# forma do que se pede, o `quem` (o nome de quem está logado no Nexus, nunca o que o navegador mandar) e a cópia do ao vivo
+# esquecida depois de gravar. As recusas passam com a frase da API (`erro`).
+_SERIE_PEDIDA = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]{3,31}")
+_CARTAO_PEDIDO = re.compile(r"scada-[a-z0-9_-]{1,200}")
+
+
+def _quem_esta_logado() -> str:
+    u = session.get("usuario") or {}
+    return (" ".join(str(u.get("nome") or "").split()) or str(u.get("email") or "").strip())[:80]
+
+
+def _do_andamento(status: int, corpo: dict):
+    resp = jsonify(corpo)
+    resp.status_code = status
+    resp.headers["Cache-Control"] = "private, no-store"
+    return resp
+
+
+def _recusa(codigo: str, erro: str):
+    return _do_andamento(400, {"erro": erro, "codigo": codigo})
+
+
+@bp.route("/monitoramento/ronda-api/inversor-campo/serie")
+def inversor_campo_serie():
+    """Onde um S/N está sendo lido agora (o "Buscar" do detalhe do inversor), e se ele já tem nome de campo."""
+    serie = (request.args.get("serie") or "").strip()
+    cartao = request.args.get("cartao") or ""
+    if not _SERIE_PEDIDA.fullmatch(serie):
+        return _recusa("SERIE_INVALIDA", "Esse texto não tem forma de número de série (4 a 32 letras e números, sem espaço).")
+    if cartao and not _CARTAO_PEDIDO.fullmatch(cartao):
+        return _recusa("CARTAO_INVALIDO", "Cartão inválido.")
+    q = urlencode({"serie": serie, **({"cartao": cartao} if cartao else {})})
+    return _do_andamento(*AND.pedir_inversor_campo(current_app.config, "GET", f"/api/nexus/inversor-campo/serie?{q}"))
+
+
+@bp.route("/monitoramento/ronda-api/inversor-campo", methods=["PUT"])
+def inversor_campo_gravar():
+    """Grava o nome de campo e o S/N de um inversor."""
+    if _de_outro_site():
+        abort(403)
+    c = request.get_json(silent=True)
+    if not isinstance(c, dict):
+        return _recusa("PEDIDO_INVALIDO", "Mande o pedido em JSON.")
+    corpo = {"cartao": c.get("cartao"), "serie_atual": c.get("serie_atual"), "nome": c.get("nome"),
+             "numero_serie": c.get("numero_serie"), "quem": _quem_esta_logado()}
+    cfg = current_app.config
+    status, d = AND.pedir_inversor_campo(cfg, "PUT", "/api/nexus/inversor-campo", corpo)
+    if status == 200:
+        AND.esquecer_ao_vivo(cfg, "/api/nexus/geracao/scada")
+    return _do_andamento(status, d)
+
+
+@bp.route("/monitoramento/ronda-api/inversor-campo/remover", methods=["POST"])
+def inversor_campo_remover():
+    """Tira o nome de campo de um S/N: o inversor volta ao nome do coletor."""
+    if _de_outro_site():
+        abort(403)
+    c = request.get_json(silent=True)
+    if not isinstance(c, dict):
+        return _recusa("PEDIDO_INVALIDO", "Mande o pedido em JSON.")
+    corpo = {"cartao": c.get("cartao"), "numero_serie": c.get("numero_serie"), "quem": _quem_esta_logado()}
+    cfg = current_app.config
+    status, d = AND.pedir_inversor_campo(cfg, "POST", "/api/nexus/inversor-campo/remover", corpo)
+    if status == 200:
+        AND.esquecer_ao_vivo(cfg, "/api/nexus/geracao/scada")
+    return _do_andamento(status, d)
+
+
+@bp.route("/monitoramento/ronda-api/inversor-campo/historico")
+def inversor_campo_historico():
+    """Quem renomeou ou trocou o S/N de um inversor da usina, e quando (o mais novo primeiro)."""
+    cartao = request.args.get("cartao") or ""
+    if not _CARTAO_PEDIDO.fullmatch(cartao):
+        return _recusa("CARTAO_INVALIDO", "Informe o cartão.")
+    q = urlencode({"cartao": cartao})
+    return _do_andamento(*AND.pedir_inversor_campo(current_app.config, "GET", f"/api/nexus/inversor-campo/historico?{q}"))
+
+
 def _url_da_pagina(**mudar) -> str:
     """O `_url` sem o `parcial`: o corpo pedido pelo JavaScript leva os links da página, e não o do pedaço."""
     return _url(parcial=None, **mudar)

@@ -498,7 +498,7 @@
       var e = ESTADO[i.veredito], grupo = e && e.grupo, v = vals[k];
       if (v != null && (menor < 0 || v < vals[menor])) { menor = k; }
       return {
-        id: i.id, nome: nomeDoInversor(i), serial: serialDoInversor(i), kw: num(i.pac), valor: base(i), rotulo: e && !o.semEstado ? e.rotulo : null,
+        id: i.id, nome: nomeDoInversor(i), serial: serialDoInversor(i), coletor: textoDoColetor(i), kw: num(i.pac), valor: base(i), rotulo: e && !o.semEstado ? e.rotulo : null,
         fracao: v == null || topo <= 0 ? 0 : Math.max(0, Math.min(1, v / topo)),
         pct: porNominal && v != null && !energia ? Math.round(v * 100) : null,
         porKw: porNominal && v != null && energia ? v : null,
@@ -557,6 +557,69 @@
     try { if (armazem) { armazem.setItem(CHAVE_DA_VISTA, v === "barras" ? "barras" : "curva"); } } catch (e) { /* sem armazenamento: vale até recarregar */ }
   }
 
+  // ── O NOME DE CAMPO DO INVERSOR (26/11/2026) — as contas sem tela ────────────────────────────────────────────────
+  // O dono, com o detalhe do INV02 do Altair 1 aberto: "quero renomear esse INV 2 para INV3 (que seria o correto em
+  // campo). Caso o inversor tivesse sido substituido, eu colocaria o SN do inversor Novo e já buscaria em tempo real". Quem
+  // decide e grava é a API da Ronda COS (o nome segue o S/N; o S/N que já tem nome neste cartão troca de lugar com o
+  // editado; com nome noutra usina, 409); daqui só as frases do que a busca achou e do que a gravação fez.
+  var SERIE_FORMA = /^[A-Za-z0-9][A-Za-z0-9._\/-]{3,31}$/;            // a mesma forma da API (`inversor-campo.regras.ts`)
+  function serieComForma(sn) { return SERIE_FORMA.test(String(sn == null ? "" : sn).trim()); }
+  function mesmaSerie(a, b) { return !!a && !!b && String(a).trim().toUpperCase() === String(b).trim().toUpperCase(); }
+  function mesmoNome(a, b) { return String(a || "").trim().toUpperCase() === String(b || "").trim().toUpperCase(); }
+  // o nome do coletor, discreto, ao lado do nome de campo ("INV3 · coletor: INV02"); sem nome de campo, nada
+  function textoDoColetor(i) {
+    return i && i.nome_de_campo && i.nome_coletor && !mesmoNome(i.nome_coletor, i.nome) ? "coletor: " + i.nome_coletor : "";
+  }
+  function ondeLido(v) {
+    var partes = ["endereço " + v.modbus_id + " do " + v.logger];
+    if (v.nome_coletor) { partes.push("no coletor: " + v.nome_coletor); }
+    var est = ESTADO[v.veredito];
+    return partes.join(", ") + (v.pac != null ? ", " + kw(v.pac) + " agora" : "") + (est ? " (" + est.rotulo.toLowerCase() + ")" : "");
+  }
+  // O que a busca do S/N achou, em palavras, para quem está editando `o.nome` no cartão `o.cartao` (o S/N de hoje dele é
+  // `o.serieAtual`). `tom`: ok (é o mesmo), troca (lido aqui, ou com nome aqui), espera (nenhum coletor desta usina o lê) ou
+  // erro (tem nome noutra usina: a API recusa). Texto puro: os nomes vêm de pessoas e nunca entram como HTML.
+  function textoDaBusca(r, o) {
+    var v = r && r.ao_vivo, nc = r && r.nome_de_campo, nome = String(o.nome || "").trim() || "este inversor";
+    var ncAqui = nc && nc.cartao === o.cartao, ncFora = nc && nc.cartao !== o.cartao;
+    if (ncFora) {
+      return { tom: "erro", texto: "Esse S/N já tem o nome " + nc.nome + " noutra usina" + (v && v.cartao_nome ? " (" + v.cartao_nome + ")" : "") +
+        ": a plataforma não deixa usar aqui. Tire o nome de lá antes." };
+    }
+    if (v && r.no_mesmo_cartao) {
+      if (mesmaSerie(r.serie, o.serieAtual)) { return { tom: "ok", texto: "É o S/N que já está aqui: " + ondeLido(v) + "." }; }
+      var dono = ncAqui && !mesmoNome(nc.nome, o.nome) ? nc.nome : null;
+      return { tom: "troca", texto: "Encontrado ao vivo nesta usina: " + ondeLido(v) + "." +
+        (dono ? " Hoje ele aparece como " + dono + ": salvar troca os dois de lugar (" + dono + " fica com o S/N de hoje deste)."
+          : " Salvar põe o nome " + nome + " nesse inversor.") };
+    }
+    if (v) {
+      return { tom: "espera", texto: "Esse S/N está sendo lido agora noutra usina (" + (v.cartao_nome || v.cartao) + ", " + ondeLido(v) +
+        "). Salvar deixa " + nome + " esperando: os dados aparecem quando um coletor desta usina o ler." };
+    }
+    if (ncAqui && !mesmoNome(nc.nome, o.nome)) {
+      return { tom: "troca", texto: "Nenhum coletor lê esse S/N agora, e ele espera com o nome " + nc.nome +
+        " nesta usina: salvar troca os dois de lugar." };
+    }
+    return { tom: "espera", texto: "Nenhum coletor desta usina lê esse S/N agora. Salvar deixa " + nome +
+      " esperando esse S/N, e os dados aparecem sozinhos quando o coletor o ler." };
+  }
+  // O que a gravação fez (a resposta 200 do PUT), em palavras
+  function textoDoResultado(d) {
+    if (!d || !d.gravado) { return "Nada mudou: o nome e o S/N já eram esses."; }
+    var base = "Gravado: " + d.nome + " (S/N " + d.numero_serie + ").";
+    if (d.troca) { return base + " Trocou de lugar com " + d.troca.nome + ", que ficou com o S/N " + d.troca.numero_serie + "."; }
+    if (d.esperando) { return "Gravado: " + d.nome + " espera o S/N " + d.numero_serie + ". Nenhum coletor desta usina o lê agora; os dados aparecem sozinhos quando ler."; }
+    return base;
+  }
+  // Uma linha do histórico: o que mudou, antes → depois
+  function textoDoHistorico(h) {
+    var mud = [];
+    if (h.nome_antes !== h.nome_depois) { mud.push("nome: " + (h.nome_antes || "do coletor") + " → " + (h.nome_depois || "do coletor")); }
+    if (h.serie_antes !== h.serie_depois) { mud.push("S/N: " + (h.serie_antes || "—") + " → " + (h.serie_depois || "—")); }
+    return (mud.join(" · ") || "sem mudança") + (h.motivo ? " (" + h.motivo + ")" : "");
+  }
+
   raiz.NexusCosInversores = { comBuracos: comBuracos, limiarDeBuraco: limiarDeBuraco, horaDaLeitura: horaDaLeitura, usinaDoLink: usinaDoLink, nomeDaString: nomeDaString, vistaDasEntradas: vistaDasEntradas, entradasDoInversor: entradasDoInversor,
     anotarPontaEnt: anotarPontaEnt, pontaEnt: pontaEnt, limparPontaEnt: limparPontaEnt, corDaEntrada: corDaEntrada,
     estiloDaCor: estiloDaCor, N_CORES: N_CORES, PONTA_MAX: PONTA_MAX, marcasDoEixo: marcasDoEixo, DIAS_ATRAS: DIAS_ATRAS, diaTexto: diaTexto, diaMenos: diaMenos, diaCurto: diaCurto,
@@ -569,6 +632,8 @@
     ehDoSunop: ehDoSunop, barrasDaUsina: barrasDaUsina, resumoDasBarras: resumoDasBarras, medianaDe: medianaDe,
     energiaDaSerie: energiaDaSerie, valorDaBarra: valorDaBarra, textoDaMediana: textoDaMediana, kwh: kwh,
     serialDoInversor: serialDoInversor, textoDoSerial: textoDoSerial,
+    serieComForma: serieComForma, textoDoColetor: textoDoColetor, textoDaBusca: textoDaBusca, textoDoResultado: textoDoResultado,
+    textoDoHistorico: textoDoHistorico,
     vistaGuardada: vistaGuardada, guardarVista: guardarVista, CHAVE_DA_VISTA: CHAVE_DA_VISTA };
   if (typeof document === "undefined") { return; }       // no node (o teste), só as contas
 
@@ -625,6 +690,136 @@
       return r.json();
     }, function (e) { clearTimeout(prazo); throw { erro: e && e.name === "AbortError" ? "a leitura não respondeu em 15 s" : "sem rede" }; });
   }
+
+  // O NOME DE CAMPO (26/11/2026): os pedidos do nome vão SEMPRE pela porta do Nexus (a sessão daqui, o `quem` é quem está
+  // logado), e a resposta volta com o status: a recusa da API (400, 404, 409, 503) traz a frase em `erro`
+  function nomePelaPorta(metodo, caminho, corpo) {
+    var base = CFG.pelaPorta ? API : "";
+    var ctl = window.AbortController ? new AbortController() : null, prazo = ctl ? setTimeout(function () { ctl.abort(); }, 25000) : 0;
+    var op = { method: metodo, credentials: "same-origin", headers: { Accept: "application/json" }, signal: ctl ? ctl.signal : undefined };
+    if (corpo) { op.headers["Content-Type"] = "application/json"; op.body = JSON.stringify(corpo); }
+    return fetch(base + "/inversor-campo" + caminho, op).then(function (r) {
+      clearTimeout(prazo);
+      var tipo = r.headers.get("content-type") || "";
+      if (r.status === 401 || r.status === 403 || tipo.indexOf("json") < 0) { throw { login: r.status === 401 || r.status === 403 || r.ok }; }
+      return r.json().then(function (d) { return { status: r.status, dados: d || {} }; });
+    }, function (e) { clearTimeout(prazo); throw { erro: e && e.name === "AbortError" ? "o Nexus não respondeu em 25 s" : "sem rede" }; });
+  }
+  function frasePelaFalha(e) {
+    return e && e.login ? "A sessão do Nexus venceu: recarregue a página e tente de novo." : "Não deu para falar com o Nexus agora (" + ((e && e.erro) || "erro") + ").";
+  }
+
+  // O FORMULÁRIO DO NOME (o detalhe do inversor e a faixa dos nomes que esperam o S/N): o estado mora em `e` (os campos o
+  // atualizam a cada tecla), para a janela poder remontar o formulário com o que a pessoa já digitou.
+  // e: { cartao, serieAtual, nome, serie, temNome, achado, aoGravar(texto), aoCancelar() }
+  function formularioDoNome(e) {
+    var f = document.createElement("div"); f.className = "cos-inv-editar";
+    var h = document.createElement("h4"); h.textContent = e.titulo || "Corrigir como o inversor é em campo"; f.appendChild(h);
+    var grade = document.createElement("div"); grade.className = "cos-inv-editar-grade"; f.appendChild(grade);
+    function campo(rotulo, ajuda, mono) {
+      var d = document.createElement("div"), l = document.createElement("label"), i = document.createElement("input");
+      i.className = "gc-campo" + (mono ? " cos-inv-mono" : ""); i.autocomplete = "off"; i.spellcheck = false;
+      l.className = "gc-rotulo"; l.textContent = rotulo; d.appendChild(l);
+      var a = document.createElement("p"); a.className = "gc-ajuda"; a.textContent = ajuda;
+      d._input = i; d._ajuda = a; d._rotulo = l;
+      return d;
+    }
+    var cn = campo("Nome em campo", "Como a equipe chama este inversor na usina. Vale na tela, nas barras e nos alarmes.");
+    cn._input.maxLength = 40; cn._input.value = e.nome || "";
+    cn.appendChild(cn._input); cn.appendChild(cn._ajuda); grade.appendChild(cn);
+    var cs = campo("Nº de série", "Inversor substituído: digite o S/N do novo e busque. A plataforma procura nos coletores ao vivo.", true);
+    cs._input.maxLength = 32; cs._input.value = e.serie || "";
+    var linha = document.createElement("div"); linha.className = "cos-inv-sn-linha";
+    var bBuscar = document.createElement("button"); bBuscar.type = "button"; bBuscar.className = "gc-btn gc-btn--contorno"; bBuscar.textContent = "Buscar";
+    linha.appendChild(cs._input); linha.appendChild(bBuscar); cs.appendChild(linha); cs.appendChild(cs._ajuda);
+    var busca = document.createElement("div"); busca.className = "cos-inv-busca"; busca.hidden = true; busca.setAttribute("role", "status");
+    cs.appendChild(busca); grade.appendChild(cs);
+    var uid = "cos-inv-nome-" + Math.random().toString(36).slice(2, 8);
+    cn._input.id = uid + "-n"; cn._rotulo.htmlFor = uid + "-n"; cs._input.id = uid + "-s"; cs._rotulo.htmlFor = uid + "-s";
+    var erro = document.createElement("p"); erro.className = "gc-ajuda gc-ajuda--erro"; erro.setAttribute("role", "alert"); erro.hidden = true; f.appendChild(erro);
+    var acoes = document.createElement("div"); acoes.className = "cos-inv-editar-acoes"; f.appendChild(acoes);
+    var bSalvar = document.createElement("button"); bSalvar.type = "button"; bSalvar.className = "gc-btn gc-btn--primario"; bSalvar.textContent = "Salvar";
+    var bCancelar = document.createElement("button"); bCancelar.type = "button"; bCancelar.className = "gc-btn gc-btn--contorno"; bCancelar.textContent = "Cancelar";
+    acoes.appendChild(bSalvar); acoes.appendChild(bCancelar);
+    var bRemover = null;
+    if (e.temNome) {
+      bRemover = document.createElement("button"); bRemover.type = "button"; bRemover.className = "gc-btn gc-btn--fantasma cos-inv-remover";
+      bRemover.textContent = "Voltar ao nome do coletor"; acoes.appendChild(bRemover);
+    }
+    function mostrarErro(msg, el) {
+      erro.textContent = msg; erro.hidden = false;
+      [cn._input, cs._input].forEach(function (x) { x.removeAttribute("aria-invalid"); });
+      if (el) { el.setAttribute("aria-invalid", "true"); }
+    }
+    function limparErro() { erro.hidden = true; [cn._input, cs._input].forEach(function (x) { x.removeAttribute("aria-invalid"); }); }
+    function mostrarBusca(b) { busca.hidden = false; busca.className = "cos-inv-busca cos-inv-busca--" + b.tom; busca.textContent = b.texto; }
+    if (e.achado && mesmaSerie(e.achado.serie, e.serie)) { mostrarBusca(e.achado.frase); }
+    var ocupado = false;
+    function trancar(sim) { ocupado = sim; [bSalvar, bBuscar, bCancelar].concat(bRemover ? [bRemover] : []).forEach(function (b) { b.disabled = sim; }); }
+    function buscar() {
+      limparErro();
+      var sn = cs._input.value.trim().toUpperCase(); cs._input.value = sn; e.serie = sn;
+      if (!serieComForma(sn)) { e.achado = null; busca.hidden = true; mostrarErro("Esse texto não tem forma de número de série (4 a 32 letras e números, sem espaço).", cs._input); return; }
+      busca.hidden = false; busca.className = "cos-inv-busca"; busca.textContent = "Procurando nos coletores, ao vivo…";
+      trancar(true);
+      nomePelaPorta("GET", "/serie?serie=" + encodeURIComponent(sn) + "&cartao=" + encodeURIComponent(e.cartao)).then(function (r) {
+        trancar(false);
+        if (r.status !== 200) { busca.hidden = true; mostrarErro((r.dados && r.dados.erro) || ("A busca falhou (" + r.status + ").")); return; }
+        if (cs._input.value.trim().toUpperCase() !== sn) { return; }      // a pessoa já mudou o campo: esta resposta é velha
+        var frase = textoDaBusca(r.dados, { nome: cn._input.value, serieAtual: e.serieAtual, cartao: e.cartao });
+        e.achado = { serie: sn, frase: frase }; mostrarBusca(frase);
+      }, function (x) { trancar(false); busca.hidden = true; mostrarErro(frasePelaFalha(x)); });
+    }
+    function salvar() {
+      limparErro();
+      var nome = cn._input.value.trim(), sn = cs._input.value.trim().toUpperCase();
+      cs._input.value = sn; e.nome = nome; e.serie = sn;
+      if (!nome) { mostrarErro("Dê um nome ao inversor.", cn._input); return; }
+      if (!serieComForma(sn)) { mostrarErro("Informe o número de série (4 a 32 letras e números, sem espaço).", cs._input); return; }
+      if (!mesmaSerie(sn, e.serieAtual) && !(e.achado && e.achado.serie === sn)) { mostrarErro("Clique em Buscar para conferir o novo S/N antes de salvar.", cs._input); return; }
+      if (e.achado && e.achado.serie === sn && e.achado.frase.tom === "erro") { mostrarErro(e.achado.frase.texto, cs._input); return; }
+      trancar(true);
+      nomePelaPorta("PUT", "", { cartao: e.cartao, serie_atual: e.serieAtual || null, nome: nome, numero_serie: sn }).then(function (r) {
+        trancar(false);
+        if (r.status === 200) { if (e.aoGravar) { e.aoGravar(textoDoResultado(r.dados)); } return; }
+        var d = r.dados || {};
+        mostrarErro(d.erro || ("O Nexus respondeu " + r.status + "."), d.codigo === "NOME_EM_USO" || d.codigo === "NOME_INVALIDO" ? cn._input
+          : /SERIE/.test(d.codigo || "") ? cs._input : null);
+        if (d.codigo === "CONCORRENCIA") { proximo(0); }                    // outra pessoa mudou agora: a leitura vem de novo
+      }, function (x) { trancar(false); mostrarErro(frasePelaFalha(x)); });
+    }
+    var confirmar = false;
+    function remover() {
+      limparErro();
+      if (!confirmar) { confirmar = true; bRemover.textContent = "Confirmar: voltar ao nome do coletor"; return; }
+      trancar(true);
+      nomePelaPorta("POST", "/remover", { cartao: e.cartao, numero_serie: e.serieAtual }).then(function (r) {
+        trancar(false);
+        if (r.status === 200) { if (e.aoGravar) { e.aoGravar("O nome de campo saiu: o inversor volta ao nome do coletor."); } return; }
+        mostrarErro((r.dados && r.dados.erro) || ("O Nexus respondeu " + r.status + "."));
+      }, function (x) { trancar(false); mostrarErro(frasePelaFalha(x)); });
+    }
+    bBuscar.addEventListener("click", buscar);
+    bSalvar.addEventListener("click", salvar);
+    bCancelar.addEventListener("click", function () { if (e.aoCancelar) { e.aoCancelar(); } });
+    if (bRemover) { bRemover.addEventListener("click", remover); }
+    cn._input.addEventListener("input", function () { e.nome = cn._input.value; limparErro(); });
+    cs._input.addEventListener("input", function () { e.serie = cs._input.value; e.achado = null; busca.hidden = true; limparErro(); });
+    cs._input.addEventListener("keydown", function (ev) { if (ev.key === "Enter") { ev.preventDefault(); buscar(); } });
+    cn._input.addEventListener("keydown", function (ev) { if (ev.key === "Enter") { ev.preventDefault(); salvar(); } });
+    f._focar = function () { (e.focarSerie ? cs._input : cn._input).focus(); };
+    f._buscar = buscar;
+    f._ocupado = function () { return ocupado; };
+    return f;
+  }
+  // pode editar: o Nexus repassa ao Andamento (a porta) e o cartão é do SCADA (o nome de campo é do SCADA: o SunOP não tem)
+  function podeEditarNome(c) { return !!CFG.pelaPorta && !!c && /^scada-/.test(String(c.pid || "")); }
+  // depois de gravar: a leitura ao vivo vem de novo na hora (o servidor do Nexus já esqueceu a cópia), e o histórico também
+  function depoisDeGravar() {
+    historicoLido = null; proximo(0);
+    if (historicoAberto && aberta) { lerHistoricoDeNomes(aberta.getAttribute("data-gid")); }
+  }
+  var historicoLido = null, historicoAberto = false, edicaoEsp = null, avisoDaUsina = "";
 
   // ── o gráfico (na largura real do bloco: nada esticado) ───────────────────────────────────────────────────────────
   function el(tag, attrs, pai) {
@@ -1522,8 +1717,12 @@
     partes.estados = document.createElement("span"); partes.estados.className = "cos-inv-estados"; res.appendChild(partes.estados);
     frag.appendChild(res);
     var cos = cosDaUsina(aberta.getAttribute("data-codigo")); if (cos) { frag.appendChild(cos); }
+    partes.aviso = document.createElement("p"); partes.aviso.className = "cos-inv-nome-aviso"; partes.aviso.setAttribute("role", "status");
+    partes.aviso.textContent = avisoDaUsina; partes.aviso.hidden = !avisoDaUsina; frag.appendChild(partes.aviso);
     var bu = bloco("A usina hoje", ""); partes.tituloU = bu._titulo; partes.detU = bu._detalhe;
     partes.gu = document.createElement("div"); partes.gu.className = "cos-inv-graf"; bu.appendChild(partes.gu); frag.appendChild(bu);
+    // os nomes de campo que esperam o S/N (nenhum coletor desta usina o lê), com a provável troca do inversor
+    partes.esp = document.createElement("div"); partes.esp.className = "cos-inv-esperando"; partes.esp.hidden = true; frag.appendChild(partes.esp);
     var bi = bloco("Cada inversor", ""); partes.escala = bi._detalhe;
     // CURVAS OU BARRAS NA JANELA (25/11/2026, o dono com a janela da Altair 5 aberta: "aqui tinha que ter a visualização em
     // barra também"): a MESMA escolha do seletor do alto da tela (um localStorage só) e, nas barras, o que se compara: o kW
@@ -1560,6 +1759,7 @@
         p.abrir.setAttribute("aria-label", "Abrir o detalhe do " + nome + ": a curva e as entradas");
         var nb = document.createElement("b"); nb.textContent = nome; p.abrir.appendChild(nb);
         if (textoDoSerial(i)) { var snb = document.createElement("small"); snb.className = "cos-inv-sn"; snb.textContent = textoDoSerial(i); p.abrir.appendChild(snb); }
+        if (textoDoColetor(i)) { var clb = document.createElement("small"); clb.className = "cos-inv-sn"; clb.textContent = textoDoColetor(i); p.abrir.appendChild(clb); }
         var seta = document.createElement("span"); seta.setAttribute("aria-hidden", "true"); seta.textContent = "›"; p.abrir.appendChild(seta);
         cab.appendChild(p.abrir);
         p.art.title = "Abrir o detalhe do " + nome;
@@ -1578,6 +1778,7 @@
         var b = document.createElement("b"); b.textContent = nome;
         var nomeEl = document.createElement("span"); nomeEl.className = "cos-inv-i-nome"; nomeEl.appendChild(b); cab.appendChild(nomeEl);
         if (textoDoSerial(i)) { var sn = document.createElement("small"); sn.className = "cos-inv-sn"; sn.textContent = textoDoSerial(i); nomeEl.appendChild(sn); }
+        if (textoDoColetor(i)) { var cl = document.createElement("small"); cl.className = "cos-inv-sn"; cl.textContent = textoDoColetor(i); nomeEl.appendChild(cl); }
       }
       p.kv = document.createElement("span"); p.kv.className = "cos-inv-i-kw"; cab.appendChild(p.kv);
       p.art.appendChild(cab);
@@ -1590,6 +1791,15 @@
       partes.reles = [];
       c.reles.forEach(function (rl, idx) { var card = montarCardRele(rl, idx); partes.reles.push(card); frag.appendChild(card.secao); });
     }
+    // NOMES E TROCAS (26/11/2026): quem renomeou ou trocou o S/N de um inversor desta usina, lido quando se abre
+    if (podeEditarNome(c)) {
+      var hs = document.createElement("details"); hs.className = "cos-inv-tabela cos-inv-historico";
+      var hsu = document.createElement("summary"); hsu.className = "cn-link"; hsu.textContent = "Nomes e trocas dos inversores"; hs.appendChild(hsu);
+      partes.hist = document.createElement("div"); hs.appendChild(partes.hist);
+      hs.open = historicoAberto;
+      hs.addEventListener("toggle", function () { historicoAberto = hs.open; if (hs.open) { historicoLido = null; lerHistoricoDeNomes(c.pid); } });
+      frag.appendChild(hs);
+    }
     var tab = document.createElement("details"); tab.className = "cos-inv-tabela";
     var su = document.createElement("summary"); su.className = "cn-link"; su.textContent = "Ver os inversores em tabela"; tab.appendChild(su);
     var t = document.createElement("table");
@@ -1597,12 +1807,92 @@
     partes.thMax = t.querySelector("[data-th=max]"); partes.thEnergia = t.querySelector("[data-th=energia]");
     partes.tbody = document.createElement("tbody"); t.appendChild(partes.tbody); tab.appendChild(t); frag.appendChild(tab);
     corpo.textContent = ""; corpo.appendChild(frag);
+    if (historicoAberto && partes.hist) { lerHistoricoDeNomes(c.pid); }
+  }
+
+  // o histórico dos nomes da usina (uma leitura por abertura, e de novo depois de gravar)
+  function lerHistoricoDeNomes(cartao) {
+    if (!partes || !partes.hist) { return; }
+    var host = partes.hist;
+    if (historicoLido && historicoLido.cartao === cartao) { desenharHistorico(host, historicoLido.lista); return; }
+    host.textContent = ""; var p = document.createElement("p"); p.className = "mudo"; p.textContent = "Lendo o histórico…"; host.appendChild(p);
+    nomePelaPorta("GET", "/historico?cartao=" + encodeURIComponent(cartao)).then(function (r) {
+      if (r.status !== 200) { p.textContent = (r.dados && r.dados.erro) || ("O histórico não veio (" + r.status + ")."); return; }
+      historicoLido = { cartao: cartao, lista: (r.dados && r.dados.historico) || [] };
+      if (partes && partes.hist === host) { desenharHistorico(host, historicoLido.lista); }
+    }, function (x) { p.textContent = frasePelaFalha(x); });
+  }
+  function desenharHistorico(host, lista) {
+    host.textContent = "";
+    if (!lista.length) { var v = document.createElement("p"); v.className = "mudo"; v.textContent = "Nenhum nome mudado nesta usina ainda."; host.appendChild(v); return; }
+    var t = document.createElement("table"), tb = document.createElement("tbody");
+    t.innerHTML = "<thead><tr><th>Quando</th><th>Inversor</th><th>O que mudou</th><th>Quem</th></tr></thead>";
+    lista.forEach(function (h) {
+      var tr = document.createElement("tr");
+      var em = h.em ? new Date(h.em) : null, quando = em && !isNaN(em) ? diaCurto(diaTexto(em.getTime())) + " " + hhmm(minutoSP(em.getTime())) : "—";
+      [quando, h.nome_depois || h.nome_antes || "—", textoDoHistorico(h), h.quem || "—"].forEach(function (x) {
+        var td = document.createElement("td"); td.textContent = x; tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb); host.appendChild(t);
+  }
+  // A FAIXA DOS NOMES QUE ESPERAM O S/N: o nome cujo S/N nenhum coletor desta usina lê; com `provavel_troca`, a pergunta
+  // "inversor substituído?" e o atalho que abre a edição já com o S/N novo (a gravação passa o nome a ele)
+  function desenharEsperando(c) {
+    var host = partes.esp, lista = (c && c.inversores_esperando) || [];
+    if (edicaoEsp && edicaoEsp.cartao !== c.pid) { edicaoEsp = null; }
+    var sig = JSON.stringify(lista) + "|" + (edicaoEsp ? edicaoEsp.nomeAtual : "");
+    if (host._sig === sig && (!edicaoEsp || host.contains(edicaoEsp.form))) { return; }
+    if (edicaoEsp && edicaoEsp.form && host.contains(edicaoEsp.form) && edicaoEsp.form._ocupado()) { return; }   // um pedido no ar
+    host._sig = sig; host.textContent = ""; host.hidden = !lista.length;
+    lista.forEach(function (x) {
+      var item = document.createElement("div"); item.className = "cos-inv-esp-item";
+      var t = document.createElement("p");
+      var b = document.createElement("b"); b.textContent = x.nome; t.appendChild(b);
+      t.appendChild(document.createTextNode(" espera o S/N " + x.numero_serie + ": nenhum coletor desta usina lê este S/N agora."));
+      if (x.provavel_troca) {
+        t.appendChild(document.createTextNode(" O endereço do " + x.nome + " agora lê o S/N " + x.provavel_troca.numero_serie +
+          (x.provavel_troca.nome_coletor ? " (no coletor: " + x.provavel_troca.nome_coletor + ")" : "") + " — inversor substituído?"));
+      }
+      item.appendChild(t);
+      var acoes = document.createElement("div"); acoes.className = "cos-inv-esp-acoes";
+      function abrirEdicao(serieNova) {
+        edicaoEsp = { cartao: c.pid, nomeAtual: x.nome, serieAtual: x.numero_serie, nome: x.nome, serie: serieNova || x.numero_serie,
+          temNome: true, focarSerie: !!serieNova, titulo: "Corrigir o " + x.nome + ", que espera o S/N",
+          aoGravar: function (texto) { edicaoEsp = null; partes.esp._sig = ""; avisoDoNome(texto); depoisDeGravar(); },
+          aoCancelar: function () { edicaoEsp = null; partes.esp._sig = ""; desenharEsperando(c); } };
+        partes.esp._sig = ""; desenharEsperando(c);
+        if (edicaoEsp && edicaoEsp.form) { edicaoEsp.form._focar(); if (serieNova) { edicaoEsp.form._buscar(); } }
+      }
+      if (podeEditarNome(c)) {
+        if (x.provavel_troca) {
+          var bt = document.createElement("button"); bt.type = "button"; bt.className = "gc-btn gc-btn--primario";
+          bt.textContent = "Usar o S/N " + x.provavel_troca.numero_serie;
+          bt.addEventListener("click", function () { abrirEdicao(x.provavel_troca.numero_serie); }); acoes.appendChild(bt);
+        }
+        var be = document.createElement("button"); be.type = "button"; be.className = "gc-btn gc-btn--contorno"; be.textContent = "Corrigir";
+        be.addEventListener("click", function () { abrirEdicao(null); }); acoes.appendChild(be);
+        item.appendChild(acoes);
+      }
+      if (edicaoEsp && edicaoEsp.nomeAtual === x.nome) {
+        edicaoEsp.form = formularioDoNome(edicaoEsp); item.appendChild(edicaoEsp.form);
+      }
+      host.appendChild(item);
+    });
+  }
+  // o aviso do que a gravação fez, no alto da janela (na usina e no detalhe), até a próxima troca de usina
+  function avisoDoNome(texto) {
+    avisoDaUsina = texto || "";                             // a janela remontada (o nome novo muda a montagem) o mostra de novo
+    var alvo = invAberto && det && det.nomeAviso ? det.nomeAviso : partes && partes.aviso;
+    if (!alvo) { return; }
+    alvo.textContent = texto; alvo.hidden = !texto;
   }
 
   function atualizar(c, cv) {
     cv = cv || SEM_CURVA;
     var gerando = c.situacao && c.situacao.chave === "GERANDO";
-    var sig = ordenados(c).map(function (i) { return i.id + "=" + i.veredito + "#" + (serialDoInversor(i) || ""); }).join(",") + (c.reles && c.reles.length ? "|reles:" + c.reles.map(function (r) { return r.cabine || ""; }).join(",") : "");
+    var sig = ordenados(c).map(function (i) { return i.id + "=" + i.veredito + "#" + (serialDoInversor(i) || "") + "#" + nomeDoInversor(i) + "#" + textoDoColetor(i); }).join(",") + (c.reles && c.reles.length ? "|reles:" + c.reles.map(function (r) { return r.cabine || ""; }).join(",") : "");
     if (!partes || sig !== assinatura) { assinatura = sig; montar(c); }
     graficos = [];
     var porId = {};
@@ -1610,6 +1900,7 @@
     var hoje = ehHoje(), quando = hoje ? "hoje" : "em " + diaCurto(diaEscolhido);
     (cv.inversores || []).forEach(function (s) { var id = s.usina_id + ":" + s.modbus_id; porId[id] = hoje ? comPonta(serie(s.pontos), "i:" + id) : serie(s.pontos); });
     if (invAberto) { detalhe(c, porId); return; }           // a usina fica montada por baixo, sem redesenhar
+    desenharEsperando(c);
     escrever(partes.kw, "textContent", kw(c.pac_total_kw));
     escrever(partes.resumo, "textContent", (c.inversores_online != null ? c.inversores_online : "—") + " de " + c.inversores_total + " inversores respondendo · " + (c.situacao ? c.situacao.texto : ""));
     var conta = {}, chips = [];
@@ -1679,7 +1970,7 @@
         } }, larguras[i.id]);
       var mx = null;
       (porId[i.id] || []).forEach(function (q) { if (q[1] != null && (!mx || q[1] > mx[1])) { mx = q; } });
-      linhas.push([nomeDoInversor(i) + (textoDoSerial(i) ? " · " + textoDoSerial(i) : ""), e.rotulo, kw(i.pac), mx ? kw(mx[1]) + " às " + hhmm(mx[0]) : "—",
+      linhas.push([nomeDoInversor(i) + (textoDoSerial(i) ? " · " + textoDoSerial(i) : "") + (textoDoColetor(i) ? " · " + textoDoColetor(i) : ""), e.rotulo, kw(i.pac), mx ? kw(mx[1]) + " às " + hhmm(mx[0]) : "—",
         hoje && i.geracao_dia != null ? fmtKW.format(i.geracao_dia) + " kWh" : "—"]);
     });
     if (emBarras) {
@@ -1766,7 +2057,7 @@
         else { ts.setAttribute("x", cx); ts.setAttribute("dy", 12); ts.textContent = "S/N " + x.serial; }
       }
       var alvo = el("rect", { class: "cos-inv-barra-alvo", x: x0, y: mt, width: passo, height: ih + mb }, g);
-      el("title", {}, alvo).textContent = x.nome + (x.serial ? " (S/N " + x.serial + ")" : "") + " · " + valorDaBarra(b, x) + (x.rotulo ? " · " + x.rotulo : "");
+      el("title", {}, alvo).textContent = x.nome + (x.serial ? " (S/N " + x.serial + ")" : "") + (x.coletor ? " · " + x.coletor : "") + " · " + valorDaBarra(b, x) + (x.rotulo ? " · " + x.rotulo : "");
       if (detEl) { alvo.addEventListener("click", function () { abrirInversor(x.id); }); }
     });
     el("line", { class: "pg-base", x1: ml, y1: mt + ih + 0.5, x2: w - mr, y2: mt + ih + 0.5 }, svg);
@@ -1855,10 +2146,20 @@
   function montarDetalhe(i) {
     det = { id: i.id, cache: {}, cacheChave: "", montado: "", entSig: "" };
     var frag = document.createDocumentFragment();
+    // O NOME DE CAMPO (26/11/2026): "Editar nome e S/N" abre o formulário aqui; o aviso diz o que a gravação fez
+    det.nomeLinha = document.createElement("div"); det.nomeLinha.className = "cos-inv-nome-linha"; det.nomeLinha.hidden = true;
+    det.editarBt = document.createElement("button"); det.editarBt.type = "button"; det.editarBt.className = "gc-btn gc-btn--contorno";
+    det.editarBt.textContent = "Editar nome e S/N"; det.editarBt.setAttribute("data-foco", "editar-nome");
+    det.nomeLinha.appendChild(det.editarBt); frag.appendChild(det.nomeLinha);
+    det.nomeAviso = document.createElement("p"); det.nomeAviso.className = "cos-inv-nome-aviso"; det.nomeAviso.setAttribute("role", "status");
+    det.nomeAviso.hidden = true; frag.appendChild(det.nomeAviso);
+    det.editarHost = document.createElement("div"); frag.appendChild(det.editarHost);
+    det.edicao = null;
     det.estado = document.createElement("div"); det.estado.className = "cos-inv-estado cos-inv-det-estado"; frag.appendChild(det.estado);
     var fatos = document.createElement("dl"); fatos.className = "cos-inv-fatos";
     det.f = {}; det.rot = {};
-    [["agora", "Agora"], ["max", "Máximo hoje"], ["energia", "Energia hoje"], ["temp", "Temperatura"], ["nominal", "Potência nominal"]].forEach(function (par) {
+    [["agora", "Agora"], ["max", "Máximo hoje"], ["energia", "Energia hoje"], ["temp", "Temperatura"], ["nominal", "Potência nominal"],
+      ["serie", "Nº de série"], ["endereco", "Endereço no logger"]].forEach(function (par) {
       var d = document.createElement("div"), dt = document.createElement("dt"), dd = document.createElement("dd");
       dt.textContent = par[1]; dd.className = "gc-num"; d.appendChild(dt); d.appendChild(dd); fatos.appendChild(d);
       det.f[par[0]] = dd; det.rot[par[0]] = dt;
@@ -1913,7 +2214,7 @@
     }
     var nome = nomeDoInversor(i), hoje = ehHoje(), dia = diaEscolhido, quando = hoje ? "hoje" : "em " + diaCurto(dia);
     escrever(detTitulo, "textContent", nome);
-    escrever(detSub, "textContent", [i.parte, i.modelo, textoDoSerial(i)].filter(Boolean).join(" · "));
+    escrever(detSub, "textContent", [i.parte, i.modelo, textoDoSerial(i), i.nome_de_campo && i.nome_coletor ? "nome corrigido em campo (no coletor: " + i.nome_coletor + ")" : ""].filter(Boolean).join(" · "));
     if (!det || det.falta || det.id !== i.id) { var lembrado = lembrarFoco(); montarDetalhe(i); devolverFoco(lembrado); }
     var gerando = c.situacao && c.situacao.chave === "GERANDO";
     var e = ESTADO[i.veredito] || { rotulo: i.veredito || "—", tom: "neutro" };
@@ -1938,6 +2239,29 @@
     escrever(campos.temp, "textContent", i.temperatura != null ? fmt1.format(i.temperatura) + " °C" : "—");
     // a nominal derivada do nome do modelo se diz como tal (o número medido e o derivado não têm o mesmo peso)
     escrever(campos.nominal, "textContent", i.capacidade != null ? kw(i.capacidade) + (i.capacidade_origem === "modelo" ? " (pelo modelo)" : "") : "—");
+    escrever(campos.serie, "textContent", serialDoInversor(i) || "—");
+    escrever(campos.endereco, "textContent", ehDoSunop(i) ? "—" : i.modbus_id + " (" + String(i.id).split(":")[0] + ")");
+    // o botão do nome de campo e o formulário (que fica aberto entre as leituras de 3 s, com o que se digitou)
+    var pode = podeEditarNome(c);
+    escrever(det.nomeLinha, "hidden", !pode || !!det.edicao);
+    if (pode && !det.editarBt._ligado) {
+      det.editarBt._ligado = true;
+      var cartao = c.pid, alvoId = i.id;
+      det.editarBt.addEventListener("click", function () {
+        var agora = mapaVivo[cartao], inv = null;
+        ((agora && agora.inversores) || []).forEach(function (x) { if (x.id === alvoId) { inv = x; } });
+        if (!inv || !det || det.id !== alvoId) { return; }
+        var ed = det.edicao = { cartao: cartao, serieAtual: serialDoInversor(inv), nome: nomeDoInversor(inv), serie: serialDoInversor(inv) || "",
+          temNome: !!inv.nome_de_campo, titulo: "Corrigir como o " + nomeDoInversor(inv) + " é em campo" };
+        var aqui = det;                                       // preso: o fechar() zera o `det` (PR #25)
+        ed.aoGravar = function (texto) { if (aqui.edicao === ed) { aqui.edicao = null; aqui.editarHost.textContent = ""; aqui.nomeLinha.hidden = false; }
+          aqui.nomeAviso.textContent = texto; aqui.nomeAviso.hidden = false; depoisDeGravar(); };
+        ed.aoCancelar = function () { if (aqui.edicao === ed) { aqui.edicao = null; aqui.editarHost.textContent = ""; aqui.nomeLinha.hidden = false; aqui.editarBt.focus(); } };
+        ed.form = formularioDoNome(ed);
+        aqui.editarHost.textContent = ""; aqui.editarHost.appendChild(ed.form); aqui.nomeLinha.hidden = true; aqui.nomeAviso.hidden = true;
+        ed.form._focar();
+      });
+    }
     escrever(det.tituloCurva, "textContent", "Curva " + (hoje ? "de hoje" : "de " + diaCurto(dia)));
     escrever(det.detCurva, "textContent", hoje ? "a curva gravada de 5 em 5 min e a ponta ao vivo, de 3 em 3 s" : "a curva gravada de 5 em 5 min");
     var eC = escalaDe([pts], 4, hoje && agoraVisivel() ? [i.pac] : []);
@@ -2312,6 +2636,7 @@
     sairDoDetalhe(); limparPontaEnt(); pontasDe = null; destaques = {};   // outra usina: a ponta e os destaques são dela
     diaEscolhido = ""; zoom = null; faixasY = {}; ampliado = ""; isoladas = {};   // e a janela abre em hoje, no dia inteiro
     aberta = art; curva = null; partes = null; assinatura = "";
+    avisoDaUsina = ""; edicaoEsp = null; historicoLido = null;   // o nome de campo: o aviso e a edição eram da usina anterior
     var gid = art.getAttribute("data-gid");
     var n = art.querySelector(".n");
     dlg.querySelector(".cos-inv-titulo").textContent = n ? n.textContent : "";

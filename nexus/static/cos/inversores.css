@@ -281,3 +281,29 @@ p.cos-inv-mppt-cab{font-weight:600;letter-spacing:.04em;text-transform:uppercase
 .cos-inv-sn{font-size:11px;font-weight:400;color:var(--mudo);font-variant-numeric:tabular-nums;white-space:nowrap}
 .cos-inv-i-nome{display:inline-flex;align-items:baseline;gap:6px;min-width:0}
 .cos-inv-barras-sn{fill:var(--fraco);font-size:9.5px}
+
+/* O NOME DE CAMPO DO INVERSOR (26/11/2026): o formulário do detalhe e da faixa dos nomes que esperam o S/N (a prévia
+   aprovada pelo dono), o aviso do que a gravação fez e o histórico. Só tokens. */
+.cos-inv-nome-linha{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.cos-inv-nome-linha[hidden],.cos-inv-nome-aviso[hidden],.cos-inv-esperando[hidden],.cos-inv-busca[hidden]{display:none}
+.cos-inv-nome-aviso{margin:0 0 12px;padding:8px 12px;border-left:3px solid var(--ok);border-radius:0 8px 8px 0;background:var(--ok-suave);font-size:13px;color:var(--tinta)}
+.cos-inv-editar{border:1px solid var(--verde);border-radius:12px;background:var(--superficie-2);padding:14px 16px;margin:0 0 16px}
+.cos-inv-editar h4{margin:0 0 12px;font-size:14px;font-weight:600}
+.cos-inv-editar-grade{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:14px}
+@media (max-width:720px){.cos-inv-editar-grade{grid-template-columns:1fr}}
+.cos-inv-editar .gc-campo{width:100%;box-sizing:border-box;margin-top:6px}
+.cos-inv-mono{font-family:var(--font-mono)}
+.cos-inv-sn-linha{display:flex;gap:8px;align-items:flex-start}
+.cos-inv-sn-linha .gc-btn{margin-top:6px}
+.cos-inv-busca{margin-top:10px;padding:8px 12px;border-left:3px solid var(--linha-forte);border-radius:0 8px 8px 0;background:var(--superficie);font-size:13px;color:var(--tinta)}
+.cos-inv-busca--ok{border-left-color:var(--ok);background:var(--ok-suave)}
+.cos-inv-busca--troca{border-left-color:var(--info);background:var(--info-suave)}
+.cos-inv-busca--espera{border-left-color:var(--alerta);background:var(--alerta-suave)}
+.cos-inv-busca--erro{border-left-color:var(--critico);background:var(--critico-suave)}
+.cos-inv-editar-acoes{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.cos-inv-remover{margin-left:auto}
+.cos-inv-esperando{display:flex;flex-direction:column;gap:10px;margin:0 0 16px}
+.cos-inv-esp-item{border:2px dashed var(--alerta);border-radius:12px;padding:10px 14px;background:var(--alerta-suave)}
+.cos-inv-esp-item p{margin:0;font-size:13px;color:var(--tinta)}
+.cos-inv-esp-acoes{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.cos-inv-esp-item .cos-inv-editar{margin:10px 0 0}

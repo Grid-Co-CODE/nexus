@@ -141,7 +141,8 @@ def test_os_pedidos_sao_os_tres_caminhos_do_repasse_do_nexus():
     assert set(re.findall(r'pedir\("([^"]+)"', texto)) == {"/scada/monitoramento?entradas=separadas", "/scada/curva/",
                                                           "/scada/entradas/", "/sunop/monitoramento"}
     assert 'pedir(art._sunop ? "/sunop/monitoramento" : "/scada/monitoramento?entradas=separadas")' in texto
-    assert "fetch(" in texto and texto.count("fetch(") == 3      # o refresh do login, o pedido direto e o pela porta
+    # o refresh do login, o pedido direto, o pela porta e, desde 26/11/2026, o do nome de campo (que escreve)
+    assert "fetch(" in texto and texto.count("fetch(") == 4
 
 
 def test_fechar_fecha_mesmo_com_o_inversor_aberto():
@@ -616,7 +617,9 @@ def test_o_serial_aparece_no_cartao_nas_barras_na_tabela_e_no_detalhe():
     montar = texto[texto.index("function montar(c) {"):]
     montar = montar[: montar.index("\n  }\n")]
     # ao lado do nome, nos dois jeitos de montar o cartão (com e sem o detalhe), e só quando há serial
-    assert montar.count("if (textoDoSerial(i)) {") == 2 and montar.count('className = "cos-inv-sn"') == 2
+    assert montar.count("if (textoDoSerial(i)) {") == 2 and montar.count("textContent = textoDoSerial(i)") == 2
+    # e, desde o nome de campo (26/11/2026), o nome do coletor ao lado, discreto, nos mesmos dois jeitos
+    assert montar.count("if (textoDoColetor(i)) {") == 2
     atualizar = texto[texto.index("function atualizar(c, cv) {"):]
     atualizar = atualizar[: atualizar.index("\n  }\n")]
     assert '"#" + (serialDoInversor(i) || "")' in atualizar                # o serial que chega depois remonta a janela
@@ -625,6 +628,102 @@ def test_o_serial_aparece_no_cartao_nas_barras_na_tabela_e_no_detalhe():
     barras = barras[: barras.index("\n  }\n")]
     assert 'el("tspan", { class: "cos-inv-barras-sn" }, tn)' in barras and '"S/N " + x.serial' in barras
     assert '(x.serial ? " (S/N " + x.serial + ")" : "")' in barras         # a dica da coluna
-    assert "[i.parte, i.modelo, textoDoSerial(i)].filter(Boolean)" in texto   # o subtítulo do detalhe
+    assert "[i.parte, i.modelo, textoDoSerial(i), " in texto              # o subtítulo do detalhe (e o coletor, desde 26/11)
     css = (JS.parent / "inversores.css").read_text(encoding="utf-8")
     assert ".cos-inv-sn{" in css and not re.search(r"#[0-9a-fA-F]{3,6}\b|rgba?\(", css[css.index("O NÚMERO DE SÉRIE"):])
+
+
+# --- o nome de campo do inversor (26/11/2026) -----------------------------------------------------------------------------
+# O dono: renomear o INV02 do Altair 1 para INV3, "e caso o inversor tivesse sido substituido, eu colocaria o SN do
+# inversor Novo e já buscaria em tempo real". Quem decide é a API da Ronda COS; daqui, as frases. Seriais fictícios.
+
+def busca(r, nome="INV3", serie_atual="EXA0000001", cartao="scada-exa01"):
+    return rodar("process.stdout.write(JSON.stringify(N.textoDaBusca(JSON.parse(A[0]), JSON.parse(A[1]))));",
+                 json.dumps(r), json.dumps({"nome": nome, "serieAtual": serie_atual, "cartao": cartao}))
+
+
+def ao_vivo(cartao="scada-exa01", modbus=4, coletor="INV04", pac=52.3, veredito="GERANDO", nome_cartao="Usina Exemplo 1"):
+    return {"cartao": cartao, "cartao_nome": nome_cartao, "inversor_id": f"EXA01:{modbus}", "logger": "EXA01", "modbus_id": modbus,
+            "nome": coletor, "nome_coletor": coletor, "pac": pac, "online": True, "veredito": veredito}
+
+
+def test_a_forma_do_numero_de_serie_e_a_da_api():
+    r = rodar("process.stdout.write(JSON.stringify(JSON.parse(A[0]).map(function (x) { return N.serieComForma(x); })));",
+              json.dumps(["EXA0000001", " exa-12/3.4 ", "ABC", "A" * 33, "1 2 3 4", "", None, "-ABCD"]))
+    assert r == [True, True, False, False, False, False, False, False]
+
+
+def test_o_nome_do_coletor_so_com_nome_de_campo_diferente():
+    r = rodar("process.stdout.write(JSON.stringify(JSON.parse(A[0]).map(function (x) { return N.textoDoColetor(x); })));", json.dumps([
+        {"nome": "INV3", "nome_de_campo": True, "nome_coletor": "INV02"}, {"nome": "INV02", "nome_de_campo": True, "nome_coletor": "inv02"},
+        {"nome": "INV02"}, {"nome": "INV3", "nome_coletor": "INV02"}]))
+    assert r == ["coletor: INV02", "", "", ""]
+
+
+def test_o_que_a_busca_achou_em_palavras():
+    # o mesmo S/N que está aqui
+    assert busca({"serie": "EXA0000001", "ao_vivo": ao_vivo(), "no_mesmo_cartao": True, "nome_de_campo": None}) == {
+        "tom": "ok", "texto": "É o S/N que já está aqui: endereço 4 do EXA01, no coletor: INV04, 52 kW agora (gerando)."}
+    # lido nesta usina com o nome de outro: troca de lugar
+    r = busca({"serie": "EXA0000002", "ao_vivo": ao_vivo(modbus=8, coletor="INV08"), "no_mesmo_cartao": True,
+               "nome_de_campo": {"nome": "INV5", "cartao": "scada-exa01"}})
+    assert r["tom"] == "troca" and "Hoje ele aparece como INV5: salvar troca os dois de lugar" in r["texto"]
+    # lido nesta usina, sem nome: o nome vai para ele
+    r = busca({"serie": "EXA0000002", "ao_vivo": ao_vivo(modbus=8, coletor="INV08"), "no_mesmo_cartao": True, "nome_de_campo": None})
+    assert r["tom"] == "troca" and r["texto"].endswith("Salvar põe o nome INV3 nesse inversor.")
+    # com nome noutra usina: a API recusa, e a tela já diz
+    r = busca({"serie": "EXA0000002", "ao_vivo": ao_vivo(cartao="scada-exa02", nome_cartao="Usina Exemplo 2"), "no_mesmo_cartao": False,
+               "nome_de_campo": {"nome": "INV7", "cartao": "scada-exa02"}})
+    assert r["tom"] == "erro" and "já tem o nome INV7 noutra usina (Usina Exemplo 2)" in r["texto"]
+    # lido noutra usina, sem nome: o nome fica esperando
+    r = busca({"serie": "EXA0000002", "ao_vivo": ao_vivo(cartao="scada-exa02", nome_cartao="Usina Exemplo 2"), "no_mesmo_cartao": False,
+               "nome_de_campo": None})
+    assert r["tom"] == "espera" and "noutra usina (Usina Exemplo 2" in r["texto"]
+    # o inversor novo que ninguém lê ainda
+    r = busca({"serie": "EXA0000009", "ao_vivo": None, "no_mesmo_cartao": False, "nome_de_campo": None})
+    assert r == {"tom": "espera", "texto": "Nenhum coletor desta usina lê esse S/N agora. Salvar deixa INV3 esperando esse S/N, "
+                                           "e os dados aparecem sozinhos quando o coletor o ler."}
+    # ninguém lê, mas ele espera com outro nome nesta usina: troca
+    r = busca({"serie": "EXA0000009", "ao_vivo": None, "no_mesmo_cartao": False, "nome_de_campo": {"nome": "INV6", "cartao": "scada-exa01"}})
+    assert r["tom"] == "troca" and "espera com o nome INV6 nesta usina" in r["texto"]
+
+
+def test_o_que_a_gravacao_fez_e_o_historico_em_palavras():
+    r = rodar("""var c = JSON.parse(A[0]); process.stdout.write(JSON.stringify(c.map(function (d) { return N.textoDoResultado(d); })));""",
+              json.dumps([{"gravado": False}, {"gravado": True, "nome": "INV3", "numero_serie": "EXA0000002", "troca": None, "esperando": False},
+                          {"gravado": True, "nome": "INV3", "numero_serie": "EXA0000002", "troca": {"nome": "INV5", "numero_serie": "EXA0000001"}},
+                          {"gravado": True, "nome": "INV3", "numero_serie": "EXA0000009", "troca": None, "esperando": True}]))
+    assert r == ["Nada mudou: o nome e o S/N já eram esses.", "Gravado: INV3 (S/N EXA0000002).",
+                 "Gravado: INV3 (S/N EXA0000002). Trocou de lugar com INV5, que ficou com o S/N EXA0000001.",
+                 "Gravado: INV3 espera o S/N EXA0000009. Nenhum coletor desta usina o lê agora; os dados aparecem sozinhos quando ler."]
+    h = rodar("process.stdout.write(JSON.stringify(N.textoDoHistorico(JSON.parse(A[0]))));",
+              json.dumps({"nome_antes": "INV02", "nome_depois": "INV3", "serie_antes": "EXA0000001", "serie_depois": "EXA0000002", "motivo": "substituído"}))
+    assert h == "nome: INV02 → INV3 · S/N: EXA0000001 → EXA0000002 (substituído)"
+
+
+def test_a_tela_do_nome_grava_so_pela_porta_sem_quem_e_com_a_busca_antes():
+    texto = JS.read_text(encoding="utf-8")
+    form = texto[texto.index("function formularioDoNome(e) {"):]
+    form = form[: form.index("\n  }\n")]
+    # os quatro pedidos, todos pelo Nexus (`nomePelaPorta`); o `quem` nunca sai do navegador (o servidor põe o de quem está logado)
+    assert 'nomePelaPorta("GET", "/serie?serie="' in form and 'nomePelaPorta("PUT", "",' in form and 'nomePelaPorta("POST", "/remover"' in form
+    assert 'nomePelaPorta("GET", "/historico?cartao="' in texto
+    assert "quem" not in form
+    # o S/N novo só vai depois de buscado, e a busca que achou nome noutra usina já barra
+    salvar = form[form.index("function salvar() {"):]
+    assert salvar.index("Clique em Buscar para conferir o novo S/N antes de salvar.") < salvar.index('nomePelaPorta("PUT"')
+    assert 'e.achado.frase.tom === "erro"' in salvar
+    # editar só pela porta e só no cartão do SCADA (o SunOP não tem nome de campo)
+    assert 'function podeEditarNome(c) { return !!CFG.pelaPorta && !!c && /^scada-/.test(String(c.pid || "")); }' in texto
+    # o detalhe mostra o S/N e o endereço, e o nome de campo entra na assinatura da montagem
+    assert '["serie", "Nº de série"], ["endereco", "Endereço no logger"]' in texto
+    assert '"#" + nomeDoInversor(i) + "#" + textoDoColetor(i)' in texto
+    # a faixa dos que esperam o S/N, com o atalho que abre a edição já com o S/N novo
+    assert 'bt.textContent = "Usar o S/N " + x.provavel_troca.numero_serie;' in texto and "abrirEdicao(x.provavel_troca.numero_serie)" in texto
+
+
+def test_o_css_do_nome_so_com_tokens():
+    css = (JS.parent / "inversores.css").read_text(encoding="utf-8")
+    bloco = css[css.index("O NOME DE CAMPO DO INVERSOR"):]
+    assert ".cos-inv-editar{" in bloco and ".cos-inv-busca--erro{" in bloco and ".cos-inv-esp-item{" in bloco
+    assert not re.search(r"#[0-9a-fA-F]{3,6}\b|rgba?\(", bloco)

@@ -337,6 +337,88 @@ def test_o_numero_de_serie_passa_pelo_servidor_do_nexus(ligada, logado, monkeypa
     assert invs[0]["numero_serie"] == "EXA0000001" and "numero_serie" not in invs[1]
 
 
+# --- o nome de campo do inversor (26/11/2026) -----------------------------------------------------------------------------
+# O dono: "quero renomear esse INV 2 para INV3 (que seria o correto em campo). Caso o inversor tivesse sido substituido, eu
+# colocaria o SN do inversor Novo e já buscaria em tempo real". Quem grava e decide é a API da Ronda COS, pelo Andamento; o
+# Nexus repassa, com o `quem` de quem está logado aqui, e deixa a recusa passar com a frase da API.
+
+def _enviar_falso(monkeypatch, respostas):
+    pedidos = []
+
+    def enviar(f, metodo, caminho, corpo=None):
+        pedidos.append((metodo, caminho, corpo))
+        return respostas.get((metodo, urllib.parse.urlsplit(caminho).path), (404, {"erro": "sem rota", "codigo": "X"}))
+    monkeypatch.setattr(AND, "_enviar", enviar)
+    return pedidos
+
+
+def _como(cliente, nome):
+    with cliente.session_transaction() as sess:
+        sess["usuario"] = {**(sess.get("usuario") or {}), "nome": nome}
+
+
+def test_o_nome_de_campo_grava_pelo_andamento_com_quem_esta_logado(ligada, logado, monkeypatch):
+    base = "/t/cos/monitoramento/ronda-api/inversor-campo"
+    resp = {"versao": 1, "ok": True, "gravado": True, "nome": "INV3", "numero_serie": "EXA0000002", "ao_vivo": None,
+            "esperando": False, "troca": None}
+    pedidos = _enviar_falso(monkeypatch, {("PUT", "/api/nexus/inversor-campo"): (200, resp)})
+    _como(logado, "  Operador   Exemplo ")
+    # a cópia do ao vivo dos cartões é esquecida: a leitura seguinte já vem com o nome novo
+    chave = (AND.fonte(ligada.config).url, "/api/nexus/geracao/scada")
+    AND._ao_vivo[chave] = (AND.time.monotonic(), {"cartoes": []}, "")
+    r = logado.put(base, json={"cartao": "scada-exa01", "serie_atual": "EXA0000001", "nome": "INV3", "numero_serie": "EXA0000002",
+                               "quem": "outra pessoa qualquer"})
+    assert r.status_code == 200 and r.get_json()["nome"] == "INV3" and r.headers["Cache-Control"] == "private, no-store"
+    assert pedidos == [("PUT", "/api/nexus/inversor-campo", {"cartao": "scada-exa01", "serie_atual": "EXA0000001", "nome": "INV3",
+                                                             "numero_serie": "EXA0000002", "quem": "Operador Exemplo"})]
+    assert chave not in AND._ao_vivo
+
+
+def test_a_recusa_da_api_passa_com_a_frase_e_sem_esquecer_o_ao_vivo(ligada, logado, monkeypatch):
+    base = "/t/cos/monitoramento/ronda-api/inversor-campo"
+    recusa = {"versao": 1, "erro": "Já existe um INV3 nesta usina.", "codigo": "NOME_EM_USO"}
+    _enviar_falso(monkeypatch, {("PUT", "/api/nexus/inversor-campo"): (409, recusa)})
+    chave = (AND.fonte(ligada.config).url, "/api/nexus/geracao/scada")
+    AND._ao_vivo[chave] = (AND.time.monotonic(), {"cartoes": []}, "")
+    r = logado.put(base, json={"cartao": "scada-exa01", "serie_atual": None, "nome": "INV3", "numero_serie": "EXA0000002"})
+    assert r.status_code == 409 and r.get_json() == recusa
+    assert chave in AND._ao_vivo
+    # o pedido que não é JSON nem chega ao Andamento
+    assert logado.put(base, data="nome=INV3").status_code == 400
+    # de outra página (outro site), 403
+    assert logado.put(base, json={"cartao": "scada-exa01"}, headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+
+
+def test_a_busca_o_remover_e_o_historico_do_nome(ligada, logado, monkeypatch):
+    base = "/t/cos/monitoramento/ronda-api/inversor-campo"
+    achado = {"versao": 1, "serie": "EXA0000002", "ao_vivo": {"cartao": "scada-exa01", "logger": "EXA01", "modbus_id": 4}, "no_mesmo_cartao": True,
+              "nome_de_campo": None}
+    hist = {"versao": 1, "cartao": "scada-exa01", "historico": [{"id": 1, "nome_antes": None, "nome_depois": "INV3"}]}
+    pedidos = _enviar_falso(monkeypatch, {("GET", "/api/nexus/inversor-campo/serie"): (200, achado),
+                                          ("POST", "/api/nexus/inversor-campo/remover"): (200, {"versao": 1, "ok": True}),
+                                          ("GET", "/api/nexus/inversor-campo/historico"): (200, hist)})
+    _como(logado, "Operador Exemplo")
+    r = logado.get(base + "/serie?serie=EXA0000002&cartao=scada-exa01")
+    assert r.status_code == 200 and r.get_json()["ao_vivo"]["modbus_id"] == 4
+    assert pedidos[-1] == ("GET", "/api/nexus/inversor-campo/serie?serie=EXA0000002&cartao=scada-exa01", None)
+    r = logado.post(base + "/remover", json={"cartao": "scada-exa01", "numero_serie": "EXA0000002", "quem": "x"})
+    assert r.status_code == 200 and pedidos[-1] == ("POST", "/api/nexus/inversor-campo/remover",
+                                                    {"cartao": "scada-exa01", "numero_serie": "EXA0000002", "quem": "Operador Exemplo"})
+    r = logado.get(base + "/historico?cartao=scada-exa01")
+    assert r.status_code == 200 and r.get_json()["historico"][0]["nome_depois"] == "INV3"
+    antes = len(pedidos)
+    # a forma errada nem vai ao Andamento
+    assert logado.get(base + "/serie?serie=a b").status_code == 400
+    assert logado.get(base + "/serie?serie=EXA0000002&cartao=../auth").status_code == 400
+    assert logado.get(base + "/historico?cartao=sunop-exa100").status_code == 400
+    assert len(pedidos) == antes
+
+
+def test_sem_a_fonte_o_nome_de_campo_diz_por_que(logado):
+    r = logado.get("/t/cos/monitoramento/ronda-api/inversor-campo/serie?serie=EXA0000002")
+    assert r.status_code == 503 and "não está ligada" in r.get_json()["erro"]
+
+
 def test_o_andamento_fora_e_503_com_o_motivo(ligada, logado, monkeypatch):
     _servir(monkeypatch, {"/api/nexus/geracao/scada": AND.FonteErro("o Andamento respondeu 503", 503)})
     r = logado.get("/t/cos/monitoramento/ronda-api/scada/monitoramento")
