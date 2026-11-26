@@ -147,12 +147,23 @@ com asterisco no mês que teve expurgo, sem cor sem meta.
     regra de "Disponibilidade e desempenho" com o percentual; `indicadores.metas`).
   A ligação pelo nome é medida: as tarefas do PCM e as usinas do Radar do cliente que não ligaram aparecem numa linha da
   aba, com quantas de quantas.
-- **A tela:** o ano navega pelas setas (como o mês do Calendário); um controle só, Completa | Só KPIs | Só manutenções;
-  o contrato numa linha de fatos (PR e disponibilidade do ano com a meta, preventivas, supressão, lavagem, os
-  usina·mês fora da meta); cada usina é uma linha que abre as sete (as três primeiras com problema já abertas; a ordem é
-  a de mais meses fora do plano ou da meta); o Total do contrato fecha a tabela (preventivas somadas, serviços como
-  usinas feitas no mês, PR e disponibilidade pela potência). O mês em curso não pinta de vermelho a preventiva ainda não
-  feita. O nome do indicador fica preso à esquerda quando a tabela rola de lado.
+- **A tela, no desenho do mockup** (a 1ª versão subiu enxuta, numa linha de fatos; o Levi, vendo no ar: "eu queria no
+  mesmo estilo, pintadinho lá do mockup [...] Antes da usina, é bom mostrar também o cliente [...] Eu tô sentindo falta
+  desses KPIs de cima"): a barra com o Ano contratual (a lista dos anos), as Metas (de onde vêm), a Visão (Completa |
+  Só KPIs | Só manutenções) e o Exportar (o PDF da aba no papel claro, `window.print` sem a casca); os quatro cartões
+  (o PR e a disponibilidade expurgada do contrato com a meta e o mês a mês em barrinhas, os meses abaixo da meta e a
+  disponibilidade sem o expurgo; as preventivas e os serviços do ano; o que ficou fora da meta e a usina que mais
+  pesa, com o atalho para Pontos); a tabela começa pelo **cliente** (o contrato inteiro: preventivas somadas, serviços
+  como usinas feitas no mês, PR e disponibilidade pela potência) e segue pelas usinas (as três primeiras com problema
+  abertas, o resto numa linha "Mais N usinas"); a célula é pintada pelo estado (fundo, borda e texto da mesma cor,
+  só tokens). O mês em curso não pinta de vermelho a preventiva ainda não feita; o nome do indicador fica preso à
+  esquerda quando a tabela rola de lado.
+- **O PR acima de 100% é leitura errada** (`indicadores.PR_MAX`, a régua da Visão gerencial): na prévia de 26/11/2026,
+  uma usina da Thopen com PR de mais de 1.000% fazia o PR do contrato dar 730,5%. A célula diz "s/d" com a dica.
+- **Os buracos, medidos em 26/11/2026:** o "s/d" de PR e disponibilidade são os meses antes de 10/2026 (o banco não
+  tem) e, na Thopen, cerca de 22 usina·mês sem PR publicado; o "—" de MPM é a MPM que o arquivo do PCM não tem
+  planejada no mês (na Thopen, 83 de 252 usina·mês; a ligação pelo nome está boa, 3.702 de 3.721 tarefas); MPS, MPA,
+  supressão e lavagem só aparecem no mês em que acontecem.
 - **Medido em 26/11/2026** com os dados reais, na cópia de prova: cerca de 1 s por contrato; na 2C, as 661 tarefas do PCM
   e as 5 usinas do Radar ligaram todas.
 - **Falta (fase 2):** o relatório de aniversário em PDF, guardado congelado no ano que fechou; o histórico de PR e

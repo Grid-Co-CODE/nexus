@@ -735,12 +735,16 @@
   }
 
   /* ── os indicadores do ano contratual (26/11/2026; nexus/contratos/indicadores.py) ─────────────────────────────────
-     A sugestão de 26/11/2026: "meses do ano contratual nas colunas, usinas nas linhas", com as preventivas, a supressão
-     vegetal e a lavagem, o PR e a disponibilidade expurgada contra a meta; no alto, o contrato inteiro. No padrão do
-     Nexus: o contrato numa linha de fatos (não em cartões grandes), cada usina numa linha que abre as sete do mês a mês
-     (as três primeiras com problema já abertas), a cor só na célula. */
-  var IND = {}, indVisao = "completa", indAbertas = {};
+     A sugestão de 26/11/2026, com o mockup: "meses do ano contratual nas colunas, usinas nas linhas", as preventivas, a
+     supressão vegetal e a lavagem, o PR e a disponibilidade expurgada contra a meta, e no alto os números do contrato.
+     Levi, vendo a 1ª versão no ar: "eu queria no mesmo estilo, pintadinho lá do mockup [...] Antes da usina, é bom
+     mostrar também o cliente [...] uma tabela por cliente [...] Eu tô sentindo falta desses KPIs de cima. Do mockup [...]
+     Se baseia no mockup". Daí: a barra (ano, metas, visão, exportar), os quatro cartões com o mês a mês em barrinhas, o
+     contrato inteiro antes das usinas, a célula pintada pelo estado, as três primeiras usinas com problema abertas e o
+     resto numa linha "Mais N usinas". */
+  var IND = {}, indVisao = "completa", indAbertas = {}, indMais = {}, indAnoAberto = false;
   var VIS = [["completa", "Completa"], ["kpis", "Só KPIs"], ["manut", "Só manutenções"]];
+  var SUB_IND = {MPM: "mensal", MPS: "semestral", MPA: "anual", rocada: "data", lavagem: "data", pr: "%", disp: "%"};
   function pedirInd(c, n) {
     var ch = c.cliente + "|" + (n || "");
     if (IND[ch] && !IND[ch].montando) return IND[ch];
@@ -754,38 +758,61 @@
     }
     return IND[ch];
   }
-  function celInd(x, mes) {
+  function celInd(x, ac) {
     if (!x) return "<td></td>";
-    var t = x.tom ? " t-" + x.tom : "";
-    return '<td class="r' + (mes ? " ind-m" : " ind-ac") + '">' + (x.txt === "" ? "" : '<span class="ind' + t + (x.txt === "—" || x.txt === "s/d" ? " ind-vazio" : "") + '"' +
+    var vazio = x.txt === "—" || x.txt === "s/d";
+    return '<td class="r' + (ac ? " ind-ac" : " ind-m") + '">' + (x.txt === "" ? "" : '<span class="ind' + (x.tom ? " t-" + x.tom : "") + (vazio ? " ind-vazio" : "") + '"' +
       (x.dica ? ' title="' + esc(x.dica) + '"' : "") + ">" + esc(x.txt) + "</span>") + "</td>";
   }
   function linhasInd(d, linhas) {
     return linhas.filter(function (l) { return indVisao === "completa" || (indVisao === "kpis" ? l.grupo === "kpi" : l.grupo === "manut"); }).map(function (l) {
-      return '<tr class="ind-l"><td class="ind-nome">' + esc(l.nome) + (l.sub ? ' <small class="mudo">' + esc(l.sub) + "</small>" : "") + "</td>" +
-        d.meses.map(function (m) { return celInd(l.cels[m.id], true); }).join("") + celInd(l.acum, false) + "</tr>";
+      var sub = l.sub || SUB_IND[l.id] || "";
+      return '<tr class="ind-l"><td class="ind-nome">' + esc(l.nome === "Disponibilidade expurgada" ? "Disp. expurgada" : l.nome) + (sub ? " <small>" + esc(sub) + "</small>" : "") + "</td>" +
+        d.meses.map(function (m) { return celInd(l.cels[m.id], false); }).join("") + celInd(l.acum, true) + "</tr>";
     }).join("");
+  }
+  function pctTxt(v) { return String(v).replace(".", ","); }
+  function barrinhas(lista) {
+    return '<div class="ind-barras" aria-hidden="true">' + (lista || []).map(function (b) {
+      return '<span class="ind-b t-' + esc(b.tom) + '" title="' + esc(b.rot + ": " + (b.txt || "ainda não chegou")) + '"></span>';
+    }).join("") + "</div>";
+  }
+  function cartoesInd(c, d) {
+    var r = d.resumo || {}, mt = d.metas || {}, pv = r.prev || {}, pt = r.prev_tom || {};
+    function grande(v, tom) { return '<b class="ind-grande' + (tom ? " c-" + tom : "") + '">' + esc(v) + (v !== "s/d" ? "%" : "") + "</b>"; }
+    function meta(x) { return x ? '<span class="ind-meta">meta ' + pctTxt(x.pct) + "</span>" : '<span class="ind-meta">sem meta no contrato</span>'; }
+    function abaixo(l) { return l && l.length ? " · <b>" + l.length + (l.length === 1 ? " mês" : " meses") + " abaixo da meta</b> (" + esc(l.join(", ")) + ")" : ""; }
+    var h = '<div class="ind-cartoes">';
+    h += '<section class="ind-cartao"><h4><i class="ph ph-chart-line-up" aria-hidden="true"></i>PR do contrato · acumulado</h4><div class="ind-val">' + grande(r.pr, r.pr_tom) + meta(mt.pr) + "</div>" +
+      '<p>' + (r.usinas_n || 0) + (r.usinas_n === 1 ? " usina" : " usinas") + ", ponderado pela potência" + abaixo(r.pr_abaixo) + "</p>" + barrinhas(r.pr_barras) + "</section>";
+    h += '<section class="ind-cartao"><h4><i class="ph ph-plugs-connected" aria-hidden="true"></i>Disponibilidade expurgada · acumulada</h4><div class="ind-val">' + grande(r.disp, r.disp_tom) + meta(mt.disp) + "</div>" +
+      "<p>" + (r.disp_sem_expurgo ? "sem expurgo " + esc(r.disp_sem_expurgo) + "%" : "sem expurgo no ano") + abaixo(r.disp_abaixo) + "</p>" + barrinhas(r.disp_barras) + "</section>";
+    var itens = [["MPM", pv.MPM, pt.MPM], ["MPS", pv.MPS, pt.MPS], ["MPA", pv.MPA, pt.MPA], ["Supressão", r.rocada, r.rocada_tom], ["Lavagem", r.lavagem, r.lavagem_tom]];
+    h += '<section class="ind-cartao ind-largo"><h4><i class="ph ph-wrench" aria-hidden="true"></i>Preventivas e serviços do ano · feitos / mínimo</h4><div class="ind-prev">' + itens.map(function (x) {
+      var v = Array.isArray(x[1]) ? (x[1][1] ? x[1][0] + "/" + x[1][1] : "—") : (x[1] || "—");
+      return "<div><small>" + x[0] + '</small><b class="' + (x[2] ? "c-" + x[2] : "") + '">' + esc(v) + "</b></div>";
+    }).join("") + "</div><p>Preventivas feitas / planejadas no ano; supressão e lavagem contra o mínimo do contrato da zeladoria</p></section>";
+    h += '<section class="ind-cartao"><h4><i class="ph ph-warning" aria-hidden="true"></i>Fora da meta no ano</h4><div class="ind-prev ind-fora"><div><small>Usina·mês PR</small><b class="' + (r.fora_pr ? "c-critico" : "") + '">' + (r.fora_pr || 0) + "</b></div>" +
+      '<div><small>Usina·mês Disp.</small><b class="' + (r.fora_disp ? "c-alerta" : "") + '">' + (r.fora_disp || 0) + "</b></div></div>" +
+      "<p>" + (r.pior ? esc(r.pior.usina) + " responde por " + r.pior.fora + " dos " + ((r.fora_pr || 0) + (r.fora_disp || 0)) + ' · <a href="' + rota(estado.ct, "pontos") + '">abrir Pontos</a>' : (mt.pr || mt.disp ? "Nenhuma usina fora da meta no ano." : "Sem meta no contrato: grave a meta de PR e a garantia de disponibilidade em Editar dados.")) + "</p></section>";
+    return h + "</div>";
   }
   function rIndicadores(c) {
     var n = estado.indAno || null, d = pedirInd(c, n);
     if (d.carregando || d.montando) return '<p class="mudo" style="padding:14px 0">Lendo os indicadores do ano contratual…</p>';
     if (d.erro) return '<p class="c-critico">Não li os indicadores: ' + esc(d.erro) + "</p>";
     if (d.sem_inicio) return '<div class="ctr-vazio"><p>Este contrato não tem o início da vigência: o ano contratual conta a partir dele.' + (pode(c) ? " Ponha a data em Editar dados." : "") + "</p></div>";
-    var a = d.ano, anos = d.anos || [], i = anos.map(function (x) { return x.n; }).indexOf(a.n);
-    var h = '<div class="ctr-regua"><span class="ctr-mesnav">' +
-      (i > 0 ? '<button type="button" class="ctr-lapis" data-ind-ano="' + anos[i - 1].n + '" title="Ano anterior"><i class="ph ph-caret-left" aria-hidden="true"></i><span class="so-leitor">Ano anterior</span></button>' : "") +
-      "<h2>" + a.n + "º ano contratual <small class=\"mudo\">" + dBR(a.ini) + " a " + dBR(a.fim) + (a.atual ? "" : d.ano_fechado ? "; fechado" : "") + "</small></h2>" +
-      (i >= 0 && i < anos.length - 1 ? '<button type="button" class="ctr-lapis" data-ind-ano="' + anos[i + 1].n + '" title="Próximo ano"><i class="ph ph-caret-right" aria-hidden="true"></i><span class="so-leitor">Próximo ano</span></button>' : "") +
-      "</span>" + seg("Visão", "data-ind-visao", indVisao, VIS) + "</div>";
-    var r = d.resumo || {}, mt = d.metas || {}, pv = r.prev || {};
-    function meta(x) { return x ? "meta " + String(x.pct).replace(".", ",") + "%" : "sem meta no contrato"; }
-    h += '<dl class="ctr-fatos">' + par("PR do contrato", '<span class="num">' + esc(r.pr) + (r.pr !== "s/d" ? "%" : "") + "</span><small>" + meta(mt.pr) + "</small>") +
-      par("Disponibilidade expurgada", '<span class="num">' + esc(r.disp) + (r.disp !== "s/d" ? "%" : "") + "</span><small>" + meta(mt.disp) + "</small>") +
-      par("Preventivas", ["MPM", "MPS", "MPA"].map(function (s) { var x = pv[s] || [0, 0]; return s + ' <span class="num">' + x[0] + "/" + x[1] + "</span>"; }).join(" · ") + "<small>feitas / planejadas no ano</small>") +
-      par("Supressão vegetal", '<span class="num">' + esc(r.rocada) + "</span><small>feitas / mínimo</small>") +
-      par("Lavagem", '<span class="num">' + esc(r.lavagem) + "</span><small>feitas / mínimo</small>") +
-      ((r.fora_pr || r.fora_disp) ? '<div><dt>Fora da meta no ano</dt><dd class="c-critico"><span class="num">' + (r.fora_pr || 0) + "</span> de PR · <span class=\"num\">" + (r.fora_disp || 0) + "</span> de disponibilidade<small>usina·mês" +
-        (r.pior ? "; " + esc(r.pior.usina) + " responde por " + r.pior.fora : "") + "</small></dd></div>" : "") + "</dl>";
+    var a = d.ano, anos = d.anos || [], mt = d.metas || {};
+    function rotAno() { return d.meses[0].rot + " – " + d.meses[d.meses.length - 1].rot; }
+    var metaTxt = mt.pr || mt.disp ? [mt.pr ? "PR ≥ " + pctTxt(mt.pr.pct) + "%" : "", mt.disp ? "Disp. expurgada ≥ " + pctTxt(mt.disp.pct) + "%" : ""].filter(Boolean).join(" · ") +
+      ' <span class="mudo">· ' + esc((mt.pr || mt.disp).origem) + "</span>" : '<span class="mudo">sem meta de PR e de disponibilidade no contrato</span>';
+    var h = '<div class="ind-barra"><div class="ind-ano"><button type="button" class="ind-chip" data-ind-ano-abrir aria-expanded="' + indAnoAberto + '"><i class="ph ph-calendar-blank" aria-hidden="true"></i>Ano contratual <b>' + rotAno() + '</b> <i class="ph ph-caret-down" aria-hidden="true"></i></button>' +
+      (indAnoAberto ? '<ul class="ind-anos">' + anos.slice().reverse().map(function (x) {
+        return '<li><button type="button" data-ind-ano="' + x.n + '"' + (x.n === a.n ? ' aria-current="true"' : "") + ">" + x.n + "º ano" + (x.n === anos.length ? " (o de agora)" : "") + "</button></li>"; }).join("") + "</ul>" : "") + "</div>" +
+      '<span class="ind-chip ind-metas"><i class="ph ph-target" aria-hidden="true"></i>Metas ' + metaTxt + "</span>" +
+      '<span class="ind-dir">' + seg("Visão", "data-ind-visao", indVisao, VIS) + '<button type="button" class="ind-chip" data-ind-exportar><i class="ph ph-export" aria-hidden="true"></i>Exportar</button></span></div>';
+    h += '<h2 class="ind-so-print">Indicadores · ' + esc(c.cliente) + " · " + a.n + "º ano contratual (" + dBR(a.ini) + " a " + dBR(a.fim) + ")</h2>";
+    h += cartoesInd(c, d);
     var lg = d.ligacao || {}, notas = [];
     if (lg.pcm && lg.pcm.total > lg.pcm.ligadas) notas.push((lg.pcm.total - lg.pcm.ligadas) + " de " + lg.pcm.total + " tarefas do PCM do cliente não ligaram a uma usina pelo nome");
     if (lg.radar && lg.radar.total > lg.radar.ligadas) notas.push((lg.radar.total - lg.radar.ligadas) + " de " + lg.radar.total + " usinas do Radar não ligaram pelo nome");
@@ -793,20 +820,28 @@
     if (notas.length) h += '<p class="ctr-nota c-alerta" style="margin:0 0 8px">' + notas.map(esc).join(". ") + ".</p>";
     if (!(d.usinas || []).length) return h + '<div class="ctr-vazio"><p>Nenhuma usina do cliente no cadastro: sem usina, não há o que medir.</p></div>';
     var ch = c.cliente + "|" + a.n, ab = indAbertas[ch];
-    if (!ab) { ab = indAbertas[ch] = {}; d.usinas.filter(function (u) { return u.fora; }).slice(0, 3).forEach(function (u) { ab[u.uid] = true; }); }
+    if (!ab) { ab = indAbertas[ch] = {}; d.usinas.filter(function (u) { return u.fora; }).slice(0, 3).forEach(function (u) { ab[u.uid] = true; }); if (!Object.keys(ab).length) ab[d.usinas[0].uid] = true; }
+    var mwp = d.usinas.reduce(function (s, u) { return s + (u.mwp || 0); }, 0), ncol = d.meses.length + 2;
     h += '<div class="ctr-rol"><table class="ctr-tab ctr-ind"><thead><tr><th>Usina · indicador</th>' + d.meses.map(function (m) { return '<th class="r' + (m.id === d.mes_hoje ? " ind-hoje" : "") + '">' + esc(m.rot) + "</th>"; }).join("") +
-      '<th class="r">Acum.</th></tr></thead><tbody>';
-    d.usinas.forEach(function (u) {
+      '<th class="r ind-ac">Acum.<small>feitas / plano ou mín.</small></th></tr></thead><tbody>';
+    // o cliente primeiro: o contrato inteiro (Levi: "Antes da usina, é bom mostrar também o cliente")
+    h += '<tr class="ind-usina ind-total"><td colspan="' + ncol + '"><b>' + esc(c.cliente) + "</b> <span class=\"mudo\">contrato inteiro · " + d.usinas.length + (d.usinas.length === 1 ? " usina" : " usinas") +
+      (mwp ? " · " + pctTxt(Math.round(mwp * 10) / 10) + " MWp" : "") + "</span></td></tr>" + linhasInd(d, d.total || []);
+    var mostrar = d.usinas.filter(function (u) { return ab[u.uid] !== undefined || indMais[ch]; }), resto = d.usinas.filter(function (u) { return ab[u.uid] === undefined && !indMais[ch]; });
+    mostrar.forEach(function (u) {
       var aberta = !!ab[u.uid];
-      h += '<tr class="ind-usina"><td colspan="' + (d.meses.length + 2) + '"><button type="button" data-ind-usina="' + u.uid + '" aria-expanded="' + aberta + '"><i class="ph ph-caret-' + (aberta ? "down" : "right") + '" aria-hidden="true"></i><b>' + esc(u.usina) + "</b>" +
-        (u.mwp ? ' <span class="mudo">' + String(u.mwp).replace(".", ",") + " MWp</span>" : "") +
-        (u.fora ? ' <span class="ctr-pill t-critico" title="meses com preventiva não feita, PR ou disponibilidade abaixo da meta">' + u.fora + (u.fora === 1 ? " mês fora do plano ou da meta" : " meses fora do plano ou da meta") + "</span>" : ' <span class="ctr-pill t-ok">no plano e na meta</span>') + "</button></td></tr>";
+      h += '<tr class="ind-usina"><td colspan="' + ncol + '"><button type="button" data-ind-usina="' + u.uid + '" aria-expanded="' + aberta + '"><i class="ph ph-caret-' + (aberta ? "down" : "right") + '" aria-hidden="true"></i><b>' + esc(u.usina) + "</b>" +
+        (u.mwp ? ' <span class="mudo">' + pctTxt(u.mwp) + " MWp</span>" : "") +
+        (u.fora ? ' <span class="ctr-pill t-critico" title="meses com preventiva não feita, PR ou disponibilidade abaixo da meta">' + u.fora + (u.fora === 1 ? " mês fora do plano ou da meta" : " meses fora do plano ou da meta") + "</span>" : "") + "</button></td></tr>";
       if (aberta) h += linhasInd(d, u.linhas);
     });
-    h += '<tr class="ind-usina ind-total"><td colspan="' + (d.meses.length + 2) + '"><b>Total do contrato</b> <span class="mudo">' + d.usinas.length + (d.usinas.length === 1 ? " usina" : " usinas") + "</span></td></tr>" + linhasInd(d, d.total || []);
+    if (resto.length) h += '<tr class="ind-mais"><td colspan="' + ncol + '"><button type="button" data-ind-mais><i class="ph ph-caret-down" aria-hidden="true"></i>Mais ' + resto.length + (resto.length === 1 ? " usina" : " usinas") + ": " +
+      esc(resto.map(function (u) { return u.usina; }).slice(0, 12).join(", ") + (resto.length > 12 ? " e mais " + (resto.length - 12) : "")) + "</button></td></tr>";
     h += "</tbody></table></div>";
-    h += '<div class="ctr-legenda" style="margin-top:8px"><span><span class="ind t-ok">1/1</span> feita, na meta</span><span><span class="ind t-alerta">77,4</span> até 2 pontos abaixo</span>' +
-      '<span><span class="ind t-critico">0/1</span> não feita, abaixo</span><span><span class="ind t-info">98,9*</span> com expurgo no mês</span><span><span class="ind ind-vazio">s/d</span> sem dado no banco (antes de 10/2026)</span><span><span class="ind ind-vazio">—</span> sem plano</span></div>';
+    h += '<div class="ctr-legenda ind-legenda"><span><span class="ind t-ok">1/1</span> feita no mês</span><span><span class="ind t-critico">0/1</span> não feita</span><span><span class="ind ind-vazio">—</span> sem plano no mês</span>' +
+      '<span><span class="ind t-ok">12/09</span> serviço feito, data</span><span><span class="ind t-alerta">3/4</span> feitas / mínimo do contrato</span><span><span class="ind t-ok">82,1</span> na meta</span>' +
+      '<span><span class="ind t-alerta">77,4</span> até 2 pontos abaixo</span><span><span class="ind t-critico">71,0</span> abaixo</span><span><span class="ind t-info">98,9*</span> com expurgo no mês</span>' +
+      '<span><span class="ind ind-vazio">s/d</span> sem dado no banco (antes de 10/2026, ou não publicado)</span><span class="ind-dica-dir">Passe o mouse na célula: o número por extenso e a meta.</span></div>';
     return h;
   }
 
@@ -958,7 +993,15 @@
       leve(cAtual, "regra", b.getAttribute("data-prior").split(","), "alteracao", {prioritaria: on ? "sim" : "nao"}, on ? "Marcada como prioritária." : "Tirada das prioritárias."); return; }
     if ((b = e.target.closest("[data-subgrupo]"))) { var tk = b.getAttribute("data-subgrupo"); estado.temas[tk] = !estado.temas[tk]; render(); return; }
     if ((b = e.target.closest("[data-tirar-com]"))) { if (window.confirm("Tirar este comentário? Ele fica no histórico.")) leve(cAtual, "comentario", [b.getAttribute("data-tirar-com")], "retirada", {}, "Comentário tirado."); return; }
-    if ((b = e.target.closest("[data-ind-ano]"))) { estado.indAno = +b.getAttribute("data-ind-ano"); render(); return; }
+    if ((b = e.target.closest("[data-ind-ano-abrir]"))) { indAnoAberto = !indAnoAberto; render(); return; }
+    if ((b = e.target.closest("[data-ind-ano]"))) { estado.indAno = +b.getAttribute("data-ind-ano"); indAnoAberto = false; render(); return; }
+    if ((b = e.target.closest("[data-ind-mais]"))) { var cM = R.contratos[estado.ct], dM = IND[cM.cliente + "|" + (estado.indAno || "")] || {}; indMais[cM.cliente + "|" + ((dM.ano || {}).n)] = true; render(); return; }
+    if ((b = e.target.closest("[data-ind-exportar]"))) {
+      // o PDF da aba como está na tela, no papel claro (o escuro não sai na impressão); o tema volta depois
+      var htmlEl = document.documentElement, antes = htmlEl.getAttribute("data-tema");
+      htmlEl.setAttribute("data-tema", "claro"); document.body.classList.add("ind-imprimindo");
+      setTimeout(function () { window.print(); document.body.classList.remove("ind-imprimindo"); if (antes) htmlEl.setAttribute("data-tema", antes); else htmlEl.removeAttribute("data-tema"); }, 50);
+      return; }
     if ((b = e.target.closest("[data-ind-visao]"))) { indVisao = b.getAttribute("data-ind-visao"); render(); return; }
     if ((b = e.target.closest("[data-ind-usina]"))) { var cI = R.contratos[estado.ct], dI = IND[cI.cliente + "|" + (estado.indAno || "")] || {}, chI = cI.cliente + "|" + ((dI.ano || {}).n);
       indAbertas[chI] = indAbertas[chI] || {}; var uI = b.getAttribute("data-ind-usina"); indAbertas[chI][uI] = !indAbertas[chI][uI]; render(); return; }

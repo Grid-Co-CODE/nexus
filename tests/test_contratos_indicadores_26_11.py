@@ -149,3 +149,17 @@ def test_a_tela_dos_indicadores(cliente):
     for t in ('["indicadores", "Indicadores"]', "function rIndicadores(c)", "indicadores.json?cliente=", "function fatoAniv(c)",
               '"Só KPIs"', '"Só manutenções"', "data-ind-ano", "data-ind-usina", "sem dado no banco"):
         assert t in js, t
+
+
+def test_o_pr_acima_de_100_e_leitura_errada_e_os_cartoes_do_alto():
+    """Na 1ª prévia (26/11/2026) uma usina com PR de mais de 1.000% fez o PR do contrato dar 730,5%: fica fora, com a dica.
+    E o resumo dos quatro cartões do mockup: as barrinhas do mês a mês, os meses abaixo da meta, a disponibilidade sem o
+    expurgo, as cores das preventivas e a usina que mais pesa."""
+    us = [{"uid": 1, "usina": "Zeta 1", "mwp": 1.0, "meses": {"2026-10": {"pr": 1375.5, "disp": 96.0}}, "com_expurgo": {"2026-10": {"disp": 99.0}}}]
+    d = _montar(usinas=us)
+    pr = _linha(d["usinas"][0], "pr")["cels"]["2026-10"]
+    assert pr["txt"] == "s/d" and "leitura errada" in pr["dica"]
+    r = _montar()["resumo"]
+    assert [b["tom"] for b in r["pr_barras"][:4]] == ["vazio", "alerta", "ok", "futuro"]       # out/26: 76,8 contra 78
+    assert r["pr_abaixo"] == ["out/26"] and r["disp_sem_expurgo"] == "98,0"   # out/26 96,9 e nov/26 99,0, sem o expurgo
+    assert r["prev_tom"]["MPM"] == "alerta" and r["pior"] == {"usina": "Zeta 1", "fora": 2}

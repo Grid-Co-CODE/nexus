@@ -247,19 +247,73 @@
 @media (max-width:640px){.ctr-campos{grid-template-columns:1fr}.ctr-hist > li{grid-template-columns:1fr}.ctr-resumo-dl{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (prefers-reduced-motion:reduce){.ctr *{transition:none!important}}
 
-/* a aba Indicadores (26/11/2026): o mês a mês do ano contratual por usina. A célula é uma etiqueta pequena colorida pelo
-   estado (as mesmas cores das pílulas); a usina é uma linha que abre as sete; o total do contrato fecha a tabela */
+/* a aba Indicadores (26/11/2026), no desenho do mockup da sugestão (Levi: "no mesmo estilo, pintadinho lá do mockup"):
+   a barra (ano, metas, visão, exportar), os quatro cartões com o mês a mês em barrinhas, o contrato inteiro antes das
+   usinas e a célula pintada pelo estado (o fundo suave, a borda e o texto da mesma cor; só tokens) */
+.ind-barra { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; margin: 4px 0 12px; }
+.ind-chip { display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px; border: 1px solid var(--linha-forte); border-radius: 8px; background: var(--superficie); color: var(--tinta-2); font-size: 12.5px; cursor: pointer; }
+.ind-chip b { color: var(--tinta); font-family: var(--font-mono); }
+.ind-chip .ph { font-size: 14px; color: var(--mudo); }
+.ind-metas { cursor: default; }
+.ind-dir { margin-left: auto; display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ind-ano { position: relative; }
+.ind-anos { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; min-width: 200px; margin: 0; padding: 4px; list-style: none; border: 1px solid var(--linha-forte); border-radius: 8px; background: var(--superficie); box-shadow: 0 12px 30px var(--sombra); }
+.ind-anos button { width: 100%; padding: 7px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--tinta); text-align: left; cursor: pointer; font-size: 13px; }
+.ind-anos button:hover, .ind-anos button[aria-current="true"] { background: var(--superficie-2); }
+.ind-cartoes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.8fr) minmax(0, .9fr); gap: 10px; margin-bottom: 12px; }
+.ind-cartao { padding: 11px 13px; border: 1px solid var(--linha); border-radius: 10px; background: var(--superficie); min-width: 0; }
+.ind-cartao h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font: 600 10.5px/1.3 var(--font-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--mudo); }
+.ind-cartao h4 .ph { font-size: 13px; }
+.ind-cartao p { margin: 4px 0 6px; font-size: 11.5px; color: var(--mudo); line-height: 1.4; }
+.ind-cartao p b { color: var(--tinta-2); }
+.ind-val { display: flex; align-items: baseline; gap: 8px; }
+.ind-grande { font: 700 24px/1.1 var(--font-sans); color: var(--tinta); }
+.ind-meta { font: 500 12px var(--font-mono); color: var(--mudo); }
+.ind-barras { display: flex; gap: 3px; margin-top: 6px; }
+.ind-b { flex: 1; height: 14px; border-radius: 2px; background: var(--superficie-3); }
+.ind-b.t-ok { background: var(--ok-cheio); } .ind-b.t-alerta { background: var(--alerta-cheio); }
+.ind-b.t-critico { background: var(--critico-cheio); } .ind-b.t-info { background: var(--info-cheio); }
+.ind-b.t-futuro { background: var(--superficie-2); opacity: .5; }
+.ind-b.t-neutro { background: var(--mudo); }
+.ind-prev { display: flex; gap: 6px 12px; flex-wrap: wrap; }
+.ind-prev div { display: flex; flex-direction: column; gap: 2px; }
+.ind-prev small { font-size: 10.5px; color: var(--mudo); }
+.ind-prev b { font: 700 16px/1.2 var(--font-mono); color: var(--tinta); white-space: nowrap; }
+.c-ok { color: var(--ok); } .c-info { color: var(--info); }
 .ctr-ind th, .ctr-ind td { white-space: nowrap; }
-.ctr-ind td.ind-m, .ctr-ind td.ind-ac { padding: 5px 6px; }
-.ctr-ind td.ind-ac { border-left: 1px solid var(--linha-forte); font-weight: 600; }
+.ctr-ind thead th { text-transform: uppercase; letter-spacing: .06em; font-size: 10.5px; }
+.ctr-ind thead th small { display: block; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.ctr-ind td.ind-m, .ctr-ind td.ind-ac { padding: 5px 5px; }
+.ctr-ind .ind-ac { border-left: 1px solid var(--linha-forte); background: var(--barra); }
 .ctr-ind th.ind-hoje { color: var(--tinta); }
-.ctr-ind td.ind-nome { padding-left: 30px; color: var(--tinta-2); }
-.ind { display: inline-block; min-width: 38px; padding: 1px 6px; border-radius: 5px; font: 600 11.5px/18px var(--font-mono); text-align: center; color: var(--tinta-2); }
+.ctr-ind td.ind-nome { padding-left: 28px; color: var(--tinta-2); }
+.ctr-ind td.ind-nome small { color: var(--mudo); font-size: 10.5px; margin-left: 3px; }
+.ind { display: inline-block; min-width: 44px; padding: 1px 6px; border-radius: 5px; font: 600 11.5px/18px var(--font-mono); text-align: center; color: var(--tinta-2); }
+.ind.t-ok { background: var(--ok-a12); color: var(--ok); box-shadow: inset 0 0 0 1px var(--verde-a35); }
+.ind.t-alerta { background: var(--alerta-a18); color: var(--alerta); box-shadow: inset 0 0 0 1px var(--alerta-a40); }
+.ind.t-critico { background: var(--critico-a18); color: var(--critico); box-shadow: inset 0 0 0 1px var(--critico-a35); }
+.ind.t-info { background: var(--info-a10); color: var(--info); box-shadow: inset 0 0 0 1px var(--info-a42); }
 .ind.ind-vazio { color: var(--mudo); font-weight: 400; }
 .ctr-ind tr.ind-usina td { padding: 0; background: var(--barra); border-top: 2px solid var(--linha-forte); }
 .ctr-ind tr.ind-usina button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: transparent; padding: 9px 12px; cursor: pointer; text-align: left; font: 600 13px/1.2 var(--font-sans); color: var(--tinta); }
 .ctr-ind tr.ind-usina button:hover { background: var(--superficie-2); }
-.ctr-ind tr.ind-total td { padding: 9px 12px; border-top: 2px solid var(--tinta-2); }
+.ctr-ind tr.ind-total td { padding: 9px 12px; border-top: 0; border-bottom: 2px solid var(--verde); }
+.ctr-ind tr.ind-mais td { padding: 0; }
+.ctr-ind tr.ind-mais button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: transparent; padding: 9px 12px; cursor: pointer; text-align: left; color: var(--info); font-size: 12.5px; white-space: normal; }
+.ind-legenda { margin-top: 8px; }
+.ind-dica-dir { margin-left: auto; }
+.ind-so-print { display: none; }
+@media (max-width: 1100px) { .ind-cartoes { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+@media (max-width: 640px) { .ind-cartoes { grid-template-columns: minmax(0, 1fr); } .ind-dir { margin-left: 0; } }
+/* o Exportar: a aba no papel claro, sem a casca nem as abas */
+@media print {
+  header.topo, nav.menu, .ctr-topo, .ctr-fatos, .ctr-abas, .ind-barra, .ctr-nota { display: none !important; }
+  main.conteudo { margin: 0 !important; padding: 0 !important; }
+  .ind-so-print { display: block; font-size: 15px; margin: 0 0 8px; }
+  .ctr-rol { overflow: visible !important; }
+  .ctr-ind { font-size: 9px; }
+  .ind, .ind-b { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
 /* o nome do indicador fica preso à esquerda quando a tabela rola de lado (o celular, a tela estreita) */
 .ctr-ind thead th:first-child, .ctr-ind td.ind-nome { position: sticky; left: 0; z-index: 1; background: var(--fundo); }
 .ctr-ind thead th:first-child { background: var(--barra); }

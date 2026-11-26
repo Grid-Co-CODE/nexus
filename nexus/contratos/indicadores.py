@@ -30,6 +30,9 @@ from datetime import date
 SIGLAS = ("MPM", "MPS", "MPA")
 SERVICOS = {"rocada": ("Roçagem", "Poda química"), "lavagem": ("Limpeza de módulos",)}
 FAIXA = 2.0                                  # pontos abaixo da meta que ainda são amarelo (a régua da sugestão)
+# o PR acima de 100% é leitura errada (a régua da Visão gerencial, `gerencial.PR_MAX`): na 1ª prévia, 26/11/2026, uma
+# usina da Thopen com PR de mais de 1.000% fez o PR do contrato dar 730,5%
+PR_MAX = 100.0
 _MESES = ("jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez")
 _PCT = re.compile(r"(\d{2,3}(?:[.,]\d+)?)\s*%")
 LINHAS = (("MPM", "MPM", "manut"), ("MPS", "MPS", "manut"), ("MPA", "MPA", "manut"),
@@ -125,10 +128,11 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
 
     out_us, tot_prev, tot_zel = [], {s: {} for s in SIGLAS}, {"rocada": {}, "lavagem": {}}
     pr_mes_contrato, disp_mes_contrato = {m["id"]: [] for m in ms}, {m["id"]: [] for m in ms}
+    bruta_mes_contrato = {m["id"]: [] for m in ms}
     fora_pr = fora_disp = 0
     for u in usinas:
         uid, mwp = u.get("uid"), u.get("mwp")
-        linhas, fora_u = {}, 0
+        linhas, fora_u, fora_kpi_u = {}, 0, 0
         for s in SIGLAS:
             dado = (pcm.get(uid) or {}).get(s) or {}
             cels = {m["id"]: cel_prev(dado.get(m["id"]), m["id"]) for m in ms}
@@ -174,6 +178,9 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
                 cels_pr[mid] = cels_disp[mid] = sem
                 continue
             pr = (um.get(mid) or {}).get("pr")
+            errado = pr is not None and not (0 < pr <= PR_MAX)
+            if errado:
+                pr = None
             bruta = (um.get(mid) or {}).get("disp")
             exp = (ue.get(mid) or {}).get("disp")
             disp = exp if exp is not None else bruta
@@ -181,7 +188,8 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
             tpr = tom_kpi(pr, meta_pr)
             cels_pr[mid] = {"txt": _br(pr) if pr is not None else "s/d", "tom": tpr,
                             "dica": (f"PR {_br(pr)}%" + (f"; meta {_br(meta_pr)}%" if meta_pr is not None else "; sem meta de PR")
-                                     + parcial) if pr is not None else "a Performance não publicou o PR do mês"}
+                                     + parcial) if pr is not None else ("leitura errada: o PR publicado passa de 100%" if errado
+                                                                else "a Performance não publicou o PR do mês")}
             teve = exp is not None and bruta is not None and round(exp, 2) != round(bruta, 2)
             tdi = "info" if teve else tom_kpi(disp, meta_disp)
             cels_disp[mid] = {"txt": (_br(disp) + ("*" if teve else "")) if disp is not None else "s/d", "tom": tdi,
@@ -194,19 +202,23 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
                 if meta_pr is not None and pr < meta_pr:
                     fora_pr += 1
                     fora_u += 1
+                    fora_kpi_u += 1
             if disp is not None:
                 disps.append(disp)
                 disp_mes_contrato[mid].append((disp, mwp))
+                if bruta is not None:
+                    bruta_mes_contrato[mid].append((bruta, mwp))
                 if meta_disp is not None and disp < meta_disp:
                     fora_disp += 1
                     fora_u += 1
+                    fora_kpi_u += 1
         acum_pr = round(sum(prs) / len(prs), 1) if prs else None
         acum_disp = round(sum(disps) / len(disps), 1) if disps else None
         linhas["pr"] = {"cels": cels_pr, "acum": {"txt": _br(acum_pr) if acum_pr is not None else "s/d",
                                                   "tom": tom_kpi(acum_pr, meta_pr), "dica": f"a média dos {len(prs)} meses com PR"}}
         linhas["disp"] = {"cels": cels_disp, "acum": {"txt": _br(acum_disp) if acum_disp is not None else "s/d",
                                                       "tom": tom_kpi(acum_disp, meta_disp), "dica": f"a média dos {len(disps)} meses com dado"}}
-        out_us.append({"uid": uid, "usina": u.get("usina"), "mwp": mwp, "fora": fora_u,
+        out_us.append({"uid": uid, "usina": u.get("usina"), "mwp": mwp, "fora": fora_u, "fora_kpi": fora_kpi_u,
                        "linhas": [dict(id=i, nome=n, grupo=g, **linhas[i]) for i, n, g in LINHAS]})
     out_us.sort(key=lambda x: (-x["fora"], -(x["mwp"] or 0), str(x["usina"]).lower()))
 
@@ -244,12 +256,37 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
     tp = {s: [sum(v[0] for v in tot_prev[s].values()), sum(v[1] for v in tot_prev[s].values())] for s in SIGLAS}
     pr_ac = next((l["acum"]["txt"] for l in total if l["id"] == "pr"), "s/d")
     disp_ac = next((l["acum"]["txt"] for l in total if l["id"] == "disp"), "s/d")
-    pior = out_us[0] if out_us and out_us[0]["fora"] else None
+    # os quatro números do alto (o mockup da sugestão: o PR e a disponibilidade do contrato com o mês a mês em miniatura,
+    # as preventivas e os serviços do ano, e o que ficou fora da meta com a usina que mais pesa)
+    def barras(chave):
+        linha = next(l for l in total if l["id"] == chave)
+        def tom(m):
+            c = linha["cels"][m["id"]]
+            if c["tom"]:
+                return c["tom"]
+            if m["id"] > mes_hoje:
+                return "futuro"
+            return "vazio" if c["txt"] in ("", "s/d") else "neutro"      # o mês com número e sem meta: cinza claro
+        return [{"rot": m["rot"], "txt": linha["cels"][m["id"]]["txt"], "tom": tom(m)} for m in ms]
+    abaixo = {chave: [m["rot"] for m in ms if (v := vals.get(m["id"])) is not None and meta is not None and v < meta]
+              for chave, vals, meta in (("pr", pr_c, meta_pr), ("disp", disp_c, meta_disp))}
+    sem_exp = _media_pesada([(v, 1.0) for v in (_media_pesada(x) for x in bruta_mes_contrato.values()) if v is not None])
+
+    def tom_feitas(f, t):
+        return "" if not t else ("ok" if f >= t else ("critico" if ano_fechado else "alerta"))
+    zel_ac = {k: next(l["acum"] for l in total if l["id"] == k) for k in ("rocada", "lavagem")}
+    pior = max(out_us, key=lambda x: x["fora_kpi"], default=None)
+    pior = pior if pior and pior["fora_kpi"] else None
     return {"ok": True, "ano": ano, "meses": ms, "mes_hoje": mes_hoje, "ano_fechado": ano_fechado,
             "metas": mt, "usinas": out_us, "total": total,
-            "resumo": {"pr": pr_ac, "disp": disp_ac, "prev": tp,
-                       "rocada": next(l["acum"]["txt"] for l in total if l["id"] == "rocada"),
-                       "lavagem": next(l["acum"]["txt"] for l in total if l["id"] == "lavagem"),
-                       "fora_pr": fora_pr, "fora_disp": fora_disp,
-                       "pior": {"usina": pior["usina"], "fora": pior["fora"]} if pior else None},
+            "resumo": {"pr": pr_ac, "pr_tom": next(l["acum"]["tom"] for l in total if l["id"] == "pr"),
+                       "disp": disp_ac, "disp_tom": next(l["acum"]["tom"] for l in total if l["id"] == "disp"),
+                       "disp_sem_expurgo": _br(sem_exp) if sem_exp is not None else None,
+                       "pr_barras": barras("pr"), "disp_barras": barras("disp"),
+                       "pr_abaixo": abaixo["pr"], "disp_abaixo": abaixo["disp"],
+                       "prev": tp, "prev_tom": {s: tom_feitas(*tp[s]) for s in SIGLAS},
+                       "rocada": zel_ac["rocada"]["txt"], "rocada_tom": zel_ac["rocada"]["tom"],
+                       "lavagem": zel_ac["lavagem"]["txt"], "lavagem_tom": zel_ac["lavagem"]["tom"],
+                       "fora_pr": fora_pr, "fora_disp": fora_disp, "usinas_n": len(out_us),
+                       "pior": {"usina": pior["usina"], "fora": pior["fora_kpi"]} if pior else None},
             "ligacao": ligacao or {}, "avisos": list(avisos or [])}
