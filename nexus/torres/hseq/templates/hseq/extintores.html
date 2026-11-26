@@ -74,6 +74,8 @@
       {{ termo('Última inspeção') }}<dd>Na usina, a conferência mais recente dos extintores dela; no cliente, a MAIS ANTIGA entre as usinas dele, para não esconder usina parada. Fica azul passados {{ sem_atualizacao_dias }} dias.</dd>
       {{ termo('Responsável e equipe') }}<dd>Embaixo do nome da usina: o Responsável O&amp;M da ficha da usina e a equipe. Os técnicos (da tela Técnicos por usina do PCM) aparecem ao passar o mouse nessa linha.</dd>
       {{ termo('Evolução') }}<dd>A última tratativa da Segurança (o que foi feito e quando), quantas há e quem registrou a última. No cliente, a mais nova entre as do cliente inteiro e as das usinas dele; na usina, a mais nova que vale para ela, contando as do cliente inteiro. "Ver histórico" abre todas; "Registrar" grava uma nova.</dd>
+      {{ termo('O que mudou nos atrasados') }}<dd>A seção embaixo da tabela, com os filtros da tela: os atrasados numa data de início (7 dias atrás, ou a que você escolher, até 90) e os de hoje. <b>Antigos</b>: estavam atrasados no início e ainda estão. <b>Novos</b>: estão atrasados hoje e não estavam no início (venceram no período). <b>Resolvidos</b>: estavam no início e não estão mais (recarregados, trocados ou excluídos). As barras mostram cada dia, os antigos embaixo e os novos em cima.</dd>
+      {{ termo('Estimado', 'info') }}<dd>O Nexus guarda a foto diária dos extintores desde 24/11/2026. Antes dela o número é estimado pela validade de hoje: o extintor estava atrasado na data se a recarga ou o hidrostático dele venceu antes dela. A estimativa não vê o que foi resolvido (o extintor recarregado depois tem a validade nova), por isso os resolvidos ficam "—". Dia sem foto depois disso (o banco fora o dia inteiro) fica sem barra, só com o contorno.</dd>
     {% endcall %}
     </div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     <div class="cn-frescor">ronda de extintores do App + cadastro do Nexus<br><b>lido às {{ lido }}</b>{% if d.get('publicado_em') %} · livro gravado em {{ d.publicado_em }}{% endif %}</div>
@@ -263,6 +265,13 @@
   </table></div>
   {% if lista|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ lista|length }}: use os filtros, o status ou a busca para afunilar.</p>{% endif %}
   {% endif %}
+  {# O que mudou nos atrasados e os atrasados por dia (25/11/2026, a entrega 3 do mockup aprovado pela Segurança): a
+     seção vem fechada e só busca a conta quando a pessoa abre (a página da tabela não lê a foto diária), com os filtros
+     da tela; a data de início se troca dentro dela #}
+  <details class="hs-mudou" id="mudou" data-busca="{{ mudou_url }}">
+    <summary><span class="ext-seta hs-seta-secao" aria-hidden="true"></span><b>O que mudou nos atrasados</b><span class="mudo"> · os atrasados de uma data até hoje, e por dia</span></summary>
+    <div class="hs-mudou-corpo" aria-live="polite"><span class="mudo">Carregando...</span></div>
+  </details>
   {% endif %}
   {# a informação adicional da última ronda (o clique na linha do extintor) e o aviso de quando não há #}
   <dialog class="hs-dialogo" id="hs-info" aria-labelledby="hs-info-t">
@@ -422,6 +431,29 @@
         var erro = !m ? 'A data vai como dd/mm/aaaa.'
           : (m[3] + m[2] + m[1] > h[2] + h[1] + h[0]) ? 'A tratativa não pode ter data no futuro.' : '';
         if (erro) { ev.preventDefault(); aviso.textContent = erro; aviso.hidden = false; form.elements.dia.focus(); }
+      });
+    })();
+    // o que mudou nos atrasados: a conta só vem quando a seção abre, e a data de início se troca sem sair da página
+    (function () {
+      var sec = document.getElementById('mudou');
+      if (!sec) return;
+      var corpo = sec.querySelector('.hs-mudou-corpo');
+      function busca(extra) {
+        corpo.innerHTML = '<span class="mudo">Carregando...</span>';
+        var url = sec.dataset.busca + (extra ? (sec.dataset.busca.indexOf('?') < 0 ? '?' : '&') + extra : '');
+        fetch(url, {credentials: 'same-origin'}).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+          .then(function (h) { corpo.innerHTML = h; sec.dataset.carregada = '1'; })
+          .catch(function () {
+            corpo.innerHTML = '<span class="cn-t-critico">Não consegui buscar o histórico dos atrasados.</span> <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno hs-mudou-tentar">Tentar de novo</button>';
+          });
+      }
+      sec.addEventListener('toggle', function () { if (sec.open && !sec.dataset.carregada) busca(''); });
+      corpo.addEventListener('click', function (ev) { if (ev.target.closest('.hs-mudou-tentar')) busca(''); });
+      corpo.addEventListener('submit', function (ev) {
+        var f = ev.target.closest('.hs-mudou-sel');
+        if (!f) return;
+        ev.preventDefault();
+        busca('de=' + encodeURIComponent(f.elements.de.value.trim()));
       });
     })();
     // a caixa dos não reconhecidos lembra se a pessoa a recolheu (só neste navegador; sem armazenamento, abre)

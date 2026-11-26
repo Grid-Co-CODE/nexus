@@ -19,7 +19,7 @@ pasta antes de mexer.
 import re
 import unicodedata
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from urllib.parse import urlencode
 
@@ -31,6 +31,8 @@ from ...hseq import decisoes as DEC
 from ...hseq import documentacao as DOC
 from ...hseq import epi as EPI
 from ...hseq import extintores as EXT
+from ...hseq import extintores_historico as HIST
+from ...hseq import extintores_mudou as MUDOU
 from ...hseq import fotos as FOT
 from ...hseq import info_extintor as INFO
 from ...hseq import planilha as PLA
@@ -475,7 +477,9 @@ def extintores():
         url=_url_ext, f=f, modo=modo, ver=ver, fl=fl, filtros_ext=FILTROS_EXT, status_opcoes=STATUS,
         q=request.args.get("q", ""), contagem=EXT.contar(base), lista=lista, limite=LIMITE_LINHAS,
         # os não reconhecidos vão para a usina deles na tabela (é lá que a Segurança decide)
-        grupos=grupos, trat_erro=trat_erro, tipos_trat=TRAT.TIPOS, obs_max=TRAT.OBS_MAX,
+        grupos=grupos, trat_erro=trat_erro,
+        mudou_url=url_for("torre_hseq.extintores_mudou", **{k: request.args[k] for k in ("cliente", "usina", "responsavel",
+                                                                                     "equipe", "q") if request.args.get(k)}), tipos_trat=TRAT.TIPOS, obs_max=TRAT.OBS_MAX,
         hoje_txt=visao._agora().strftime("%d/%m/%Y"),
         nr_lista=nrs if ver == "extintor" and f == NR else [],
         historico=_historico(d, fl) if modo == "excluidos" else [], n_excluidos=len(fl["excluidos"]),
@@ -627,6 +631,32 @@ def extintores_tratativas():
         uids = {int(u) for u in request.args.get("usinas", "").split(",") if u.strip().isdigit()}
         ts = [t for t in todas if (cid and t["cliente_id"] == cid) or (t["escopo"] == "usina" and t["usina_id"] in uids)]
     return render_template("hseq/_tratativas.html", ts=ts, nomes=nomes, erro=est.get("erro") or "", por_usina=not uid)
+
+
+@bp.route("/extintores/mudou")
+def extintores_mudou():
+    """O que mudou nos atrasados e os atrasados por dia (a entrega 3 do mockup aprovado pela Segurança, 25/11/2026): o
+    pedaço que a seção de baixo da tabela busca SÓ quando a pessoa a abre (a página da tabela não lê a foto diária). Os
+    filtros da tela valem; `de` é a data de início em dd/mm/aaaa (7 dias atrás por padrão; até 90)."""
+    leitura, d, todas, _base, _nao_rec, fl = _filtrados()
+    if leitura.erro or not d.get("aba_existe") or d.get("colunas_faltando"):
+        abort(404)
+    hoje = d.get("hoje") or visao._agora().date()
+    try:
+        de = datetime.strptime(request.args.get("de", "").strip(), "%d/%m/%Y").date()
+    except ValueError:
+        de = hoje - timedelta(days=MUDOU.DIAS_PADRAO)
+    erro = ""
+    try:
+        cru = HIST.ler(current_app.config)
+    except Exception as e:      # noqa: BLE001 — banco fora: a seção diz e não inventa
+        cru, erro = None, f"{type(e).__name__}: {str(e)[:160]}"
+    r = None
+    if cru is not None:
+        por_usina = {x["usina_id"]: x for x in todas + fl["seguem"] + fl["excluidos"] if x.get("usina_id")}
+        r = MUDOU.comparar(cru, todas, hoje, de, fl["passa"], por_usina)
+    return render_template("hseq/_extintores_mudou.html", r=r, erro=erro, g=MUDOU.grafico(r["barras"]) if r else None,
+                           dias_max=MUDOU.DIAS_MAX)
 
 
 @bp.route("/extintores/opcoes")

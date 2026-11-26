@@ -365,6 +365,7 @@
   .hs-clientes > tbody > tr.cn-detalhe{display:block}
   .hs-clientes > tbody > tr.cn-detalhe[hidden]{display:none}
   .hs-clientes > tbody > tr.cn-detalhe > td{display:block;overflow-x:auto}
+}
 
 /* Incidentes (24/11/2026): os relatos de segurança do App. O texto livre guarda as quebras de linha que o técnico
    escreveu; as fotos em miniatura, que abrem inteiras numa aba; no celular cada relato vira um cartão (como a APR e PT) */
@@ -394,3 +395,55 @@
   .inc-fotos a{flex:0 0 calc(50% - 5px)}
   .inc-fotos img{width:100%;height:auto;aspect-ratio:4/3}
 }
+/* O que mudou nos atrasados (25/11/2026, a entrega 3 do mockup): a seção fechada embaixo da tabela, que só busca a conta
+   ao abrir; dois cartões lado a lado, a comparação e as barras por dia. Os novos são o vermelho mais claro (o mesmo
+   token, com transparência: não há token de vermelho claro); o estimado vai tracejado e a lacuna, só o contorno */
+.hs-mudou{margin-top:18px;border:1px solid var(--linha);border-radius:12px;background:var(--superficie)}
+.hs-mudou > summary{display:flex;align-items:center;gap:4px;padding:12px 16px;cursor:pointer;list-style:none}
+.hs-mudou > summary::-webkit-details-marker{display:none}
+.hs-mudou[open] > summary .ext-seta{transform:rotate(90deg)}
+.hs-mudou-corpo{padding:0 16px 16px}
+.hs-mudou-fila{display:flex;gap:18px;align-items:stretch;flex-wrap:wrap}
+.hs-mudou-cartao{flex:1 1 360px;min-width:0;padding:14px 16px;border:1px solid var(--linha);border-radius:12px}
+.hs-mudou-comp{flex:0 1 440px}
+.hs-mudou-cartao h3{margin:0 0 4px;font-size:15px}
+.hs-mudou-q{margin:0 0 12px;font-size:12px;color:var(--mudo)}
+.hs-mudou-sel{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:12px}
+.hs-mudou-sel label{display:flex;flex-direction:column;gap:4px}
+.hs-mudou-sel .gc-campo{width:120px}
+.hs-mudou-ate{font-size:12.5px;color:var(--mudo);padding-bottom:8px}
+.hs-mudou-big{display:flex;align-items:center;gap:14px;margin:6px 0 10px}
+.hs-mudou-big > div{display:flex;flex-direction:column}
+.hs-mudou-big b{font-size:32px;line-height:1.1;font-variant-numeric:tabular-nums}
+.hs-mudou-big span{font-size:11.5px;color:var(--mudo)}
+.hs-mudou-big .hs-est{color:var(--info);font-weight:600}
+.hs-mudou-seta{font-size:22px}
+.hs-mudou-lin{margin:0}
+.hs-mudou-lin > div{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--linha);font-size:13px}
+.hs-mudou-lin dt{display:flex;align-items:center;gap:8px}
+.hs-mudou-lin dd{margin:0;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.hs-bola--novo{background:var(--critico);opacity:.45}
+.hs-novo{color:var(--critico);opacity:.75}
+.hs-mudou-lista{margin-top:10px}
+.hs-mudou-lista > summary{display:inline-block;list-style:none;cursor:pointer}
+.hs-mudou-lista > summary::-webkit-details-marker{display:none}
+.hs-mudou-lista table{width:100%;margin-top:8px;border-collapse:collapse;font-size:12.5px}
+.hs-mudou-lista th{text-align:left;font-size:11px;color:var(--mudo);padding:4px 6px}
+.hs-mudou-lista td{padding:4px 6px;border-top:1px solid var(--linha);overflow-wrap:anywhere}
+.hs-mudou-leg{display:flex;flex-wrap:wrap;gap:6px 16px;margin:6px 0;font-size:12px;color:var(--mudo)}
+.hs-mudou-leg i{display:inline-block;width:10px;height:10px;margin-right:5px;border-radius:2px;vertical-align:-1px}
+.hs-leg-antigo{background:var(--critico)}
+.hs-leg-novo{background:var(--critico);opacity:.45}
+.hs-leg-est{border:1px dashed var(--info)}
+.hs-leg-lacuna{border:1px dashed var(--mudo)}
+.hs-graf{display:block;width:100%;height:auto;max-height:280px}
+.hs-graf-grade{stroke:var(--linha);stroke-width:1}
+.hs-graf-base{stroke:var(--mudo);stroke-width:1}
+.hs-graf-eixo{fill:var(--mudo);font-size:10px;font-family:var(--font-mono, monospace)}
+.hs-graf-total{fill:var(--tinta);font-size:11px}
+.hs-graf-antigo{fill:var(--critico)}
+.hs-graf-novo{fill:var(--critico);fill-opacity:.45}
+.hs-graf-est .hs-graf-antigo,.hs-graf-est .hs-graf-novo{stroke:var(--info);stroke-dasharray:3 2;stroke-width:1}
+.hs-graf-est .hs-graf-antigo{fill-opacity:.6}
+.hs-graf-est .hs-graf-novo{fill-opacity:.3}
+.hs-graf-lacuna{fill:none;stroke:var(--mudo);stroke-dasharray:2 2;stroke-width:1}
