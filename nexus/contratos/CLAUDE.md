@@ -147,8 +147,17 @@ com asterisco no mês que teve expurgo, sem cor sem meta.
   - supressão vegetal (roçagem e poda química) e lavagem (limpeza de módulos): o histórico do cronograma do Radar
     (`cronograma_publico`), pelo nome da usina; o mínimo do ano, o `zeladoria_contratual` do Radar por UFV (só o
     "fixo"); a linha do portfólio ("82 UFVs") vale para as usinas sem linha própria;
-  - as metas: o número dos Dados do contrato (`meta_pr`, `meta_disp`, editáveis com prova) vence o lido do PDF (a 1ª
-    regra de "Disponibilidade e desempenho" com o percentual; `indicadores.metas`).
+  - a meta de PR (26/11/2026, Levi: "As metas de PR, você vai entrar na BD Performance"): por usina e mês, o "PR Previsto
+    1° Ano" da aba Info Mensal da BD Performance e o "PR (2026)" da aba Dados Mensais 2026 da BD Thopen
+    (`contratos_tela._metas_pr_bd`, ligados pelo nome); o PR do contrato no mês compara com a meta do mês pela potência. O
+    número dos Dados do contrato (`meta_pr`, editável com prova) vence. O PR lido do PDF saiu (numa ficha, outra regra virou
+    um PR de 98%). Medido em 26/11: na Thopen, 72 das 84 usinas com meta; na Athon, 10 de 10;
+  - a garantia de disponibilidade: a dos Dados do contrato (`meta_disp`), ou a lida do PDF, ou **99%** (Levi: "As que
+    faltam, bota 99%"; `indicadores.DISP_PADRAO`);
+  - a vegetação e a sujidade (Levi: "Tem na parte de rondas. Do usinas 360°. Isso daí aparece bastante"): duas linhas ao
+    lado da supressão e da lavagem, o pior nível do mês que as rondas leram (de 1 a 5, a régua das Rondas: 5 crítico, 4
+    atenção), o acumulado é a última leitura, e no contrato, as usinas em 4 ou 5 (`_rondas_das_usinas`, pelo
+    `visao.historico_usina`; o livro das rondas guarda 90 dias). Na Thopen, 78 das 84 usinas com leitura.
   A ligação pelo nome é medida: as tarefas do PCM e as usinas do Radar do cliente que não ligaram aparecem numa linha da
   aba, com quantas de quantas.
 - **A tela, no desenho do mockup** (a 1ª versão subiu enxuta, numa linha de fatos; o Levi, vendo no ar: "eu queria no

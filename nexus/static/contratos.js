@@ -744,7 +744,7 @@
      resto numa linha "Mais N usinas". */
   var IND = {}, indVisao = "completa", indAbertas = {}, indMais = {}, indAnoAberto = false;
   var VIS = [["completa", "Completa"], ["kpis", "Só KPIs"], ["manut", "Só manutenções"]];
-  var SUB_IND = {MPM: "mensal", MPS: "semestral", MPA: "anual", rocada: "data", lavagem: "data", pr: "%", disp: "%"};
+  var SUB_IND = {MPM: "mensal", MPS: "semestral", MPA: "anual", rocada: "data", lavagem: "data", veg: "nível 1 a 5", suj: "nível 1 a 5", pr: "%", disp: "%"};
   function pedirInd(c, n) {
     var ch = c.cliente + "|" + (n || "");
     if (IND[ch] && !IND[ch].montando) return IND[ch];
@@ -849,7 +849,7 @@
     // a legenda: cada amostra do mesmo tamanho, com o valor no meio (Levi: "os valores centralizados [...] tá meio frouxo")
     var LEG = [["t-ok", "1/1", "feita no mês"], ["t-critico", "0/1", "não feita"], ["ind-vazio", "—", "sem plano no mês"], ["t-ok", "12/09", "serviço feito, data"],
       ["t-alerta", "3/4", "feitas / mínimo do contrato"], ["t-ok", "82,1", "na meta"], ["t-alerta", "77,4", "até 2 pontos abaixo"], ["t-critico", "71,0", "abaixo da meta"],
-      ["t-info", "98,9*", "com expurgo no mês"], ["ind-vazio", "s/d", "sem dado no banco"]];
+      ["t-info", "98,9*", "com expurgo no mês"], ["ind-vazio", "s/d", "sem dado no banco"], ["t-alerta", "4", "ronda: vegetação ou sujidade alta (5 = muito alta)"]];
     h += '<div class="ind-legenda">' + LEG.map(function (x) { return '<span><i class="ind ' + x[0] + '">' + esc(x[1]) + "</i>" + esc(x[2]) + "</span>"; }).join("") +
       '<span class="ind-dica-dir">Clique na célula: a gaveta explica o dado, com as OS.</span></div>';
     return h;
@@ -913,6 +913,10 @@
     if ((d.servicos || []).length) h += "<h3>Os serviços (" + d.servicos.length + ")</h3><ul class=\"ctr-gav-lista\">" + d.servicos.map(function (s) {
       return '<li><span class="ctr-gav-data">' + dBR(s.data) + '</span><span class="ctr-gav-txt"><b>' + esc(s.servico) + "</b><small>" + esc(s.usina) + "</small></span></li>"; }).join("") + "</ul>";
     else if (/Supressão|Lavagem/.test(d.titulo)) h += '<p class="mudo">Nenhum serviço feito neste período.</p>';
+    if ((d.rondas || []).length) h += "<h3>As leituras das rondas (" + d.rondas.length + ")</h3><ul class=\"ctr-gav-lista\">" + d.rondas.slice(0, 200).map(function (r) {
+      return '<li><span class="ind' + (r.tom ? " t-" + r.tom : "") + '" title="nível de 1 a 5">' + esc(String(r.nivel)) + '</span><span class="ctr-gav-txt"><b>' + esc(r.usina) + " · " + dBR(r.data) + "</b><small>" + esc(r.tipo) + "</small></span>" +
+        (r.os ? '<button type="button" class="ctr-gav-os" data-os-abrir="" data-os-folio="' + esc(r.os) + '" title="Abrir o card da OS da ronda">' + esc(r.os) + "</button>" : "") + "</li>"; }).join("") + "</ul>";
+    else if (/Vegetação na ronda|Sujidade na ronda/.test(d.titulo)) h += '<p class="mudo">Nenhuma ronda leu isso neste período.</p>';
     if ((d.usinas || []).length) h += "<h3>Usina a usina</h3><ul class=\"ctr-gav-lista\">" + d.usinas.map(function (u) {
       return '<li><span class="ind' + (u.tom ? " t-" + u.tom : "") + '">' + esc(u.val) + '</span><span class="ctr-gav-txt"><b>' + esc(u.usina) + " · " + esc(u.mes) + "</b>" + (u.extra ? "<small>" + esc(u.extra) + "</small>" : "") + "</span></li>"; }).join("") + "</ul>";
     if ((d.textos || []).length) h += "<h3>O que mais conta</h3>" + d.textos.map(function (x) { return '<p class="ctr-gav-p">' + esc(x) + "</p>"; }).join("");

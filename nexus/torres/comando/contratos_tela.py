@@ -227,6 +227,49 @@ def _fontes_da_ligacao(cliente: str, uids: set, ano: dict) -> tuple[dict, dict, 
     return pcm, zel, zel_min, ligacao, avisos
 
 
+def _metas_pr_bd(uids: set, nomes) -> dict:
+    """{uid: {"AAAA-MM": PR previsto em %}} (26/11/2026, Levi: "As metas de PR, você vai entrar na BD Performance"): o "PR
+    Previsto 1° Ano" da aba Info Mensal da BD Performance e o "PR (2026)" da aba Dados Mensais 2026 da BD Thopen, por
+    usina e mês, ligados pelo nome (`responsaveis.Nomes`, que já conhece as abas das duas BDs). Fonte que não abre fica
+    de fora (o log diz), e a meta daquele cliente some da célula."""
+    from ...campo import visao
+    out: dict = {}
+    for livro, aba, col in (("bd_performance", "Info Mensal", "PR Previsto 1° Ano (%)"), ("bd_thopen", "Dados Mensais 2026", "PR (2026)")):
+        try:
+            linhas = visao._livro(livro, aba)
+        except Exception:                # noqa: BLE001
+            _log.exception("Contratos · Indicadores: a meta de PR (%s · %s) não abriu", livro, aba)
+            continue
+        for r in linhas:
+            uid = nomes.usina(r.get("Usina"))[0]
+            mes = str(r.get("Mês") or "")[:7]
+            try:
+                v = float(r.get(col))
+            except (TypeError, ValueError):
+                continue
+            if uid in uids and len(mes) == 7 and 0 < v <= 1.5:
+                out.setdefault(uid, {})[mes] = round(v * 100 if v <= 1.5 else v, 1)
+    return out
+
+
+def _rondas_das_usinas(uids: set) -> dict:
+    """{uid: [{data, sujidade, vegetacao, os, tipo, validada}]}: as leituras das rondas do Usinas 360° (o livro das rondas
+    guarda 90 dias; as respostas do checklist, as das OS que o Nexus leu), a mesma conta do histórico da usina."""
+    from ...campo import ronda_checklist, visao
+    lr = visao.rondas()
+    dr = lr.dados or {}
+    if lr.erro:
+        raise RuntimeError(lr.erro)
+    resp = ronda_checklist.respostas()
+    out = {}
+    for uid in uids:
+        hist = visao.historico_usina(dr.get("todas") or [], resp, uid, dr.get("validacoes") or [])
+        out[uid] = [{"data": str(h.get("data") or "")[:10], "sujidade": h.get("sujidade"), "vegetacao": h.get("vegetacao"),
+                     "os": h.get("os"), "tipo": h.get("tipo") or "", "validada": bool(h.get("validada"))}
+                    for h in hist if h.get("data") and (h.get("sujidade") is not None or h.get("vegetacao") is not None)]
+    return out
+
+
 @bp.route("/contratos/indicadores.json")
 def contratos_indicadores():
     """A aba Indicadores de um contrato num ano contratual (`?cliente=&ano=`, o 1º ano é 1; sem ano, o de hoje). Enquanto
@@ -270,13 +313,28 @@ def contratos_indicadores():
                 return resp
             cg = next((x for x in g.get("clientes") or [] if chave_cliente(x.get("cliente")) == chave_cliente(cliente)), None)
             usinas = (cg or {}).get("usinas") or []
-            pcm, zel, zel_min, ligacao, avisos = _fontes_da_ligacao(cliente, {u.get("uid") for u in usinas}, ano)
+            uids = {u.get("uid") for u in usinas}
+            pcm, zel, zel_min, ligacao, avisos = _fontes_da_ligacao(cliente, uids, ano)
+            from ...campo import responsaveis as R
+            try:
+                metas_pr = _metas_pr_bd(uids, R.Nomes(visao._Base()))
+            except Exception:            # noqa: BLE001 — sem o cadastro, a meta de PR da BD fica de fora e a aba diz
+                _log.exception("Contratos · Indicadores: a meta de PR da BD Performance não abriu")
+                metas_pr = {}
+                avisos.append("a meta de PR da BD Performance")
+            try:
+                rondas = _rondas_das_usinas(uids)
+            except Exception:            # noqa: BLE001 — sem as rondas, a vegetação e a sujidade ficam "—" e a aba diz
+                _log.exception("Contratos · Indicadores: as rondas não abriram")
+                rondas = {}
+                avisos.append("as rondas do Usinas 360° (a vegetação e a sujidade)")
             if not cg:
                 avisos.append("o cliente não tem usina mobilizada no cadastro com este nome")
             com_dado = {m for m in (x["id"] for x in g.get("meses") or [])}
             out = I.montar(c, (vis.get("fichas") or {}).get(cliente), ano, usinas, pcm, zel, zel_min, hoje, com_dado,
                            ligacao, avisos + [x for x in g.get("avisos") or []      # só os avisos das fontes desta aba
-                                              if any(p in x for p in ("histórico", "disponibilidade", "expurgo", "limitaç", "religamento"))])
+                                              if any(p in x for p in ("histórico", "disponibilidade", "expurgo", "limitaç", "religamento"))],
+                           metas_pr=metas_pr, rondas=rondas)
             atual = K.ano_contratual(prim, hoje)
             out["anos"] = [{"n": i, "ini": K.ano_contratual(prim, hoje, i)["ini"], "fim": K.ano_contratual(prim, hoje, i)["fim"]}
                            for i in range(1, atual["n"] + 1)] if atual else []
@@ -294,7 +352,7 @@ def contratos_indicadores():
 # datas, os serviços de zeladoria com a data, o PR e a disponibilidade com a meta, o expurgo e a conta. Só lê: as fontes
 # são as mesmas da aba, nas cópias que já estão na memória.
 _ROT_LINHA = {"MPM": "MPM", "MPS": "MPS", "MPA": "MPA", "rocada": "Supressão vegetal", "lavagem": "Lavagem de módulos",
-              "pr": "PR", "disp": "Disponibilidade expurgada"}
+              "veg": "Vegetação na ronda", "suj": "Sujidade na ronda", "pr": "PR", "disp": "Disponibilidade expurgada"}
 
 
 def _br(v, casas=1):
@@ -346,7 +404,7 @@ def contratos_indicadores_celula():
             abort(404)
         alvo, nome_alvo = {uid}, usinas[uid].get("usina")
     out = {"ok": True, "titulo": f"{_ROT_LINHA[linha]} · {nome_alvo} · {rot_mes}", "os": [], "servicos": [], "numeros": [],
-           "usinas": [], "textos": [], "fonte": ""}
+           "usinas": [], "rondas": [], "textos": [], "fonte": ""}
     nomes = R.Nomes(visao._Base())
     memo: dict = {}
 
@@ -378,6 +436,26 @@ def contratos_indicadores_celula():
                         "feita é a Finalizada. A OS abre o card do Fracttal.")
         if lei is None:
             out["textos"].append("As tarefas do PCM ainda estão chegando: abra de novo em instantes.")
+    elif linha in ("veg", "suj"):
+        campo = "vegetacao" if linha == "veg" else "sujidade"
+        try:
+            rds = _rondas_das_usinas(alvo)
+        except Exception:                # noqa: BLE001
+            rds = {}
+            out["textos"].append("As rondas do Usinas 360° não abriram agora.")
+        for u, lista in rds.items():
+            for r in lista:
+                if r["data"][:7] in ids and r.get(campo) is not None:
+                    out["rondas"].append({"data": r["data"], "nivel": r[campo], "tom": I.tom_nivel(r[campo]),
+                                          "os": str(r.get("os") or ""), "tipo": "validação por foto" if r["validada"] else (r["tipo"] or "ronda"),
+                                          "usina": (usinas.get(u) or {}).get("usina") or ""})
+        out["rondas"].sort(key=lambda r: (r["data"], r["usina"]), reverse=True)
+        altos = [r for r in out["rondas"] if r["nivel"] >= 4]
+        out["numeros"] = [{"rot": "Leituras", "val": str(len(out["rondas"]))}, {"rot": "Em 4 ou 5", "val": str(len(altos))},
+                          {"rot": "A pior", "val": str(max((r["nivel"] for r in out["rondas"]), default="—"))}]
+        out["fonte"] = ("As rondas do Usinas 360°: a " + ("vegetação" if linha == "veg" else "sujidade") + " que o técnico marca no "
+                        "checklist da ronda, de 1 (muito baixa) a 5 (muito alta); 4 pede atenção e 5, ação (a régua das Rondas). "
+                        "O livro das rondas guarda 90 dias. A OS abre o card do Fracttal.")
     elif linha in ("rocada", "lavagem"):
         from ...zeladoria import leitura
         est = leitura.estado(current_app.config)
@@ -397,6 +475,7 @@ def contratos_indicadores_celula():
     else:
         mt = I.metas(c, (vis.get("fichas") or {}).get(cliente))
         meta = (mt["pr"] if linha == "pr" else mt["disp"]) or {}
+        metas_bd = _metas_pr_bd(alvo, nomes) if linha == "pr" and not meta else {}
         for u in sorted((usinas[x] for x in alvo), key=lambda x: -(x.get("mwp") or 0)):
             for mid in ids:
                 mm = (u.get("meses") or {}).get(mid) or {}
@@ -414,12 +493,16 @@ def contratos_indicadores_celula():
                         out["textos"].append(f"{next(m['rot'] for m in meses if m['id'] == mid)}: {item['expurgo']}")
                 if v is None and not mm:
                     continue
+                mu = meta.get("pct") if meta else (metas_bd.get(u.get("uid")) or {}).get(mid)
+                if linha == "pr" and not meta:
+                    extra = (f"meta {_br(mu)}% (BD Performance)" if mu is not None else "sem meta na BD") + (" · " + extra if extra else "")
                 out["usinas"].append({"usina": u.get("usina"), "mes": next(m["rot"] for m in meses if m["id"] == mid),
-                                      "val": _br(v) + "%" if v is not None else "s/d", "tom": I.tom_kpi(v, meta.get("pct")), "extra": extra})
-        out["numeros"] = [{"rot": "Meta do contrato", "val": (_br(meta["pct"]) + "%") if meta.get("pct") is not None else "sem meta"}]
+                                      "val": _br(v) + "%" if v is not None else "s/d", "tom": I.tom_kpi(v, mu), "extra": extra})
+        out["numeros"] = [{"rot": "Meta do contrato" if meta else "Meta", "val": (_br(meta["pct"]) + "%") if meta.get("pct") is not None
+                           else ("por usina, da BD Performance" if linha == "pr" else "sem meta")}]
         out["fonte"] = ("A Visão gerencial: o PR e a meta do mês que a Performance publica (desde 10/2026) e a disponibilidade "
                         "do Fracttal e do COS, com o expurgo do contrato (a queda da rede e a limitação imposta). "
-                        "Meta: " + (meta.get("origem") or "o contrato não traz") + ".")
+                        "Meta: " + (meta.get("origem") or ("a da BD Performance (Info Mensal) e da BD Thopen (Dados Mensais 2026), por usina e mês" if linha == "pr" else "o contrato não traz")) + ".")
         if any(i < "2026-10" for i in ids):
             out["textos"].append("Antes de 10/2026 o banco não tem o PR nem a disponibilidade por mês: esses meses ficam sem dado.")
     resp = jsonify(out)

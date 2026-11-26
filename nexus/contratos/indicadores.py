@@ -35,9 +35,21 @@ FAIXA = 2.0                                  # pontos abaixo da meta que ainda s
 PR_MAX = 100.0
 _MESES = ("jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez")
 _PCT = re.compile(r"(\d{2,3}(?:[.,]\d+)?)\s*%")
+# a vegetação e a sujidade das rondas (26/11/2026, Levi: "Vegetação e sujidade. Tem na parte de rondas. Do usinas 360°.
+# Isso daí aparece bastante"): ao lado do serviço, o pior nível do mês que a ronda leu (de 1 a 5)
 LINHAS = (("MPM", "MPM", "manut"), ("MPS", "MPS", "manut"), ("MPA", "MPA", "manut"),
-          ("rocada", "Supressão vegetal", "manut"), ("lavagem", "Lavagem de módulos", "manut"),
+          ("rocada", "Supressão vegetal", "manut"), ("veg", "Vegetação na ronda", "manut"),
+          ("lavagem", "Lavagem de módulos", "manut"), ("suj", "Sujidade na ronda", "manut"),
           ("pr", "PR", "kpi"), ("disp", "Disponibilidade expurgada", "kpi"))
+# a garantia de disponibilidade onde o contrato não traz o número (Levi, 26/11/2026: "Garantia de disponibilidade. Bota
+# 99% para tudo [...] As que faltam, bota 99%")
+DISP_PADRAO = 99.0
+NIVEL_TXT = {1: "muito baixa", 2: "baixa", 3: "média", 4: "alta", 5: "muito alta"}
+
+
+def tom_nivel(n) -> str:
+    """A régua das Rondas (`campo.visao.criticidade`): 5 crítico, 4 atenção; 1 a 3, ok."""
+    return "" if n is None else ("critico" if n >= 5 else ("alerta" if n == 4 else "ok"))
 
 
 def ultimos_12_meses(hoje: date) -> dict:
@@ -76,16 +88,18 @@ def _pct_da_regra(ficha: dict | None, palavras: re.Pattern) -> dict | None:
 
 
 def metas(contrato: dict, ficha: dict | None) -> dict:
-    """{"pr": {pct, origem} | None, "disp": {pct, origem} | None}. O número dos Dados do contrato (o gestor gravou, com
-    prova) vence o lido do PDF; sem nenhum, None e a célula fica sem cor."""
+    """{"pr": {pct, origem} | None, "disp": {pct, origem}}. O número dos Dados do contrato (o gestor gravou, com prova)
+    vence. Sem ele, a meta de PR é a da BD Performance, por usina e mês (`montar`, `metas_pr`; Levi, 26/11/2026: "As
+    metas de PR, você vai entrar na BD Performance"; o PR lido do PDF saiu: numa ficha, outra regra virou um PR de 98%), e
+    a garantia de disponibilidade é a do contrato lido ou, sem ela, 99% (`DISP_PADRAO`)."""
     out = {}
-    for chave, campo, palavras in (("pr", "meta_pr", re.compile(r"\bpr\b|performance ratio")),
-                                   ("disp", "meta_disp", re.compile(r"disponibilidade"))):
-        v = contrato.get(campo)
-        if isinstance(v, (int, float)) and not isinstance(v, bool):
-            out[chave] = {"pct": float(v), "origem": "dos Dados do contrato"}
-        else:
-            out[chave] = _pct_da_regra(ficha, palavras)
+    v = contrato.get("meta_pr")
+    out["pr"] = {"pct": float(v), "origem": "dos Dados do contrato"} if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+    v = contrato.get("meta_disp")
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        out["disp"] = {"pct": float(v), "origem": "dos Dados do contrato"}
+    else:
+        out["disp"] = _pct_da_regra(ficha, re.compile(r"disponibilidade")) or {"pct": DISP_PADRAO, "origem": "padrão da Grid (99%)"}
     return out
 
 
@@ -113,13 +127,16 @@ def _media_pesada(pares) -> float | None:
 
 
 def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pcm: dict, zel: dict, zel_min: dict,
-           hoje: date, meses_com_dado: set[str], ligacao: dict | None = None, avisos: list[str] | None = None) -> dict:
+           hoje: date, meses_com_dado: set[str], ligacao: dict | None = None, avisos: list[str] | None = None,
+           metas_pr: dict | None = None, rondas: dict | None = None) -> dict:
     """O que a aba lê.
 
     `usinas` = as do cliente na Visão gerencial: [{uid, usina, mwp, meses {"AAAA-MM": {pr, disp, ...}}, com_expurgo
     {"AAAA-MM": {disp, pr}}}]; `pcm` = {uid: {sigla: {"AAAA-MM": [feitas, total]}}}; `zel` = {uid: {"rocada" | "lavagem":
     [datas ISO]}}; `zel_min` = {uid: {"rocada" | "lavagem": n por ano}}; `meses_com_dado` = os meses que o banco de
-    performance tem (fora deles, "sem dado")."""
+    performance tem (fora deles, "sem dado"); `metas_pr` = {uid: {"AAAA-MM": PR previsto em %}} (a BD Performance e a BD
+    Thopen); `rondas` = {uid: [{data, sujidade, vegetacao}]} (as leituras das rondas do Usinas 360°)."""
+    metas_pr, rondas = metas_pr or {}, rondas or {}
     ms = meses_do_ano(ano)
     mes_hoje = hoje.isoformat()[:7]
     mt = metas(contrato, ficha)
@@ -141,6 +158,8 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
     out_us, tot_prev, tot_zel = [], {s: {} for s in SIGLAS}, {"rocada": {}, "lavagem": {}}
     pr_mes_contrato, disp_mes_contrato = {m["id"]: [] for m in ms}, {m["id"]: [] for m in ms}
     bruta_mes_contrato = {m["id"]: [] for m in ms}
+    meta_mes_contrato = {m["id"]: [] for m in ms}             # a meta de PR do mês pela potência das usinas com PR
+    tot_rd = {"veg": {}, "suj": {}}
     fora_pr = fora_disp = 0
     for u in usinas:
         uid, mwp = u.get("uid"), u.get("mwp")
@@ -177,9 +196,28 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
                 acum = {"txt": str(len(datas)) if datas else "—", "tom": "",
                         "dica": "o contrato da zeladoria não traz o mínimo desta usina" if datas else "nenhuma no ano"}
             linhas[chave] = {"cels": cels, "acum": acum}
+        leit = sorted((r for r in rondas.get(uid) or [] if ano["ini"] <= str(r.get("data") or "")[:10] <= ano["fim"]),
+                      key=lambda r: r["data"])
+        for chave, campo, nome in (("veg", "vegetacao", "vegetação"), ("suj", "sujidade", "sujidade")):
+            cels = {}
+            for m in ms:
+                ns = [(r[campo], r["data"]) for r in leit if r["data"][:7] == m["id"] and r.get(campo) is not None]
+                if not ns:
+                    cels[m["id"]] = {"txt": "—", "tom": "", "dica": "nenhuma ronda leu a " + nome + " no mês"}
+                    continue
+                pior = max(ns)
+                if pior[0] >= 4:
+                    tot_rd[chave][m["id"]] = tot_rd[chave].get(m["id"], 0) + 1
+                cels[m["id"]] = {"txt": str(pior[0]), "tom": tom_nivel(pior[0]),
+                                 "dica": f"{len(ns)} {'leitura' if len(ns) == 1 else 'leituras'} no mês; a pior: {pior[0]} "
+                                         f"({NIVEL_TXT.get(pior[0], '')}) em {_dm(pior[1])}"}
+            ult = next((r for r in reversed(leit) if r.get(campo) is not None), None)
+            linhas[chave] = {"cels": cels, "acum": ({"txt": str(ult[campo]), "tom": tom_nivel(ult[campo]),
+                                                     "dica": f"a última leitura: {ult[campo]} ({NIVEL_TXT.get(ult[campo], '')}) em {_dm(ult['data'])}"}
+                                                    if ult else {"txt": "—", "tom": "", "dica": "nenhuma leitura na janela (as rondas ficam 90 dias)"})}
         # o PR e a disponibilidade: o mês sem dado no banco diz "sem dado" (nunca 0)
         um, ue = u.get("meses") or {}, u.get("com_expurgo") or {}
-        cels_pr, cels_disp, prs, disps = {}, {}, [], []
+        cels_pr, cels_disp, prs, disps, metas_u = {}, {}, [], [], []
         for m in ms:
             mid = m["id"]
             if mid > mes_hoje:
@@ -197,9 +235,10 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
             exp = (ue.get(mid) or {}).get("disp")
             disp = exp if exp is not None else bruta
             parcial = " (mês em curso)" if mid == mes_hoje else ""
-            tpr = tom_kpi(pr, meta_pr)
+            meta_u = meta_pr if meta_pr is not None else (metas_pr.get(uid) or {}).get(mid)
+            tpr = tom_kpi(pr, meta_u)
             cels_pr[mid] = {"txt": _br(pr) if pr is not None else "s/d", "tom": tpr,
-                            "dica": (f"PR {_br(pr)}%" + (f"; meta {_br(meta_pr)}%" if meta_pr is not None else "; sem meta de PR")
+                            "dica": (f"PR {_br(pr)}%" + (f"; meta {_br(meta_u)}%" if meta_u is not None else "; sem meta de PR")
                                      + parcial) if pr is not None else ("leitura errada: o PR publicado passa de 100%" if errado
                                                                 else "a Performance não publicou o PR do mês")}
             teve = exp is not None and bruta is not None and round(exp, 2) != round(bruta, 2)
@@ -211,7 +250,10 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
             if pr is not None:
                 prs.append(pr)
                 pr_mes_contrato[mid].append((pr, mwp))
-                if meta_pr is not None and pr < meta_pr:
+                if meta_u is not None:
+                    meta_mes_contrato[mid].append((meta_u, mwp))
+                    metas_u.append(meta_u)
+                if meta_u is not None and pr < meta_u:
                     fora_pr += 1
                     fora_u += 1
                     fora_kpi_u += 1
@@ -226,8 +268,10 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
                     fora_kpi_u += 1
         acum_pr = round(sum(prs) / len(prs), 1) if prs else None
         acum_disp = round(sum(disps) / len(disps), 1) if disps else None
+        meta_ac = meta_pr if meta_pr is not None else (round(sum(metas_u) / len(metas_u), 1) if metas_u else None)
         linhas["pr"] = {"cels": cels_pr, "acum": {"txt": _br(acum_pr) if acum_pr is not None else "s/d",
-                                                  "tom": tom_kpi(acum_pr, meta_pr), "dica": f"a média dos {len(prs)} meses com PR"}}
+                                                  "tom": tom_kpi(acum_pr, meta_ac),
+                                                  "dica": f"a média dos {len(prs)} meses com PR" + (f"; meta {_br(meta_ac)}%" if meta_ac is not None else "")}}
         linhas["disp"] = {"cels": cels_disp, "acum": {"txt": _br(acum_disp) if acum_disp is not None else "s/d",
                                                       "tom": tom_kpi(acum_disp, meta_disp), "dica": f"a média dos {len(disps)} meses com dado"}}
         out_us.append({"uid": uid, "usina": u.get("usina"), "mwp": mwp, "fora": fora_u, "fora_kpi": fora_kpi_u,
@@ -250,21 +294,35 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
                       "acum": {"txt": f"{feitas}/{minimo}" if minimo else (str(feitas) if feitas else "—"),
                                "tom": ("ok" if feitas >= minimo else ("critico" if ano_fechado else "alerta")) if minimo else "",
                                "dica": f"{feitas} feitas; mínimo somado das usinas com contrato de zeladoria: {minimo}"}})
+    for chave, nome in (("veg", "Vegetação na ronda"), ("suj", "Sujidade na ronda")):
+        cels = {m["id"]: ({"txt": str(tot_rd[chave][m["id"]]), "tom": "alerta", "dica": "usinas com nível 4 ou 5 no mês"}
+                          if tot_rd[chave].get(m["id"]) else {"txt": "—", "tom": "", "dica": "nenhuma usina com nível 4 ou 5"}) for m in ms}
+        agora = sum(1 for u in out_us if next(l for l in u["linhas"] if l["id"] == chave)["acum"]["tom"] in ("alerta", "critico"))
+        pos = 4 if chave == "veg" else 6
+        total.insert(pos, {"id": chave, "nome": nome, "grupo": "manut", "sub": "usinas em alerta", "cels": cels,
+                           "acum": {"txt": str(agora) if agora else "—", "tom": "alerta" if agora else "",
+                                    "dica": "usinas com a última leitura em 4 ou 5"}})
+    meta_c = {mid: (meta_pr if meta_pr is not None else _media_pesada(v)) for mid, v in meta_mes_contrato.items()}
     pr_c = {mid: _media_pesada(v) for mid, v in pr_mes_contrato.items()}
     disp_c = {mid: _media_pesada(v) for mid, v in disp_mes_contrato.items()}
-    for chave, nome, vals, meta in (("pr", "PR do contrato", pr_c, meta_pr), ("disp", "Disponibilidade expurgada", disp_c, meta_disp)):
+    metas_ok = [v for v in meta_c.values() if v is not None]
+    meta_pr_ac = meta_pr if meta_pr is not None else (round(sum(metas_ok) / len(metas_ok), 1) if metas_ok else None)
+    for chave, nome, vals, meta in (("pr", "PR do contrato", pr_c, None), ("disp", "Disponibilidade expurgada", disp_c, meta_disp)):
         cels = {}
         for m in ms:
             v = vals.get(m["id"])
+            mm = meta_c.get(m["id"]) if chave == "pr" else meta
             if m["id"] > mes_hoje:
                 cels[m["id"]] = {"txt": "", "tom": "", "dica": ""}
             elif m["id"] not in meses_com_dado:
                 cels[m["id"]] = {"txt": "s/d", "tom": "", "dica": "sem dado no banco antes de 10/2026"}
             else:
-                cels[m["id"]] = {"txt": _br(v) if v is not None else "s/d", "tom": tom_kpi(v, meta), "dica": "ponderado pela potência das usinas"}
+                cels[m["id"]] = {"txt": _br(v) if v is not None else "s/d", "tom": tom_kpi(v, mm),
+                                 "dica": "ponderado pela potência das usinas" + (f"; meta {_br(mm)}%" if mm is not None else "")}
         ac = _media_pesada([(v, 1.0) for v in vals.values() if v is not None])
+        ma = meta_pr_ac if chave == "pr" else meta
         total.append({"id": chave, "nome": nome, "grupo": "kpi", "sub": "% ponderado", "cels": cels,
-                      "acum": {"txt": _br(ac) if ac is not None else "s/d", "tom": tom_kpi(ac, meta), "dica": "a média dos meses com dado"}})
+                      "acum": {"txt": _br(ac) if ac is not None else "s/d", "tom": tom_kpi(ac, ma), "dica": "a média dos meses com dado"}})
     tp = {s: [sum(v[0] for v in tot_prev[s].values()), sum(v[1] for v in tot_prev[s].values())] for s in SIGLAS}
     pr_ac = next((l["acum"]["txt"] for l in total if l["id"] == "pr"), "s/d")
     disp_ac = next((l["acum"]["txt"] for l in total if l["id"] == "disp"), "s/d")
@@ -280,8 +338,10 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
                 return "futuro"
             return "vazio" if c["txt"] in ("", "s/d") else "neutro"      # o mês com número e sem meta: cinza claro
         return [{"rot": m["rot"], "txt": linha["cels"][m["id"]]["txt"], "tom": tom(m)} for m in ms]
-    abaixo = {chave: [m["rot"] for m in ms if (v := vals.get(m["id"])) is not None and meta is not None and v < meta]
-              for chave, vals, meta in (("pr", pr_c, meta_pr), ("disp", disp_c, meta_disp))}
+    abaixo = {"pr": [m["rot"] for m in ms if (v := pr_c.get(m["id"])) is not None and meta_c.get(m["id"]) is not None and v < meta_c[m["id"]]],
+              "disp": [m["rot"] for m in ms if (v := disp_c.get(m["id"])) is not None and meta_disp is not None and v < meta_disp]}
+    if mt["pr"] is None and meta_pr_ac is not None:
+        mt = {**mt, "pr": {"pct": meta_pr_ac, "origem": "da BD Performance, por usina e mês (a média da janela)"}}
     sem_exp = _media_pesada([(v, 1.0) for v in (_media_pesada(x) for x in bruta_mes_contrato.values()) if v is not None])
 
     def tom_feitas(f, t):

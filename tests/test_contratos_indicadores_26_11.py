@@ -50,10 +50,12 @@ def test_as_metas_do_contrato_lido_e_o_numero_dos_dados_vence():
         {"categoria": "Disponibilidade e desempenho", "nome": "Disponibilidade garantida", "vigente": "Mínimo de 98,5% ao mês"},
         {"categoria": "Disponibilidade e desempenho", "nome": "PR mínimo", "vigente": "PR de 78% no ano"}]}]}
     m = I.metas({}, ficha)
-    assert m["disp"]["pct"] == 98.5 and m["pr"]["pct"] == 78.0 and m["pr"]["origem"].startswith("do contrato")
+    # o PR lido do PDF saiu: a meta de PR é a da BD Performance, por usina e mês (Levi, 26/11/2026)
+    assert m["disp"]["pct"] == 98.5 and m["pr"] is None
     m = I.metas({"meta_pr": 80.0}, ficha)
     assert m["pr"] == {"pct": 80.0, "origem": "dos Dados do contrato"}
-    assert I.metas({}, None) == {"pr": None, "disp": None}
+    # sem garantia no contrato: 99% (Levi: "As que faltam, bota 99%")
+    assert I.metas({}, None) == {"pr": None, "disp": {"pct": 99.0, "origem": "padrão da Grid (99%)"}}
 
 
 def _montar(**k):
@@ -128,6 +130,10 @@ def test_a_rota_dos_indicadores(carga, cliente, relogio, monkeypatch):  # noqa: 
     monkeypatch.setattr(GT, "dados_gerencial_sem_esperar", lambda: g)
     monkeypatch.setattr(CT, "_fontes_da_ligacao", lambda cli, uids, ano: (
         {7: {"MPM": {"2026-10": [1, 1]}}}, {}, {7: {}}, {"pcm": {"ligadas": 1, "total": 2}}, []))
+    monkeypatch.setattr(CT, "_metas_pr_bd", lambda uids, nomes: {7: {"2026-10": 82.0}})
+    monkeypatch.setattr(CT, "_rondas_das_usinas", lambda uids: {7: [{"data": "2026-10-03", "sujidade": 4, "vegetacao": 2, "os": "900", "tipo": "", "validada": False}]})
+    from nexus.campo import visao as _v
+    monkeypatch.setattr(_v, "_Base", lambda: None)
     cliente.application.extensions.pop("nexus_contratos_indicadores", None)
     d = adm.get("/t/comando/contratos/indicadores.json", query_string={"cliente": "Solar Alfa"}).get_json()
     # o padrão são os últimos 12 meses até o mês de hoje (Levi: "puxa pelos últimos 12 meses até atualmente")
@@ -155,7 +161,7 @@ def test_a_tela_dos_indicadores(cliente):
     js = r.get_data(as_text=True)
     r.close()
     for t in ('["indicadores", "Indicadores"]', "function rIndicadores(c)", "indicadores.json?cliente=", "function fatoAniv(c)",
-              '"Só KPIs"', '"Só manutenções"', "data-ind-ano", "data-ind-usina", "sem dado no banco", "Últimos 12 meses", "ind-cinco", "data-cel", "function abrirGaveta(c, cel)", "data-os-abrir", "NexusOsCard"):
+              '"Só KPIs"', '"Só manutenções"', "data-ind-ano", "data-ind-usina", "sem dado no banco", "Últimos 12 meses", "ind-cinco", "data-cel", "function abrirGaveta(c, cel)", "data-os-abrir", "NexusOsCard", "As leituras das rondas", "nível 1 a 5"):
         assert t in js, t
 
 
@@ -213,3 +219,25 @@ def test_a_gaveta_da_celula_explica_com_as_os(carga, cliente, relogio, monkeypat
     assert adm.get("/t/comando/contratos/indicadores/celula.json", query_string=dict(q, linha="nada")).status_code == 404
     assert adm.get("/t/comando/contratos/indicadores/celula.json", query_string=dict(q, uid="8")).status_code == 404
     assert adm.get("/t/comando/contratos/indicadores/celula.json", query_string=dict(q, mes="2020-01")).status_code == 404
+
+
+def test_a_meta_de_pr_da_bd_e_a_vegetacao_e_a_sujidade_da_ronda():
+    """A meta de PR por usina e mês da BD Performance (Levi, 26/11/2026: "As metas de PR, você vai entrar na BD
+    Performance"); a vegetação e a sujidade das rondas do Usinas 360° ("Isso daí aparece bastante")."""
+    rondas = {1: [{"data": "2026-10-05", "sujidade": 2, "vegetacao": 5}, {"data": "2026-10-20", "sujidade": 4, "vegetacao": 3},
+                  {"data": "2026-11-02", "sujidade": 1, "vegetacao": None}]}
+    d = _montar(contrato={}, metas_pr={1: {"2026-10": 78.0, "2026-11": 78.0}, 2: {"2026-10": 80.0}}, rondas=rondas)
+    z1 = next(u for u in d["usinas"] if u["uid"] == 1)
+    pr = _linha(z1, "pr")["cels"]
+    assert pr["2026-10"]["tom"] == "critico" and "meta 78,0%" in pr["2026-10"]["dica"] and pr["2026-11"]["tom"] == "ok"
+    assert d["metas"]["pr"]["origem"].startswith("da BD Performance") and d["metas"]["disp"]["pct"] == 99.0
+    veg, suj = _linha(z1, "veg"), _linha(z1, "suj")
+    assert (veg["cels"]["2026-10"]["txt"], veg["cels"]["2026-10"]["tom"]) == ("5", "critico")
+    assert (suj["cels"]["2026-10"]["txt"], suj["cels"]["2026-10"]["tom"]) == ("4", "alerta")
+    assert veg["acum"]["txt"] == "3" and suj["acum"]["txt"] == "1"          # a última leitura
+    assert [l["id"] for l in z1["linhas"]] == ["MPM", "MPS", "MPA", "rocada", "veg", "lavagem", "suj", "pr", "disp"]
+    tot = {l["id"]: l for l in d["total"]}
+    assert [l["id"] for l in d["total"]] == ["MPM", "MPS", "MPA", "rocada", "veg", "lavagem", "suj", "pr", "disp"]
+    assert tot["veg"]["cels"]["2026-10"]["txt"] == "1" and tot["suj"]["cels"]["2026-10"]["txt"] == "1"
+    # o PR do contrato no mês contra a meta do mês pela potência: (78 × 3 + 80 × 1) / 4 = 78,5; o PR 76,8 fica amarelo
+    assert tot["pr"]["cels"]["2026-10"]["tom"] == "alerta" and "78,5" in tot["pr"]["cels"]["2026-10"]["dica"]
