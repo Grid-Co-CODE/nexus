@@ -498,7 +498,7 @@
       var e = ESTADO[i.veredito], grupo = e && e.grupo, v = vals[k];
       if (v != null && (menor < 0 || v < vals[menor])) { menor = k; }
       return {
-        id: i.id, nome: nomeDoInversor(i), kw: num(i.pac), valor: base(i), rotulo: e && !o.semEstado ? e.rotulo : null,
+        id: i.id, nome: nomeDoInversor(i), serial: serialDoInversor(i), kw: num(i.pac), valor: base(i), rotulo: e && !o.semEstado ? e.rotulo : null,
         fracao: v == null || topo <= 0 ? 0 : Math.max(0, Math.min(1, v / topo)),
         pct: porNominal && v != null && !energia ? Math.round(v * 100) : null,
         porKw: porNominal && v != null && energia ? v : null,
@@ -568,6 +568,7 @@
     releSemMedicao: releSemMedicao, releDesequilibrio: releDesequilibrio, releFaseDoCodigo: releFaseDoCodigo, releDisjuntor: releDisjuntor,
     ehDoSunop: ehDoSunop, barrasDaUsina: barrasDaUsina, resumoDasBarras: resumoDasBarras, medianaDe: medianaDe,
     energiaDaSerie: energiaDaSerie, valorDaBarra: valorDaBarra, textoDaMediana: textoDaMediana, kwh: kwh,
+    serialDoInversor: serialDoInversor, textoDoSerial: textoDoSerial,
     vistaGuardada: vistaGuardada, guardarVista: guardarVista, CHAVE_DA_VISTA: CHAVE_DA_VISTA };
   if (typeof document === "undefined") { return; }       // no node (o teste), só as contas
 
@@ -1070,7 +1071,7 @@
       var h = x.tom === "sem" ? 4 : Math.max(1.5, x.fracao * (H - 2));
       var r = el("rect", { class: "cos-barra cos-barra--" + x.tom, x: k * 10 + 1, y: H - h, width: 8, height: h }, svg);
       var t = el("title", {}, r);
-      t.textContent = x.nome + " · " + (x.kw == null ? "sem medida" : kw(x.kw)) + (x.pct != null ? " (" + x.pct + "% da nominal)" : "") + (x.rotulo ? " · " + x.rotulo : "");
+      t.textContent = x.nome + (x.serial ? " (S/N " + x.serial + ")" : "") + " · " + (x.kw == null ? "sem medida" : kw(x.kw)) + (x.pct != null ? " (" + x.pct + "% da nominal)" : "") + (x.rotulo ? " · " + x.rotulo : "");
     });
     if (b.mediana != null && gerando) {
       var y = H - b.mediana * (H - 2);
@@ -1276,6 +1277,14 @@
     return (c.inversores || []).slice().sort(function (a, b) { return (ORDEM[a.veredito] || 9) - (ORDEM[b.veredito] || 9) || a.modbus_id - b.modbus_id; });
   }
   function nomeDoInversor(i) { return i.nome || ("Inversor " + i.modbus_id); }
+  // O NÚMERO DE SÉRIE (26/11/2026, pedido do dono): o coletor 2026.11.26.1 lê o serial do próprio equipamento, e a Ronda
+  // COS o manda em `numero_serie` em cada inversor de `/geracao/scada` (a chave nem vem quando não há). A tela escreve
+  // "S/N <serial>" ao lado do nome, apagado e menor, só quando há; sem serial, nada muda.
+  function serialDoInversor(i) {
+    var s = i && i.numero_serie != null ? String(i.numero_serie).trim() : "";
+    return s || null;
+  }
+  function textoDoSerial(i) { var s = serialDoInversor(i); return s ? "S/N " + s : ""; }
   function motivoDoEstado(i, e) {
     if (e.grupo === "semcom") { return ehDoSunop(i) ? "o portal SunOP acusa falha de comunicação: pode estar gerando" : "não responde ao SCADA: pode estar gerando"; }
     return i.veredito === "FALHA" ? (i.descricao_falha || i.estado) : (e.grupo ? i.estado : "");
@@ -1550,6 +1559,7 @@
         p.abrir = document.createElement("button"); p.abrir.type = "button"; p.abrir.className = "cos-inv-i-abrir";
         p.abrir.setAttribute("aria-label", "Abrir o detalhe do " + nome + ": a curva e as entradas");
         var nb = document.createElement("b"); nb.textContent = nome; p.abrir.appendChild(nb);
+        if (textoDoSerial(i)) { var snb = document.createElement("small"); snb.className = "cos-inv-sn"; snb.textContent = textoDoSerial(i); p.abrir.appendChild(snb); }
         var seta = document.createElement("span"); seta.setAttribute("aria-hidden", "true"); seta.textContent = "›"; p.abrir.appendChild(seta);
         cab.appendChild(p.abrir);
         p.art.title = "Abrir o detalhe do " + nome;
@@ -1565,7 +1575,9 @@
         p.art.addEventListener("pointerenter", preCarregarHist);
         p.art.addEventListener("focusin", preCarregarHist);
       } else {
-        var b = document.createElement("b"); b.textContent = nome; cab.appendChild(b);
+        var b = document.createElement("b"); b.textContent = nome;
+        var nomeEl = document.createElement("span"); nomeEl.className = "cos-inv-i-nome"; nomeEl.appendChild(b); cab.appendChild(nomeEl);
+        if (textoDoSerial(i)) { var sn = document.createElement("small"); sn.className = "cos-inv-sn"; sn.textContent = textoDoSerial(i); nomeEl.appendChild(sn); }
       }
       p.kv = document.createElement("span"); p.kv.className = "cos-inv-i-kw"; cab.appendChild(p.kv);
       p.art.appendChild(cab);
@@ -1590,7 +1602,7 @@
   function atualizar(c, cv) {
     cv = cv || SEM_CURVA;
     var gerando = c.situacao && c.situacao.chave === "GERANDO";
-    var sig = ordenados(c).map(function (i) { return i.id + "=" + i.veredito; }).join(",") + (c.reles && c.reles.length ? "|reles:" + c.reles.map(function (r) { return r.cabine || ""; }).join(",") : "");
+    var sig = ordenados(c).map(function (i) { return i.id + "=" + i.veredito + "#" + (serialDoInversor(i) || ""); }).join(",") + (c.reles && c.reles.length ? "|reles:" + c.reles.map(function (r) { return r.cabine || ""; }).join(",") : "");
     if (!partes || sig !== assinatura) { assinatura = sig; montar(c); }
     graficos = [];
     var porId = {};
@@ -1667,7 +1679,7 @@
         } }, larguras[i.id]);
       var mx = null;
       (porId[i.id] || []).forEach(function (q) { if (q[1] != null && (!mx || q[1] > mx[1])) { mx = q; } });
-      linhas.push([nomeDoInversor(i), e.rotulo, kw(i.pac), mx ? kw(mx[1]) + " às " + hhmm(mx[0]) : "—",
+      linhas.push([nomeDoInversor(i) + (textoDoSerial(i) ? " · " + textoDoSerial(i) : ""), e.rotulo, kw(i.pac), mx ? kw(mx[1]) + " às " + hhmm(mx[0]) : "—",
         hoje && i.geracao_dia != null ? fmtKW.format(i.geracao_dia) + " kWh" : "—"]);
     });
     if (emBarras) {
@@ -1716,11 +1728,17 @@
       vazio.textContent = o.carregando ? "lendo a curva gravada do dia…" : "sem a leitura dos inversores agora";
       host.appendChild(vazio); return;
     }
-    var n = b.barras.length, maxNome = 0;
-    b.barras.forEach(function (x) { maxNome = Math.max(maxNome, String(x.nome).length); });
+    var n = b.barras.length, maxNome = 0, maxSerial = 0;
+    b.barras.forEach(function (x) {
+      maxNome = Math.max(maxNome, String(x.nome).length);
+      if (x.serial) { maxSerial = Math.max(maxSerial, ("S/N " + x.serial).length); }
+    });
     var ml = 60, mr = 10, mt = 20, iw = w - ml - mr, passo = iw / n;
-    var gira = maxNome * 6.2 > passo - 4;                 // o nome que não cabe na largura da coluna vai inclinado
-    var mb = gira ? Math.min(96, 14 + maxNome * 5.2) : 28, h = 200 + mb, ih = h - mt - mb;
+    // o nome (ou o S/N, menor) que não cabe na largura da coluna vai inclinado; sem serial, a conta de antes
+    var gira = maxNome * 6.2 > passo - 4 || maxSerial * 5.6 > passo - 4;
+    var mb = !gira ? (maxSerial ? 40 : 28)
+      : maxSerial ? Math.min(150, 18 + 0.82 * (maxNome * 6.2 + 18 + maxSerial * 5.6)) : Math.min(96, 14 + maxNome * 5.2);
+    var h = 200 + mb, ih = h - mt - mb;
     var teto = tetoBonito(b.topo > 0 ? b.topo : 1, 4), bw = Math.max(2, Math.min(44, passo * 0.68));
     var y = function (v) { return mt + ih - Math.max(0, Math.min(1, v / teto)) * ih; };
     var svg = el("svg", { viewBox: "0 0 " + w + " " + h, width: w, height: h, class: "pg cos-inv-barras-svg", role: "img",
@@ -1742,8 +1760,13 @@
       var tn = el("text", { class: "cos-inv-barras-rot", x: cx, y: mt + ih + 14, "text-anchor": gira ? "end" : "middle" }, g);
       if (gira) { tn.setAttribute("transform", "rotate(-55 " + cx + " " + (mt + ih + 10) + ")"); }
       tn.textContent = x.nome;
+      if (x.serial) {
+        var ts = el("tspan", { class: "cos-inv-barras-sn" }, tn);
+        if (gira) { ts.textContent = " · S/N " + x.serial; }
+        else { ts.setAttribute("x", cx); ts.setAttribute("dy", 12); ts.textContent = "S/N " + x.serial; }
+      }
       var alvo = el("rect", { class: "cos-inv-barra-alvo", x: x0, y: mt, width: passo, height: ih + mb }, g);
-      el("title", {}, alvo).textContent = x.nome + " · " + valorDaBarra(b, x) + (x.rotulo ? " · " + x.rotulo : "");
+      el("title", {}, alvo).textContent = x.nome + (x.serial ? " (S/N " + x.serial + ")" : "") + " · " + valorDaBarra(b, x) + (x.rotulo ? " · " + x.rotulo : "");
       if (detEl) { alvo.addEventListener("click", function () { abrirInversor(x.id); }); }
     });
     el("line", { class: "pg-base", x1: ml, y1: mt + ih + 0.5, x2: w - mr, y2: mt + ih + 0.5 }, svg);
@@ -1890,7 +1913,7 @@
     }
     var nome = nomeDoInversor(i), hoje = ehHoje(), dia = diaEscolhido, quando = hoje ? "hoje" : "em " + diaCurto(dia);
     escrever(detTitulo, "textContent", nome);
-    escrever(detSub, "textContent", [i.parte, i.modelo].filter(Boolean).join(" · "));
+    escrever(detSub, "textContent", [i.parte, i.modelo, textoDoSerial(i)].filter(Boolean).join(" · "));
     if (!det || det.falta || det.id !== i.id) { var lembrado = lembrarFoco(); montarDetalhe(i); devolverFoco(lembrado); }
     var gerando = c.situacao && c.situacao.chave === "GERANDO";
     var e = ESTADO[i.veredito] || { rotulo: i.veredito || "—", tom: "neutro" };

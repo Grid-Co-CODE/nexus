@@ -326,6 +326,17 @@ def test_sem_a_fonte_nao_ha_seletor_de_barras(logado):
     assert "data-cos-vista-sel" not in logado.get("/t/cos/monitoramento").get_data(as_text=True)
 
 
+def test_o_numero_de_serie_passa_pelo_servidor_do_nexus(ligada, logado, monkeypatch):
+    """26/11/2026, o pedido do dono: o serial de cada inversor na janela da usina. A Ronda COS o manda em `numero_serie`
+    (a chave nem vem quando não há), e o servidor do Nexus repassa o cartão como veio, sem remontar o inversor campo a
+    campo (onde o campo novo sumiria calado)."""
+    scada = {"versao": 1, "configurado": True, "canal_calado": False, "cartoes": [{"pid": "scada-exa01", "inversores": [
+        {"id": "EXA01:1", "modbus_id": 1, "pac": 86, "numero_serie": "EXA0000001"}, {"id": "EXA01:2", "modbus_id": 2, "pac": 84}]}]}
+    _servir(monkeypatch, {"/api/nexus/geracao/scada": scada})
+    invs = logado.get("/t/cos/monitoramento/ronda-api/scada/monitoramento?entradas=separadas").get_json()["cartoes"][0]["inversores"]
+    assert invs[0]["numero_serie"] == "EXA0000001" and "numero_serie" not in invs[1]
+
+
 def test_o_andamento_fora_e_503_com_o_motivo(ligada, logado, monkeypatch):
     _servir(monkeypatch, {"/api/nexus/geracao/scada": AND.FonteErro("o Andamento respondeu 503", 503)})
     r = logado.get("/t/cos/monitoramento/ronda-api/scada/monitoramento")

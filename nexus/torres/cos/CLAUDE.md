@@ -498,6 +498,12 @@ Ignora esse monitoramento que já existe no nexus" (a Performance › Tempo real
   trecho** (`energiaDaSerie`: a curva GRAVADA de 5 em 5 min, cada ponto vale 5 min, nunca a ponta de 3 s), no dia inteiro
   ou no trecho do zoom; num dia que passou, só a energia e sem a cor do estado de agora. Com a nominal de todos, a energia
   vira kWh por kW. Nas barras, as curvas de cada inversor não são desenhadas (a grade está escondida).
+- **O número de série do inversor** (26/11/2026, pedido do dono): o coletor 2026.11.26.1 lê o serial do equipamento, e a
+  Ronda COS o manda em `numero_serie` em cada inversor de `/geracao/scada` (a chave nem vem quando não há; em 26/11 só o
+  BER01 e o RCS estavam na versão nova). O servidor do Nexus repassa o cartão como veio. A janela escreve "S/N <serial>"
+  (`textoDoSerial`) ao lado do nome no cartão do inversor, embaixo do nome nas barras (inclinado, depois dele), na dica da
+  coluna, na tabela e no subtítulo do detalhe; sem serial, nada muda. O serial entra na assinatura da montagem: o que chega
+  com o coletor atualizado aparece sem fechar a janela.
 - **O detalhe de um inversor** (13/11/2026, o dono: "clicar num inversor e ver o gráfico individual desse inversor,
   junto com o gráfico das strings dele, individual ou em grupo, por exemplo por MPPT"): na janela da usina, o inversor é
   botão e troca o corpo pelo detalhe (`.cos-inv-det` no `cos/_inversores.html`; "Voltar à usina" e o Esc voltam, com o

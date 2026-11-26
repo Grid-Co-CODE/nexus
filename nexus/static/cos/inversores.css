@@ -276,3 +276,8 @@ p.cos-inv-mppt-cab{font-weight:600;letter-spacing:.04em;text-transform:uppercase
 .cos-inv-barras-val{fill:var(--tinta-2);font:600 10.5px var(--font-sans);font-variant-numeric:tabular-nums;pointer-events:none}
 .cos-inv-barras-rot{fill:var(--mudo);font:400 10.5px var(--font-sans);pointer-events:none}
 .cos-inv-barras .d{margin:6px 0 0;color:var(--mudo);font-size:12px}
+
+/* O NÚMERO DE SÉRIE (26/11/2026): "S/N <serial>" ao lado do nome do inversor, apagado e menor, só quando o coletor o lê */
+.cos-inv-sn{font-size:11px;font-weight:400;color:var(--mudo);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cos-inv-i-nome{display:inline-flex;align-items:baseline;gap:6px;min-width:0}
+.cos-inv-barras-sn{fill:var(--fraco);font-size:9.5px}

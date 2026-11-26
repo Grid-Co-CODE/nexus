@@ -594,3 +594,37 @@ def test_o_css_das_barras_da_janela_so_com_tokens():
     bloco = css[css.index("CURVAS OU BARRAS NA JANELA"):]
     assert ".cos-inv-grade[hidden]" in bloco and ".cos-inv-barra--fora{fill:var(--critico)}" in bloco
     assert not re.search(r"#[0-9a-fA-F]{3,6}\b|rgba?\(", bloco)
+
+
+# --- o número de série na janela da usina (26/11/2026) -----------------------------------------------------------------
+# O pedido do dono: o serial de cada inversor no Monitoramento do Nexus. O coletor 2026.11.26.1 o lê do equipamento, e a
+# Ronda COS o manda em `numero_serie` (a chave nem vem quando não há). Seriais fictícios.
+
+def test_o_serial_so_quando_ha_e_sem_espaco_sobrando():
+    r = rodar("process.stdout.write(JSON.stringify(JSON.parse(A[0]).map(function (i) { return [N.serialDoInversor(i), N.textoDoSerial(i)]; })));",
+              json.dumps([{"numero_serie": "EXA0000001"}, {"numero_serie": "  EXA0000002 "}, {"numero_serie": ""}, {"numero_serie": None}, {}]))
+    assert r == [["EXA0000001", "S/N EXA0000001"], ["EXA0000002", "S/N EXA0000002"], [None, ""], [None, ""], [None, ""]]
+
+
+def test_as_barras_levam_o_serial_de_cada_inversor():
+    c = {"situacao": {"chave": "GERANDO"}, "inversores": [dict(inv(1, 86), numero_serie="EXA0000001"), inv(2, 84)]}
+    assert [x["serial"] for x in barras(c)["barras"]] == ["EXA0000001", None]
+
+
+def test_o_serial_aparece_no_cartao_nas_barras_na_tabela_e_no_detalhe():
+    texto = JS.read_text(encoding="utf-8")
+    montar = texto[texto.index("function montar(c) {"):]
+    montar = montar[: montar.index("\n  }\n")]
+    # ao lado do nome, nos dois jeitos de montar o cartão (com e sem o detalhe), e só quando há serial
+    assert montar.count("if (textoDoSerial(i)) {") == 2 and montar.count('className = "cos-inv-sn"') == 2
+    atualizar = texto[texto.index("function atualizar(c, cv) {"):]
+    atualizar = atualizar[: atualizar.index("\n  }\n")]
+    assert '"#" + (serialDoInversor(i) || "")' in atualizar                # o serial que chega depois remonta a janela
+    assert 'nomeDoInversor(i) + (textoDoSerial(i) ? " · " + textoDoSerial(i) : "")' in atualizar   # a tabela
+    barras = texto[texto.index("function graficoDeBarras(host, b, o) {"):]
+    barras = barras[: barras.index("\n  }\n")]
+    assert 'el("tspan", { class: "cos-inv-barras-sn" }, tn)' in barras and '"S/N " + x.serial' in barras
+    assert '(x.serial ? " (S/N " + x.serial + ")" : "")' in barras         # a dica da coluna
+    assert "[i.parte, i.modelo, textoDoSerial(i)].filter(Boolean)" in texto   # o subtítulo do detalhe
+    css = (JS.parent / "inversores.css").read_text(encoding="utf-8")
+    assert ".cos-inv-sn{" in css and not re.search(r"#[0-9a-fA-F]{3,6}\b|rgba?\(", css[css.index("O NÚMERO DE SÉRIE"):])
