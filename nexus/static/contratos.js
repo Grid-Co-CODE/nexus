@@ -762,7 +762,7 @@
   // clicáveis e aparecesse a confirmação da resposta no card lateral [...] qual é a OS e tudo mais")
   function celInd(x, ac, cel) {
     if (!x) return "<td></td>";
-    var vazio = x.txt === "—" || x.txt === "s/d";
+    var vazio = x.txt === "—" || x.txt === "s/d" || (x.txt === "não" && !x.tom);   // o "não" sem atenção fica apagado
     return '<td class="r' + (ac ? " ind-ac" : " ind-m") + '">' + (x.txt === "" ? "" : '<button type="button" class="ind' + (x.tom ? " t-" + x.tom : "") + (vazio ? " ind-vazio" : "") + '"' +
       (cel ? ' data-cel="' + esc(cel) + '"' : "") + (x.dica ? ' title="' + esc(x.dica) + '"' : "") + ">" + esc(x.txt) + "</button>") + "</td>";
   }
@@ -785,7 +785,7 @@
     function meta(x) { return x ? '<span class="ind-meta">meta ' + pctTxt(x.pct) + "</span>" : '<span class="ind-meta">sem meta no contrato</span>'; }
     function abaixo(l) { return l && l.length ? " · <b>" + l.length + (l.length === 1 ? " mês" : " meses") + " abaixo da meta</b> (" + esc(l.join(", ")) + ")" : ""; }
     var h = '<div class="ind-cartoes">';
-    h += '<section class="ind-cartao"><h4><i class="ph ph-chart-line-up" aria-hidden="true"></i>PR do contrato · acumulado</h4><div class="ind-val">' + grande(r.pr, r.pr_tom) + meta(mt.pr) + "</div>" +
+    h += '<section class="ind-cartao"><h4><i class="ph ph-chart-line-up" aria-hidden="true"></i>PR expurgado · acumulado</h4><div class="ind-val">' + grande(r.pr, r.pr_tom) + meta(mt.pr) + "</div>" +
       '<p>' + (r.usinas_n || 0) + (r.usinas_n === 1 ? " usina" : " usinas") + ", ponderado pela potência" + abaixo(r.pr_abaixo) + "</p>" + barrinhas(r.pr_barras) + "</section>";
     h += '<section class="ind-cartao"><h4><i class="ph ph-plugs-connected" aria-hidden="true"></i>Disponibilidade expurgada · acumulada</h4><div class="ind-val">' + grande(r.disp, r.disp_tom) + meta(mt.disp) + "</div>" +
       "<p>" + (r.disp_sem_expurgo ? "sem expurgo " + esc(r.disp_sem_expurgo) + "%" : "sem expurgo no ano") + abaixo(r.disp_abaixo) + "</p>" + barrinhas(r.disp_barras) + "</section>";
@@ -849,7 +849,7 @@
     // a legenda: cada amostra do mesmo tamanho, com o valor no meio (Levi: "os valores centralizados [...] tá meio frouxo")
     var LEG = [["t-ok", "1/1", "feita no mês"], ["t-critico", "0/1", "não feita"], ["ind-vazio", "—", "sem plano no mês"], ["t-ok", "12/09", "serviço feito, data"],
       ["t-alerta", "3/4", "feitas / mínimo do contrato"], ["t-ok", "82,1", "na meta"], ["t-alerta", "77,4", "até 2 pontos abaixo"], ["t-critico", "71,0", "abaixo da meta"],
-      ["t-info", "98,9*", "com expurgo no mês"], ["ind-vazio", "s/d", "sem dado no banco"], ["t-alerta", "4", "ronda: vegetação ou sujidade alta (5 = muito alta)"]];
+      ["t-info", "98,9*", "com expurgo no mês"], ["ind-vazio", "s/d", "sem dado no banco"], ["t-alerta", "4", "ronda: vegetação ou sujidade alta (5 = muito alta)"], ["t-alerta", "não", "sem lavagem ou supressão, com o PR expurgado abaixo da meta e a ronda em 4 ou 5"]];
     h += '<div class="ind-legenda">' + LEG.map(function (x) { return '<span><i class="ind ' + x[0] + '">' + esc(x[1]) + "</i>" + esc(x[2]) + "</span>"; }).join("") +
       '<span class="ind-dica-dir">Clique na célula: a gaveta explica o dado, com as OS.</span></div>';
     return h;
@@ -911,13 +911,14 @@
       }).join("") + "</ul>" + (ordem.length > 200 ? '<p class="mudo">E mais ' + (ordem.length - 200) + " OS.</p>" : "");
     } else if (/MPM|MPS|MPA/.test(d.titulo)) h += '<p class="mudo">Nenhuma OS planejada neste mês.</p>';
     if ((d.servicos || []).length) h += "<h3>Os serviços (" + d.servicos.length + ")</h3><ul class=\"ctr-gav-lista\">" + d.servicos.map(function (s) {
-      return '<li><span class="ctr-gav-data">' + dBR(s.data) + '</span><span class="ctr-gav-txt"><b>' + esc(s.servico) + "</b><small>" + esc(s.usina) + "</small></span></li>"; }).join("") + "</ul>";
+      return '<li><span class="ctr-gav-data">' + dBR(s.data) + '</span><span class="ctr-gav-txt"><b>' + esc(s.servico) + "</b><small>" + esc(s.usina) + (s.origem ? " · " + esc(s.origem) : "") + "</small></span>" +
+        (s.os ? '<button type="button" class="ctr-gav-os" data-os-abrir="' + esc(s.id || "") + '" data-os-folio="' + esc(s.os) + '" title="Abrir o card da OS">' + esc(s.os) + "</button>" : "") + "</li>"; }).join("") + "</ul>";
     else if (/Supressão|Lavagem/.test(d.titulo)) h += '<p class="mudo">Nenhum serviço feito neste período.</p>';
     if ((d.rondas || []).length) h += "<h3>As leituras das rondas (" + d.rondas.length + ")</h3><ul class=\"ctr-gav-lista\">" + d.rondas.slice(0, 200).map(function (r) {
       return '<li><span class="ind' + (r.tom ? " t-" + r.tom : "") + '" title="nível de 1 a 5">' + esc(String(r.nivel)) + '</span><span class="ctr-gav-txt"><b>' + esc(r.usina) + " · " + dBR(r.data) + "</b><small>" + esc(r.tipo) + "</small></span>" +
         (r.os ? '<button type="button" class="ctr-gav-os" data-os-abrir="" data-os-folio="' + esc(r.os) + '" title="Abrir o card da OS da ronda">' + esc(r.os) + "</button>" : "") + "</li>"; }).join("") + "</ul>";
     else if (/Vegetação na ronda|Sujidade na ronda/.test(d.titulo)) h += '<p class="mudo">Nenhuma ronda leu isso neste período.</p>';
-    if ((d.usinas || []).length) h += "<h3>Usina a usina</h3><ul class=\"ctr-gav-lista\">" + d.usinas.map(function (u) {
+    if ((d.usinas || []).length) h += "<h3>" + esc(d.usinas_titulo || "Usina a usina") + "</h3><ul class=\"ctr-gav-lista\">" + d.usinas.map(function (u) {
       return '<li><span class="ind' + (u.tom ? " t-" + u.tom : "") + '">' + esc(u.val) + '</span><span class="ctr-gav-txt"><b>' + esc(u.usina) + " · " + esc(u.mes) + "</b>" + (u.extra ? "<small>" + esc(u.extra) + "</small>" : "") + "</span></li>"; }).join("") + "</ul>";
     if ((d.textos || []).length) h += "<h3>O que mais conta</h3>" + d.textos.map(function (x) { return '<p class="ctr-gav-p">' + esc(x) + "</p>"; }).join("");
     if (d.fonte) h += '<h3>De onde vem</h3><p class="ctr-gav-p mudo">' + esc(d.fonte) + "</p>";

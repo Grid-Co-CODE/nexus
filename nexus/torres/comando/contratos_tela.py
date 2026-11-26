@@ -12,6 +12,7 @@ Leitura só para quem está logado e não é cliente; edição só do gestor do 
 """
 import json
 import logging
+import re
 
 from flask import abort, jsonify, redirect, render_template, request, send_file, session
 
@@ -143,6 +144,44 @@ def contratos_dados():
 INDICADORES_S = 60                   # a cópia por contrato e ano: as fontes já têm as delas, esta poupa a montagem
 
 
+def _servicos_feitos(uids: set, nomes, hoje_iso: str, tarefas, abas_radar) -> dict:
+    """{uid: [{tipo, data, servico, rotulo, os, id}]}: a supressão e a lavagem
+    feitas, do Radar (como o Histórico de Serviços as junta) e das OS finalizadas do Fracttal (o arquivo do ano do
+    PCM), sem contar duas vezes o mesmo serviço (`indicadores.juntar_servicos`)."""
+    from ...contratos import indicadores as I
+    radar: dict = {}
+    for sv in I.servicos_do_radar(abas_radar or {}, hoje_iso):
+        uid = nomes.usina(sv["usina"], codigo=sv["codigo"])[0]
+        if uid in uids:
+            radar.setdefault(uid, []).append({**sv, "id": None})
+    frac: dict = {}
+    memo: dict = {}
+    for tr in tarefas or []:
+        if str(tr.get("estado") or "") != "Finalizada":
+            continue
+        tipo = I.tipo_da_tarefa(tr.get("tarefa"))
+        data = str(tr.get("dataFinal") or "")[:10]
+        if not tipo or len(data) != 10 or data > hoje_iso:
+            continue
+        nome = tr.get("usina")
+        if nome not in memo:
+            memo[nome] = nomes.usina(nome, fracttal=nome)[0]
+        if memo[nome] in uids:
+            frac.setdefault(memo[nome], []).append({"tipo": tipo, "data": data, "servico": re.sub(r"^(\[[^\]]*\]\s*)+", "", str(tr.get("tarefa") or "")).strip(" -")[:80],
+                                                   "rotulo": "OS do Fracttal", "os": str(tr.get("os") or ""), "id": tr.get("idWO")})
+    return {uid: I.juntar_servicos(radar.get(uid, []), frac.get(uid, [])) for uid in set(radar) | set(frac)}
+
+
+def _zel_desde(config) -> str | None:
+    """O 1º mês ("AAAA-MM") das tarefas do arquivo do ano do PCM: antes dele, o mês sem supressão ou lavagem é "sem dado"
+    (em 26/11/2026 o arquivo começava em 01/2026)."""
+    from ...pcm import fonte as PF
+    lei = PF.ler_gestao_sem_esperar(config)
+    ms = [str(t.get("dataProg") or "")[:7] for t in ((lei.dados or {}).get("tarefas") or [])] if lei else []
+    ms = [m for m in ms if len(m) == 7]
+    return min(ms) if ms else None
+
+
 def _fontes_da_ligacao(cliente: str, uids: set, ano: dict) -> tuple[dict, dict, dict, dict, list[str]]:
     """(pcm, zel, zel_min, ligacao, avisos) do cliente no ano: as tarefas do PCM e o cronograma do Radar ligados à usina
     pelo nome (`responsaveis.Nomes`, a régua de todo o Nexus: nome que serve a duas usinas não liga). Fonte que não abre
@@ -164,8 +203,10 @@ def _fontes_da_ligacao(cliente: str, uids: set, ano: dict) -> tuple[dict, dict, 
         meses.add(f"{a:04d}-{m:02d}")
         a, m = (a + 1, 1) if m == 12 else (a, m + 1)
     # MPM, MPS e MPA: as tarefas do ano do PCM (a cópia que já está na memória; sem ela, a leitura vem por trás)
+    tarefas = []
     try:
         lei = PF.ler_gestao_sem_esperar(current_app.config)
+        tarefas = ((lei.dados or {}).get("tarefas") or []) if lei else []
         if lei is None:
             avisos.append("as tarefas do PCM ainda estão chegando: as preventivas aparecem em instantes")
         else:
@@ -190,24 +231,24 @@ def _fontes_da_ligacao(cliente: str, uids: set, ano: dict) -> tuple[dict, dict, 
         avisos.append("as tarefas do PCM (MPM, MPS e MPA)")
     # a supressão vegetal e a lavagem: o cronograma do Radar da Zeladoria e o contratual dele (o mínimo por ano)
     try:
-        from ...contratos.indicadores import SERVICOS
+        from ...campo import visao as V
+        from ...contratos.indicadores import servicos_do_radar
         from ...zeladoria import leitura
         est = leitura.estado(current_app.config)
-        linha = next((x for x in est["abas"].get("cronograma_publico", []) if str(x.get("id")) == "cronograma"), None)
-        snap = (linha or {}).get("dados") or {}
-        lig = tot = 0
-        for u in snap.get("usinas") or []:
-            uid = nomes.usina(u.get("usina"))[0]
-            if uid not in uids:
-                tot += 1 if chave_cliente(u.get("cliente")) == chave else 0
-                continue
-            tot += 1
-            lig += 1
-            for h in u.get("historico") or []:
-                for k, servs in SERVICOS.items():
-                    if h.get("servico") in servs and h.get("data"):
-                        zel.setdefault(uid, {}).setdefault(k, []).append(str(h["data"])[:10])
-        ligacao["radar"] = {"ligadas": lig, "total": tot}
+        # os serviços feitos: o Radar (como o Histórico de Serviços os junta) e as OS finalizadas do Fracttal; a usina do
+        # Radar liga à do Nexus pelo nome ou pelo código
+        hoje_iso = V._agora().date().isoformat()
+        vistas, ligadas = set(), set()
+        for sv in servicos_do_radar(est["abas"], hoje_iso):
+            uid = nomes.usina(sv["usina"], codigo=sv["codigo"])[0]
+            if uid in uids or chave_cliente(sv["cliente"]) == chave:
+                vistas.add(sv["usina_radar"])
+            if uid in uids:
+                ligadas.add(sv["usina_radar"])
+        ligacao["radar"] = {"ligadas": len(ligadas), "total": len(vistas)}
+        for uid, lista in _servicos_feitos(uids, nomes, hoje_iso, tarefas, est["abas"]).items():
+            for sv in lista:
+                zel.setdefault(uid, {}).setdefault(sv["tipo"], []).append(sv["data"])
         geral = {}
         for r in est["abas"].get("zeladoria_contratual") or []:
             if chave_cliente(r.get("cliente")) != chave:
@@ -334,7 +375,7 @@ def contratos_indicadores():
             out = I.montar(c, (vis.get("fichas") or {}).get(cliente), ano, usinas, pcm, zel, zel_min, hoje, com_dado,
                            ligacao, avisos + [x for x in g.get("avisos") or []      # só os avisos das fontes desta aba
                                               if any(p in x for p in ("histórico", "disponibilidade", "expurgo", "limitaç", "religamento"))],
-                           metas_pr=metas_pr, rondas=rondas)
+                           metas_pr=metas_pr, rondas=rondas, zel_desde=_zel_desde(current_app.config))
             atual = K.ano_contratual(prim, hoje)
             out["anos"] = [{"n": i, "ini": K.ano_contratual(prim, hoje, i)["ini"], "fim": K.ano_contratual(prim, hoje, i)["fim"]}
                            for i in range(1, atual["n"] + 1)] if atual else []
@@ -352,7 +393,7 @@ def contratos_indicadores():
 # datas, os serviços de zeladoria com a data, o PR e a disponibilidade com a meta, o expurgo e a conta. Só lê: as fontes
 # são as mesmas da aba, nas cópias que já estão na memória.
 _ROT_LINHA = {"MPM": "MPM", "MPS": "MPS", "MPA": "MPA", "rocada": "Supressão vegetal", "lavagem": "Lavagem de módulos",
-              "veg": "Vegetação na ronda", "suj": "Sujidade na ronda", "pr": "PR", "disp": "Disponibilidade expurgada"}
+              "veg": "Vegetação na ronda", "suj": "Sujidade na ronda", "pr": "PR expurgado", "disp": "Disponibilidade expurgada"}
 
 
 def _br(v, casas=1):
@@ -457,21 +498,40 @@ def contratos_indicadores_celula():
                         "checklist da ronda, de 1 (muito baixa) a 5 (muito alta); 4 pede atenção e 5, ação (a régua das Rondas). "
                         "O livro das rondas guarda 90 dias. A OS abre o card do Fracttal.")
     elif linha in ("rocada", "lavagem"):
+        from ...pcm import fonte as PF
         from ...zeladoria import leitura
         est = leitura.estado(current_app.config)
-        ln = next((x for x in est["abas"].get("cronograma_publico", []) if str(x.get("id")) == "cronograma"), None)
-        for u in ((ln or {}).get("dados") or {}).get("usinas") or []:
-            uu = nomes.usina(u.get("usina"))[0]
-            if uu not in alvo:
-                continue
-            for h in u.get("historico") or []:
-                d = str(h.get("data") or "")[:10]
-                if h.get("servico") in I.SERVICOS[linha] and d and d[:7] in ids:
-                    out["servicos"].append({"data": d, "servico": h.get("servico"), "usina": (usinas.get(uu) or {}).get("usina") or ""})
+        lei = PF.ler_gestao_sem_esperar(current_app.config)
+        tarefas = ((lei.dados or {}).get("tarefas") or []) if lei else []
+        for uu, lista in _servicos_feitos(alvo, nomes, hoje.isoformat(), tarefas, est["abas"]).items():
+            for sv in lista:
+                if sv["tipo"] == linha and sv["data"][:7] in ids:
+                    out["servicos"].append({"data": sv["data"], "servico": sv["servico"][:1].upper() + sv["servico"][1:].lower() if sv["rotulo"] != "OS do Fracttal" else sv["servico"],
+                                            "origem": sv["rotulo"], "os": sv["os"], "id": sv.get("id"), "usina": (usinas.get(uu) or {}).get("usina") or ""})
         out["servicos"].sort(key=lambda s: (s["data"], s["usina"]))
-        out["numeros"] = [{"rot": "Feitas", "val": str(len(out["servicos"]))}]
-        out["fonte"] = ("O histórico do cronograma do Radar da Zeladoria (roçagem e poda química são a supressão vegetal; "
-                        "limpeza de módulos, a lavagem). O mínimo do ano vem do contrato da zeladoria de cada UFV.")
+        # feita ou não, sobre o PR expurgado: as usinas do mês sem o serviço, com o PR abaixo da meta e a ronda em 4 ou 5,
+        # lidas da conta da aba que já está na memória (a mesma célula, a mesma dica)
+        copia = (current_app.extensions.get("nexus_contratos_indicadores") or {}).get((cliente, n))
+        for u in ((copia or [0, {}])[1].get("usinas") or []):
+            if u.get("uid") not in alvo:
+                continue
+            ln = next((x for x in u["linhas"] if x["id"] == linha), None) or {}
+            for mid in ids:
+                cel = (ln.get("cels") or {}).get(mid) or {}
+                if cel.get("tom") == "alerta" or (uid_txt != "t" and cel.get("txt") == "não"):
+                    out["usinas"].append({"usina": u.get("usina"), "mes": next(m["rot"] for m in meses if m["id"] == mid),
+                                          "val": "não", "tom": cel.get("tom") or "", "extra": cel.get("dica") or ""})
+        nome_sv = "supressão" if linha == "rocada" else "lavagem"
+        out["usinas_titulo"] = (f"Sem {nome_sv}, com o PR expurgado abaixo da meta e a ronda em 4 ou 5" if uid_txt == "t"
+                                else f"Os meses sem {nome_sv}")
+        em_alerta = sum(1 for x in out["usinas"] if x["tom"] == "alerta")
+        out["numeros"] = [{"rot": "Feitas", "val": str(len(out["servicos"]))}, {"rot": "Não feitas em atenção", "val": str(em_alerta)}]
+        out["fonte"] = ("Os serviços feitos do Radar da Zeladoria, como o Histórico de Serviços os junta (o histórico de serviços, "
+                        "a cotação com a execução terminada, a rota da equipe e a OS de contrato), e as OS finalizadas do Fracttal "
+                        "(as tarefas de limpeza de módulos e de supressão vegetal do ano). A OS do Fracttal a até 10 dias de um "
+                        "serviço do Radar é o mesmo serviço. O mínimo do ano vem do contrato da zeladoria de cada UFV. "
+                        "Em atenção: o mês sem o serviço com o PR expurgado abaixo da meta e a " + ("vegetação" if linha == "rocada" else "sujidade")
+                        + " da ronda em 4 ou 5. A perda de PR por sujeira ou mato não é medida em lugar nenhum, então não há número dela.")
     else:
         mt = I.metas(c, (vis.get("fichas") or {}).get(cliente))
         meta = (mt["pr"] if linha == "pr" else mt["disp"]) or {}
@@ -481,10 +541,11 @@ def contratos_indicadores_celula():
                 mm = (u.get("meses") or {}).get(mid) or {}
                 ex = (u.get("com_expurgo") or {}).get(mid) or {}
                 if linha == "pr":
-                    v = mm.get("pr")
+                    v = ex.get("pr") if ex.get("pr") is not None else mm.get("pr")
                     v = v if v is not None and 0 < v <= I.PR_MAX else None
-                    extra = (f"meta da Performance {_br(mm.get('pr_prev'))}% · geração {_br(mm.get('prod_kwh'), 0)} kWh de "
-                             f"{_br(mm.get('meta_kwh'), 0)} kWh previstos") if mm else ""
+                    extra = ((f"sem o expurgo {_br(mm.get('pr'))}% · " if ex.get("pr") is not None and mm.get("pr") is not None
+                              and round(ex["pr"], 2) != round(mm["pr"], 2) else "")
+                             + f"geração {_br(mm.get('prod_kwh'), 0)} kWh de {_br(mm.get('meta_kwh'), 0)} kWh previstos") if mm else ""
                 else:
                     v = ex.get("disp") if ex.get("disp") is not None else mm.get("disp")
                     extra = f"sem o expurgo {_br(mm.get('disp'))}%" if mm.get("disp") is not None else ""
@@ -500,8 +561,9 @@ def contratos_indicadores_celula():
                                       "val": _br(v) + "%" if v is not None else "s/d", "tom": I.tom_kpi(v, mu), "extra": extra})
         out["numeros"] = [{"rot": "Meta do contrato" if meta else "Meta", "val": (_br(meta["pct"]) + "%") if meta.get("pct") is not None
                            else ("por usina, da BD Performance" if linha == "pr" else "sem meta")}]
-        out["fonte"] = ("A Visão gerencial: o PR e a meta do mês que a Performance publica (desde 10/2026) e a disponibilidade "
-                        "do Fracttal e do COS, com o expurgo do contrato (a queda da rede e a limitação imposta). "
+        out["fonte"] = ("A Visão gerencial: o PR do mês que a Performance publica (desde 10/2026) e a disponibilidade do "
+                        "Fracttal e do COS, os dois com o expurgo do contrato (a queda da rede e a limitação imposta saem da conta; "
+                        "o asterisco marca o mês em que o expurgo mudou o número). "
                         "Meta: " + (meta.get("origem") or ("a da BD Performance (Info Mensal) e da BD Thopen (Dados Mensais 2026), por usina e mês" if linha == "pr" else "o contrato não traz")) + ".")
         if any(i < "2026-10" for i in ids):
             out["textos"].append("Antes de 10/2026 o banco não tem o PR nem a disponibilidade por mês: esses meses ficam sem dado.")

@@ -144,9 +144,29 @@ com asterisco no mês que teve expurgo, sem cor sem meta.
     Nexus acabou de subir), a rota volta `montando` e a página pede de novo a cada 3 s;
   - MPM, MPS e MPA: as tarefas do ano do PCM (`pcm.fonte.ler_gestao_sem_esperar` e `pcm.gestao.classificar`: a sigla no
     nome, o mês da Data Programada, feita = Finalizada), ligadas à usina pelo nome (`responsaveis.Nomes`);
-  - supressão vegetal (roçagem e poda química) e lavagem (limpeza de módulos): o histórico do cronograma do Radar
-    (`cronograma_publico`), pelo nome da usina; o mínimo do ano, o `zeladoria_contratual` do Radar por UFV (só o
-    "fixo"); a linha do portfólio ("82 UFVs") vale para as usinas sem linha própria;
+  - supressão vegetal (roçagem e poda química) e lavagem (limpeza de módulos), de duas fontes juntas
+    (`contratos_tela._servicos_feitos`). O Radar da Zeladoria, como o Histórico de Serviços o junta (Levi, 26/11/2026: "a
+    lavagem de módulos está na parte de zeladoria [...] em histórico de serviços"; `indicadores.servicos_do_radar`, o
+    `analiseTimelinePorUsina` do clone): o histórico de serviços, a cotação com a execução terminada, a rota da equipe e
+    a OS de contrato, o mesmo serviço no mesmo dia uma vez; a usina liga pelo nome ou pelo código. E as OS finalizadas do
+    Fracttal (o arquivo do ano do PCM: "Acompanhamento - Limpeza de Módulos", "Acompanhamento - Supressão Vegetal";
+    `indicadores.tipo_da_tarefa`, a inspeção pré-lavagem fica fora), porque o Radar sozinho é ralo: em 26/11 ele tinha 18
+    lavagens no ano, o Fracttal 49 tarefas de lavagem e 186 de supressão, todas ligadas a uma usina. A OS a até 10 dias
+    de um serviço do mesmo tipo já contado é o mesmo serviço (`indicadores.juntar_servicos`). Com as duas, a Thopen foi
+    de 14 para 27 usina·mês com lavagem e de 65 para 108 com supressão. O mínimo do ano, o `zeladoria_contratual` do
+    Radar por UFV (só o "fixo"); a linha do portfólio ("82 UFVs") vale para as usinas sem linha própria;
+  - **feita ou não, sobre o PR expurgado** (Levi, 26/11/2026: "supressão vegetal e lavagem de módulos tem que mostrar se
+    foi feita ou não sobre o PR expurgado"): o mês com o serviço mostra a data; o mês sem ele, "não", e fica em atenção
+    quando o PR expurgado ficou abaixo da meta e a ronda leu 4 ou 5 (a sujidade para a lavagem, a vegetação para a
+    supressão); a dica traz o PR, a meta e o nível. Antes do 1º mês do arquivo do PCM (`_zel_desde`, 01/2026 em 26/11) é
+    "s/d", porque sem as OS do Fracttal o "não" seria chute. A linha do contrato pinta o mês de atenção e a gaveta lista
+    as usinas. O chat da Performance confirmou (26/11): o expurgo do contrato só tira a queda da rede e a limitação, a
+    sujidade e a vegetação não entram, e a perda de PR por sujeira ou mato não é medida em lugar nenhum; por isso a
+    célula não mostra número de perda. "PR antes e depois da lavagem" (pelo PR diário) é conta nova e precisa de regra
+    aprovada;
+  - o PR é o **expurgado** (o `com_expurgo` da Visão gerencial, `comando/expurgos.py`: a queda da rede e a limitação
+    imposta saem da conta, `pr × (prod + E) ÷ prod`), com asterisco no mês em que o expurgo mudou o número; sem expurgo
+    no mês, o PR publicado. Até 26/11 a linha usava o PR sem expurgo;
   - a meta de PR (26/11/2026, Levi: "As metas de PR, você vai entrar na BD Performance"): por usina e mês, o "PR Previsto
     1° Ano" da aba Info Mensal da BD Performance e o "PR (2026)" da aba Dados Mensais 2026 da BD Thopen
     (`contratos_tela._metas_pr_bd`, ligados pelo nome); o PR do contrato no mês compara com a meta do mês pela potência. O
@@ -180,7 +200,8 @@ com asterisco no mês que teve expurgo, sem cor sem meta.
   `/t/comando/contratos/indicadores/celula.json?cliente=&ano=&uid=&linha=&mes=` (uid `t` = o contrato; mes `acum` = a
   janela). MPM, MPS e MPA: as OS do mês, uma vez cada, com as tarefas dentro (o PCM conta TAREFA a tarefa: uma OS de MPM
   traz a cabine, o inversor, a segurança…), quantas feitas, e a OS abre o card do Fracttal (`NexusOsCard.abrir`, pelo id;
-  sem id, pelo número). Supressão e lavagem: os serviços com a data. PR e disponibilidade: usina a usina, com a meta, o
+  sem id, pelo número). Supressão e lavagem: os serviços com a data, a origem (rota da equipe, OS de contrato, OS do
+  Fracttal…) e a OS clicável. PR e disponibilidade: usina a usina, com a meta, o
   número sem o expurgo e o texto do expurgo (o mesmo da nota da Visão gerencial). Toda gaveta diz de onde vem.
 - **A legenda** são amostras do mesmo tamanho, com o valor no meio, em colunas iguais.
 - **O PR acima de 100% é leitura errada** (`indicadores.PR_MAX`, a régua da Visão gerencial): na prévia de 26/11/2026,
@@ -193,7 +214,7 @@ com asterisco no mês que teve expurgo, sem cor sem meta.
   e as 5 usinas do Radar ligaram todas.
 - **Falta (fase 2):** o relatório de aniversário em PDF, guardado congelado no ano que fechou; o histórico de PR e
   disponibilidade antes de 10/2026 (a Performance); MPM, MPS e MPA no banco (hoje o arquivo do PCM, por nome); o Radar
-  ligado ao cadastro; a ligação contrato × usina para o cliente com vários contratos.
+  ligado ao cadastro; o planejado do Radar (diarista), que não está nas tabelas copiadas; a ligação contrato × usina para o cliente com vários contratos.
 - Prova: `tests/test_contratos_indicadores_26_11.py`.
 
 ## A planilha de controle de obrigações na visão do contrato (16/11/2026; `controle.py`)

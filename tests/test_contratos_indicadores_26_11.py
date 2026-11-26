@@ -241,3 +241,73 @@ def test_a_meta_de_pr_da_bd_e_a_vegetacao_e_a_sujidade_da_ronda():
     assert tot["veg"]["cels"]["2026-10"]["txt"] == "1" and tot["suj"]["cels"]["2026-10"]["txt"] == "1"
     # o PR do contrato no mês contra a meta do mês pela potência: (78 × 3 + 80 × 1) / 4 = 78,5; o PR 76,8 fica amarelo
     assert tot["pr"]["cels"]["2026-10"]["tom"] == "alerta" and "78,5" in tot["pr"]["cels"]["2026-10"]["dica"]
+
+
+def test_os_servicos_de_zeladoria_como_o_historico_do_radar():
+    """A lavagem e a roçada como o Histórico de Serviços do Radar as junta (Levi, 26/11/2026: "a lavagem de módulos está
+    na parte de zeladoria [...] em histórico de serviços"): o histórico, a cotação executada, a rota e a OS de contrato;
+    o mesmo serviço no mesmo dia vale uma vez (o do app vence a planilha); o futuro e o sem data ficam fora."""
+    abas = {
+        "usinas": [{"id": 1, "usina": "ZETA UM - SOLAR", "codigo": "ZT1", "cliente": "Solar Alfa"}],
+        "servicos_zeladoria": [{"usina_id": 1, "tipo": "LIMPEZA DE MÓDULOS", "data_termino": "2026-09-10", "origem": "planilha_historica"},
+                               {"usina_id": 1, "tipo": "ROÇAGEM", "data_termino": "2026-08-01", "origem": "manual", "excluido": True}],
+        "cotacoes": [{"usina": "Zeta Um - Solar", "servico": "LIMPEZA DE MÓDULOS", "data_execucao_fim": "2026-09-10", "numero_os": "501"}],
+        "rota_equipe": [{"usina_id": 1, "servicos": ["ROÇAGEM"], "etapas": {"ROÇAGEM": {"dataExecucaoFim": "2026-10-20", "numeroOs": "777"}}},
+                        {"usina_id": 1, "servicos": ["ROÇAGEM"], "etapas": {}, "concluida": False, "data_fim": "2026-10-25"}],
+        "contrato_os": [{"usina_id": "1", "servico": "LIMPEZA DE MÓDULOS", "data_execucao_fim": "2026-11-05", "numero_os": "888"},
+                        {"usina_id": "1", "servico": "LIMPEZA DE MÓDULOS", "data_execucao_fim": "2026-12-20"}]}
+    s = I.servicos_do_radar(abas, "2026-11-26")
+    assert [(x["tipo"], x["data"], x["rotulo"], x["os"]) for x in s] == [
+        ("lavagem", "2026-09-10", "cotação fechada", "501"),          # a cotação (app) vence a planilha no mesmo dia
+        ("rocada", "2026-10-20", "rota da equipe", "777"),
+        ("lavagem", "2026-11-05", "OS de contrato", "888")]
+    assert all(x["codigo"] == "ZT1" for x in s)
+
+
+def test_a_lavagem_e_a_supressao_nas_os_do_fracttal():
+    """As OS finalizadas do Fracttal somam ao Radar (26/11/2026: o Radar tinha 18 lavagens no ano; o Fracttal, 56 tarefas
+    de limpeza de módulos finalizadas): a inspeção pré-lavagem não é lavagem; a OS a até 10 dias de um serviço já
+    contado é o mesmo serviço; duas tarefas da mesma OS contam uma vez."""
+    assert I.tipo_da_tarefa("Acompanhamento - Limpeza de Módulos") == "lavagem"
+    assert I.tipo_da_tarefa("Acompanhamento - Supressão Vegetal") == "rocada"
+    assert I.tipo_da_tarefa("Inspeção de integridade dos módulos pré-lavagem") is None
+    assert I.tipo_da_tarefa("Troca de string box") is None
+    assert I.tipo_da_tarefa("") is None
+    radar = [{"tipo": "lavagem", "data": "2026-09-10", "rotulo": "cotação fechada", "os": "501"}]
+    frac = [{"tipo": "lavagem", "data": "2026-09-15", "os": "9001"},     # 5 dias do Radar: o mesmo serviço
+            {"tipo": "lavagem", "data": "2026-11-02", "os": "9002"},
+            {"tipo": "lavagem", "data": "2026-11-02", "os": "9002"},     # outra tarefa da mesma OS
+            {"tipo": "lavagem", "data": "2026-11-08", "os": "9003"},     # 6 dias da 9002: a mesma lavagem
+            {"tipo": "rocada", "data": "2026-09-12", "os": "9004"}]      # outro tipo: conta
+    s = I.juntar_servicos(radar, frac)
+    assert [(x["tipo"], x["data"], x["os"]) for x in s] == [
+        ("lavagem", "2026-09-10", "501"), ("rocada", "2026-09-12", "9004"), ("lavagem", "2026-11-02", "9002")]
+
+
+def test_a_lavagem_feita_ou_nao_sobre_o_pr_expurgado():
+    """Levi, 26/11/2026: "supressão vegetal e lavagem de módulos tem que mostrar se foi feita ou não sobre o PR expurgado".
+    O PR da tabela é o expurgado (o `com_expurgo` da Visão gerencial), com asterisco quando o expurgo mudou o número; o
+    mês sem lavagem diz "não", e fica em atenção quando o PR expurgado ficou abaixo da meta e a sujidade da ronda em 4 ou
+    5; antes do 1º mês do arquivo do PCM, "s/d"; o mês que não chegou, em branco."""
+    usinas = [{"uid": 1, "usina": "Zeta 1", "mwp": 3.0,
+               "meses": {"2026-10": {"pr": 74.0, "disp": 99.0}, "2026-11": {"pr": 76.0, "disp": 99.0}},
+               "com_expurgo": {"2026-10": {"disp": 99.0, "pr": 75.0}, "2026-11": {"disp": 99.0, "pr": 76.0}}}]
+    rondas = {1: [{"data": "2026-10-08", "sujidade": 4, "vegetacao": 2}, {"data": "2026-11-05", "sujidade": 5, "vegetacao": 4}]}
+    zel = {1: {"lavagem": ["2026-11-12"], "rocada": []}}
+    d = _montar(usinas=usinas, zel=zel, rondas=rondas, zel_desde="2026-10")
+    z1 = d["usinas"][0]
+    pr = _linha(z1, "pr")["cels"]
+    assert pr["2026-10"]["txt"] == "75,0*" and "sem o expurgo 74,0%" in pr["2026-10"]["dica"]
+    assert pr["2026-11"]["txt"] == "76,0"                                # o expurgo não mudou: sem asterisco
+    lav, roc = _linha(z1, "lavagem")["cels"], _linha(z1, "rocada")["cels"]
+    assert lav["2026-09"]["txt"] == "s/d"                                # antes do arquivo do PCM: sem dado
+    assert (lav["2026-10"]["txt"], lav["2026-10"]["tom"]) == ("não", "alerta")      # PR 75 < 78 e sujidade 4
+    assert "PR expurgado 75,0% (meta 78,0%)" in lav["2026-10"]["dica"] and "sujidade da ronda 4" in lav["2026-10"]["dica"]
+    assert (lav["2026-11"]["txt"], lav["2026-11"]["tom"]) == ("12/11", "ok")         # feita: a data
+    assert (roc["2026-10"]["txt"], roc["2026-10"]["tom"]) == ("não", "")             # vegetação 2: não, sem atenção
+    assert (roc["2026-11"]["txt"], roc["2026-11"]["tom"]) == ("não", "alerta")       # vegetação 4 e PR 76 < 78
+    assert lav["2026-12"]["txt"] == ""                                   # ainda não chegou
+    tot = {l["id"]: l for l in d["total"]}
+    assert tot["lavagem"]["cels"]["2026-10"]["tom"] == "alerta" and "1 sem o serviço" in tot["lavagem"]["cels"]["2026-10"]["dica"]
+    assert (tot["lavagem"]["cels"]["2026-11"]["txt"], tot["lavagem"]["cels"]["2026-11"]["tom"]) == ("1", "ok")
+    assert [l["nome"] for l in d["total"] if l["id"] == "pr"] == ["PR expurgado"]

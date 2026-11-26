@@ -13,9 +13,13 @@ As fontes chegam prontas (a tela as junta, `torres/comando/contratos_tela.py`), 
   `usina_id`); o banco tem esses meses só desde 10/2026 (`diagnostico_mes.PRIMEIRO_MES`);
 - MPM, MPS e MPA: as tarefas do ano do PCM (`pcm.gestao.classificar`: a sigla no nome e o mês da Data Programada; feita =
   "Finalizada"), ligadas à usina pelo nome (`campo.responsaveis.Nomes`);
-- a supressão vegetal (roçagem e poda química) e a lavagem (limpeza de módulos): o histórico do cronograma do Radar da
-  Zeladoria (`cronograma_publico`), pelo nome da usina; o mínimo do ano, o `zeladoria_contratual` do Radar por UFV (só o
-  "fixo": o "sob demanda" não tem mínimo);
+- a supressão vegetal (roçagem e poda química) e a lavagem (limpeza de módulos): o Radar da Zeladoria (como o Histórico
+  de Serviços os junta, `servicos_do_radar`) e as OS finalizadas do Fracttal (`tipo_da_tarefa`, `juntar_servicos`); o
+  mínimo do ano, o `zeladoria_contratual` do Radar por UFV (só o "fixo": o "sob demanda" não tem mínimo). Cada mês diz
+  feita ou não, sobre o PR expurgado (Levi, 26/11/2026: "tem que mostrar se foi feita ou não sobre o PR expurgado"): o mês
+  sem o serviço, com o PR expurgado abaixo da meta e a ronda em 4 ou 5 (sujidade para a lavagem, vegetação para a
+  supressão), fica em atenção. Não há perda por sujidade medida em lugar nenhum (o chat da Performance, 26/11/2026: o
+  expurgo do contrato só tira a rede e a limitação), então a célula não inventa número;
 - as metas: a garantia de disponibilidade e o PR que o contrato lido escreve (as regras de "Disponibilidade e desempenho"),
   ou o que o gestor gravou nos Dados do contrato, que vence.
 
@@ -28,7 +32,6 @@ import re
 from datetime import date
 
 SIGLAS = ("MPM", "MPS", "MPA")
-SERVICOS = {"rocada": ("Roçagem", "Poda química"), "lavagem": ("Limpeza de módulos",)}
 FAIXA = 2.0                                  # pontos abaixo da meta que ainda são amarelo (a régua da sugestão)
 # o PR acima de 100% é leitura errada (a régua da Visão gerencial, `gerencial.PR_MAX`): na 1ª prévia, 26/11/2026, uma
 # usina da Thopen com PR de mais de 1.000% fez o PR do contrato dar 730,5%
@@ -40,7 +43,7 @@ _PCT = re.compile(r"(\d{2,3}(?:[.,]\d+)?)\s*%")
 LINHAS = (("MPM", "MPM", "manut"), ("MPS", "MPS", "manut"), ("MPA", "MPA", "manut"),
           ("rocada", "Supressão vegetal", "manut"), ("veg", "Vegetação na ronda", "manut"),
           ("lavagem", "Lavagem de módulos", "manut"), ("suj", "Sujidade na ronda", "manut"),
-          ("pr", "PR", "kpi"), ("disp", "Disponibilidade expurgada", "kpi"))
+          ("pr", "PR expurgado", "kpi"), ("disp", "Disponibilidade expurgada", "kpi"))
 # a garantia de disponibilidade onde o contrato não traz o número (Levi, 26/11/2026: "Garantia de disponibilidade. Bota
 # 99% para tudo [...] As que faltam, bota 99%")
 DISP_PADRAO = 99.0
@@ -50,6 +53,101 @@ NIVEL_TXT = {1: "muito baixa", 2: "baixa", 3: "média", 4: "alta", 5: "muito alt
 def tom_nivel(n) -> str:
     """A régua das Rondas (`campo.visao.criticidade`): 5 crítico, 4 atenção; 1 a 3, ok."""
     return "" if n is None else ("critico" if n >= 5 else ("alerta" if n == 4 else "ok"))
+
+
+# os serviços de zeladoria feitos, como o Histórico de Serviços e a análise do Radar os juntam (Levi, 26/11/2026: "a
+# lavagem de módulos está na parte de zeladoria. Eu creio que seja em histórico de serviços"): o retrato do cronograma,
+# que a aba lia antes, trazia 28 lavagens; as tabelas, mais (16 no histórico, 33 nas OS de contrato, 9 na rota)
+_TIPO_RADAR = {"ROCAGEM": "rocada", "PODA QUIMICA": "rocada", "LIMPEZA DE MODULOS": "lavagem"}
+_PRIORIDADE = {"app": 3, "manual": 2, "planilha_historica": 1}
+
+
+def _sem_acento(t) -> str:
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", str(t or "")) if unicodedata.category(c) != "Mn").upper().strip()
+
+
+def servicos_do_radar(abas: dict, hoje_iso: str) -> list[dict]:
+    """[{usina_radar, usina, codigo, cliente, tipo ("rocada" | "lavagem"), servico, data, origem, os}]: a mesma conta do
+    `analiseTimelinePorUsina` do clone do Radar. Entram o histórico de serviços (`servicos_zeladoria`), a cotação com a
+    execução terminada, a rota da equipe (o fim do serviço na etapa, ou o fim da rota concluída) e a OS de contrato com a
+    execução terminada; o mesmo serviço na mesma usina e no mesmo dia vale uma vez (o do app vence o manual, que vence o da
+    planilha histórica). Sem data, fora. O planejado (diarista) não está nas tabelas copiadas e fica fora."""
+    usinas = {str(u.get("id")): u for u in abas.get("usinas") or [] if not u.get("excluido")}
+    por_nome = {_sem_acento(u.get("usina")): u for u in usinas.values()}
+    itens = []
+
+    def junta(u, servico, data, origem, rotulo, os_=None):
+        tipo = _TIPO_RADAR.get(_sem_acento(servico))
+        data = str(data or "")[:10]
+        if not u or not tipo or len(data) != 10 or data > hoje_iso:
+            return
+        itens.append({"usina_radar": str(u.get("id")), "usina": u.get("usina") or "", "codigo": u.get("codigo") or "",
+                      "cliente": u.get("cliente") or "", "tipo": tipo, "servico": str(servico).strip(), "data": data,
+                      "origem": origem, "rotulo": rotulo, "os": str(os_ or "")})
+    for s in abas.get("servicos_zeladoria") or []:
+        if not s.get("excluido"):
+            junta(usinas.get(str(s.get("usina_id"))), s.get("tipo"), s.get("data_termino"), s.get("origem") or "manual", "histórico de serviços")
+    for c in abas.get("cotacoes") or []:
+        if not c.get("excluido") and c.get("data_execucao_fim"):
+            junta(por_nome.get(_sem_acento(c.get("usina"))), c.get("servico"), c.get("data_execucao_fim"), "app", "cotação fechada", c.get("numero_os"))
+    for r in abas.get("rota_equipe") or []:
+        if r.get("excluido"):
+            continue
+        u = usinas.get(str(r.get("usina_id")))
+        et = r.get("etapas") if isinstance(r.get("etapas"), dict) else {}
+        for sv in r.get("servicos") or []:
+            ex = et.get(sv) if isinstance(et.get(sv), dict) else {}
+            fim = ex.get("dataExecucaoFim")
+            data = fim if fim and str(fim)[:10] <= hoje_iso else ((r.get("data_fim") or r.get("data_inicio")) if r.get("concluida") else None)
+            junta(u, sv, data, "app", "rota da equipe", ex.get("numeroOs"))
+    for o in abas.get("contrato_os") or []:
+        if not o.get("excluido") and o.get("data_execucao_fim"):
+            junta(usinas.get(str(o.get("usina_id"))), o.get("servico"), o.get("data_execucao_fim"), "app", "OS de contrato", o.get("numero_os"))
+    melhor: dict = {}
+    for i in itens:
+        k = (i["usina_radar"], i["servico"].upper(), i["data"])
+        if k not in melhor or _PRIORIDADE.get(i["origem"], 0) > _PRIORIDADE.get(melhor[k]["origem"], 0):
+            melhor[k] = i
+    return sorted(melhor.values(), key=lambda i: (i["data"], i["usina"]))
+
+
+# a lavagem e a supressão nas OS finalizadas do Fracttal (26/11/2026): o Radar juntava 18 lavagens no ano; o arquivo do
+# ano do PCM tinha 56 tarefas de limpeza de módulos finalizadas ("Acompanhamento - Limpeza de Módulos") e 194 de
+# supressão. A inspeção "pré-lavagem" não é lavagem.
+_RX_LAVAGEM = re.compile(r"limpeza (de |dos )?modulo|lavagem")
+_RX_ROCADA = re.compile(r"supressao|rocada|rocagem|poda quimica")
+_RX_NAO = re.compile(r"inspecao|pre-lavagem|pre lavagem")
+JANELA_MESMO_SERVICO = 10                    # dias: a OS do Fracttal perto de um serviço do Radar é o mesmo serviço
+
+
+def tipo_da_tarefa(tarefa) -> str | None:
+    """"lavagem", "rocada" ou None para o nome da tarefa do Fracttal."""
+    t = _sem_acento(tarefa).lower()
+    if _RX_NAO.search(t):
+        return None
+    if _RX_LAVAGEM.search(t):
+        return "lavagem"
+    if _RX_ROCADA.search(t):
+        return "rocada"
+    return None
+
+
+def juntar_servicos(radar: list[dict], fracttal: list[dict]) -> list[dict]:
+    """Os serviços do Radar e as OS do Fracttal, numa lista por data, cada um {tipo, data, ...}: a OS do Fracttal a até
+    `JANELA_MESMO_SERVICO` dias de um serviço do mesmo tipo já contado (do Radar, que vale, ou de outra OS do Fracttal:
+    a lavagem de uma usina grande leva dias e mais de uma OS) é o mesmo serviço; duas tarefas da mesma OS contam uma vez."""
+    out = sorted(radar, key=lambda x: x["data"])
+    vistos = {(x["tipo"], x.get("os")) for x in out if x.get("os")}
+    for f in sorted(fracttal, key=lambda x: x["data"]):
+        if (f["tipo"], f.get("os")) in vistos:
+            continue
+        d = date.fromisoformat(f["data"])
+        if any(x["tipo"] == f["tipo"] and abs((date.fromisoformat(x["data"]) - d).days) <= JANELA_MESMO_SERVICO for x in out):
+            continue
+        out.append(f)
+        vistos.add((f["tipo"], f.get("os")))
+    return sorted(out, key=lambda x: x["data"])
 
 
 def ultimos_12_meses(hoje: date) -> dict:
@@ -128,14 +226,15 @@ def _media_pesada(pares) -> float | None:
 
 def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pcm: dict, zel: dict, zel_min: dict,
            hoje: date, meses_com_dado: set[str], ligacao: dict | None = None, avisos: list[str] | None = None,
-           metas_pr: dict | None = None, rondas: dict | None = None) -> dict:
+           metas_pr: dict | None = None, rondas: dict | None = None, zel_desde: str | None = None) -> dict:
     """O que a aba lê.
 
     `usinas` = as do cliente na Visão gerencial: [{uid, usina, mwp, meses {"AAAA-MM": {pr, disp, ...}}, com_expurgo
     {"AAAA-MM": {disp, pr}}}]; `pcm` = {uid: {sigla: {"AAAA-MM": [feitas, total]}}}; `zel` = {uid: {"rocada" | "lavagem":
     [datas ISO]}}; `zel_min` = {uid: {"rocada" | "lavagem": n por ano}}; `meses_com_dado` = os meses que o banco de
     performance tem (fora deles, "sem dado"); `metas_pr` = {uid: {"AAAA-MM": PR previsto em %}} (a BD Performance e a BD
-    Thopen); `rondas` = {uid: [{data, sujidade, vegetacao}]} (as leituras das rondas do Usinas 360°)."""
+    Thopen); `rondas` = {uid: [{data, sujidade, vegetacao}]} (as leituras das rondas do Usinas 360°); `zel_desde` =
+    "AAAA-MM", o 1º mês que o arquivo do PCM traz (antes dele, o mês sem serviço é "sem dado", não "não feita")."""
     metas_pr, rondas = metas_pr or {}, rondas or {}
     ms = meses_do_ano(ano)
     mes_hoje = hoje.isoformat()[:7]
@@ -156,6 +255,7 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
         return {"txt": f"{f}/{t}", "tom": tom, "dica": f"{f} tarefas feitas de {t} planejadas (o PCM conta tarefa a tarefa); clique para ver as OS"}
 
     out_us, tot_prev, tot_zel = [], {s: {} for s in SIGLAS}, {"rocada": {}, "lavagem": {}}
+    tot_zel_alerta = {"rocada": {}, "lavagem": {}}         # usinas sem o serviço, com o PR abaixo e a ronda alta
     pr_mes_contrato, disp_mes_contrato = {m["id"]: [] for m in ms}, {m["id"]: [] for m in ms}
     bruta_mes_contrato = {m["id"]: [] for m in ms}
     meta_mes_contrato = {m["id"]: [] for m in ms}             # a meta de PR do mês pela potência das usinas com PR
@@ -179,25 +279,9 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
                                                 "tom": "ok" if t and f >= t else ("critico" if ruim else ""),
                                                 "dica": f"{f} feitas de {t} planejadas no ano contratual" if t else "sem plano no ano"}}
             fora_u += sum(1 for c in cels.values() if c["tom"] == "critico")
-        for chave in ("rocada", "lavagem"):
-            datas = sorted(d for d in (zel.get(uid) or {}).get(chave) or [] if ano["ini"] <= d <= ano["fim"])
-            cels = {}
-            for m in ms:
-                ds = [d for d in datas if d[:7] == m["id"]]
-                if ds:
-                    tot_zel[chave][m["id"]] = tot_zel[chave].get(m["id"], 0) + 1
-                cels[m["id"]] = ({"txt": _dm(ds[0]) + (f" +{len(ds) - 1}" if len(ds) > 1 else ""), "tom": "ok",
-                                  "dica": "feita em " + ", ".join(_dm(d) for d in ds)} if ds else {"txt": "—", "tom": "", "dica": ""})
-            minimo = (zel_min.get(uid) or {}).get(chave)
-            if minimo:
-                tom = "ok" if len(datas) >= minimo else ("critico" if ano_fechado else "alerta")
-                acum = {"txt": f"{len(datas)}/{minimo}", "tom": tom, "dica": f"{len(datas)} feitas de {minimo} no mínimo do contrato"}
-            else:
-                acum = {"txt": str(len(datas)) if datas else "—", "tom": "",
-                        "dica": "o contrato da zeladoria não traz o mínimo desta usina" if datas else "nenhuma no ano"}
-            linhas[chave] = {"cels": cels, "acum": acum}
         leit = sorted((r for r in rondas.get(uid) or [] if ano["ini"] <= str(r.get("data") or "")[:10] <= ano["fim"]),
                       key=lambda r: r["data"])
+        niv = {"veg": {}, "suj": {}}                         # o pior nível do mês, para a célula do serviço
         for chave, campo, nome in (("veg", "vegetacao", "vegetação"), ("suj", "sujidade", "sujidade")):
             cels = {}
             for m in ms:
@@ -206,6 +290,7 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
                     cels[m["id"]] = {"txt": "—", "tom": "", "dica": "nenhuma ronda leu a " + nome + " no mês"}
                     continue
                 pior = max(ns)
+                niv[chave][m["id"]] = pior[0]
                 if pior[0] >= 4:
                     tot_rd[chave][m["id"]] = tot_rd[chave].get(m["id"], 0) + 1
                 cels[m["id"]] = {"txt": str(pior[0]), "tom": tom_nivel(pior[0]),
@@ -218,6 +303,7 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
         # o PR e a disponibilidade: o mês sem dado no banco diz "sem dado" (nunca 0)
         um, ue = u.get("meses") or {}, u.get("com_expurgo") or {}
         cels_pr, cels_disp, prs, disps, metas_u = {}, {}, [], [], []
+        pr_u = {}                                          # {mês: (PR expurgado, meta)}, para a célula do serviço
         for m in ms:
             mid = m["id"]
             if mid > mes_hoje:
@@ -227,20 +313,27 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
                 sem = {"txt": "s/d", "tom": "", "dica": "sem dado no banco: o PR e a disponibilidade por mês começam em 10/2026"}
                 cels_pr[mid] = cels_disp[mid] = sem
                 continue
-            pr = (um.get(mid) or {}).get("pr")
+            # o PR expurgado (o `com_expurgo` da Visão gerencial: a rede e a limitação saem da conta, como na
+            # disponibilidade); sem ele, o PR do mês
+            pr_bruto = (um.get(mid) or {}).get("pr")
+            pr_exp = (ue.get(mid) or {}).get("pr")
+            pr = pr_exp if pr_exp is not None else pr_bruto
             errado = pr is not None and not (0 < pr <= PR_MAX)
             if errado:
                 pr = None
+            teve_pr = pr is not None and pr_bruto is not None and round(pr, 2) != round(pr_bruto, 2)
             bruta = (um.get(mid) or {}).get("disp")
             exp = (ue.get(mid) or {}).get("disp")
             disp = exp if exp is not None else bruta
             parcial = " (mês em curso)" if mid == mes_hoje else ""
             meta_u = meta_pr if meta_pr is not None else (metas_pr.get(uid) or {}).get(mid)
             tpr = tom_kpi(pr, meta_u)
-            cels_pr[mid] = {"txt": _br(pr) if pr is not None else "s/d", "tom": tpr,
-                            "dica": (f"PR {_br(pr)}%" + (f"; meta {_br(meta_u)}%" if meta_u is not None else "; sem meta de PR")
+            cels_pr[mid] = {"txt": (_br(pr) + ("*" if teve_pr else "")) if pr is not None else "s/d", "tom": tpr,
+                            "dica": (f"PR expurgado {_br(pr)}%" + (f" (sem o expurgo {_br(pr_bruto)}%)" if teve_pr else "")
+                                     + (f"; meta {_br(meta_u)}%" if meta_u is not None else "; sem meta de PR")
                                      + parcial) if pr is not None else ("leitura errada: o PR publicado passa de 100%" if errado
                                                                 else "a Performance não publicou o PR do mês")}
+            pr_u[mid] = (pr, meta_u)
             teve = exp is not None and bruta is not None and round(exp, 2) != round(bruta, 2)
             tdi = "info" if teve else tom_kpi(disp, meta_disp)
             cels_disp[mid] = {"txt": (_br(disp) + ("*" if teve else "")) if disp is not None else "s/d", "tom": tdi,
@@ -266,6 +359,42 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
                     fora_disp += 1
                     fora_u += 1
                     fora_kpi_u += 1
+        # a supressão e a lavagem: feita (a data) ou não, sobre o PR expurgado e a ronda do mês
+        for chave, rd, nome_rd, nome in (("rocada", "veg", "vegetação", "supressão"), ("lavagem", "suj", "sujidade", "lavagem")):
+            datas = sorted(d for d in (zel.get(uid) or {}).get(chave) or [] if ano["ini"] <= d <= ano["fim"])
+            cels = {}
+            for m in ms:
+                mid = m["id"]
+                ds = [d for d in datas if d[:7] == mid]
+                p, mu = pr_u.get(mid, (None, None))
+                nv = niv[rd].get(mid)
+                ctx = ([f"PR expurgado {_br(p)}%" + (f" (meta {_br(mu)}%)" if mu is not None else "")] if p is not None else []) + \
+                      ([f"{nome_rd} da ronda {nv} ({NIVEL_TXT.get(nv, '')})"] if nv is not None else [])
+                ctx_txt = ("; " + "; ".join(ctx)) if ctx else ""
+                if ds:
+                    tot_zel[chave][mid] = tot_zel[chave].get(mid, 0) + 1
+                    cels[mid] = {"txt": _dm(ds[0]) + (f" +{len(ds) - 1}" if len(ds) > 1 else ""), "tom": "ok",
+                                 "dica": "feita em " + ", ".join(_dm(d) for d in ds) + ctx_txt}
+                elif mid > mes_hoje:
+                    cels[mid] = {"txt": "", "tom": "", "dica": "ainda não chegou"}
+                elif zel_desde and mid < zel_desde:
+                    cels[mid] = {"txt": "s/d", "tom": "", "dica": "antes deste mês o arquivo do PCM não tem as OS do Fracttal: sem dado"}
+                else:
+                    alerta = p is not None and mu is not None and p < mu and nv is not None and nv >= 4
+                    if alerta:
+                        tot_zel_alerta[chave][mid] = tot_zel_alerta[chave].get(mid, 0) + 1
+                        fora_u += 1
+                    cels[mid] = {"txt": "não", "tom": "alerta" if alerta else "",
+                                 "dica": (f"sem {nome} no mês" + (" (mês em curso)" if mid == mes_hoje else "") + ctx_txt
+                                          + (f": o PR ficou abaixo da meta com a {nome_rd} alta e sem {nome}" if alerta else ""))}
+            minimo = (zel_min.get(uid) or {}).get(chave)
+            if minimo:
+                tom = "ok" if len(datas) >= minimo else ("critico" if ano_fechado else "alerta")
+                acum = {"txt": f"{len(datas)}/{minimo}", "tom": tom, "dica": f"{len(datas)} feitas de {minimo} no mínimo do contrato"}
+            else:
+                acum = {"txt": str(len(datas)) if datas else "—", "tom": "",
+                        "dica": "o contrato da zeladoria não traz o mínimo desta usina" if datas else "nenhuma no ano"}
+            linhas[chave] = {"cels": cels, "acum": acum}
         acum_pr = round(sum(prs) / len(prs), 1) if prs else None
         acum_disp = round(sum(disps) / len(disps), 1) if disps else None
         meta_ac = meta_pr if meta_pr is not None else (round(sum(metas_u) / len(metas_u), 1) if metas_u else None)
@@ -286,8 +415,13 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
         total.append({"id": s, "nome": s, "grupo": "manut", "cels": cels,
                       "acum": {"txt": f"{f}/{t}" if t else "—", "tom": "ok" if t and f >= t else "", "dica": f"{f} feitas de {t} planejadas"}})
     for chave, nome in (("rocada", "Supressão vegetal"), ("lavagem", "Lavagem de módulos")):
-        cels = {m["id"]: ({"txt": str(tot_zel[chave][m["id"]]), "tom": "ok", "dica": "usinas feitas no mês"}
-                          if tot_zel[chave].get(m["id"]) else {"txt": "—", "tom": "", "dica": ""}) for m in ms}
+        cels = {}
+        for m in ms:
+            f, a = tot_zel[chave].get(m["id"], 0), tot_zel_alerta[chave].get(m["id"], 0)
+            nada = "—" if m["id"] <= mes_hoje else ""
+            dica = (f"{f} {'usina feita' if f == 1 else 'usinas feitas'} no mês" if f else "nenhuma usina feita no mês") + \
+                (f"; {a} sem o serviço com o PR expurgado abaixo da meta e a ronda em 4 ou 5 (clique para ver)" if a else "")
+            cels[m["id"]] = {"txt": str(f) if f else nada, "tom": "alerta" if a else ("ok" if f else ""), "dica": dica}
         feitas = sum(len([d for d in (zel.get(u.get("uid")) or {}).get(chave) or [] if ano["ini"] <= d <= ano["fim"]]) for u in usinas)
         minimo = sum((zel_min.get(u.get("uid")) or {}).get(chave) or 0 for u in usinas)
         total.append({"id": chave, "nome": nome, "grupo": "manut", "sub": "usinas feitas", "cels": cels,
@@ -307,7 +441,7 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
     disp_c = {mid: _media_pesada(v) for mid, v in disp_mes_contrato.items()}
     metas_ok = [v for v in meta_c.values() if v is not None]
     meta_pr_ac = meta_pr if meta_pr is not None else (round(sum(metas_ok) / len(metas_ok), 1) if metas_ok else None)
-    for chave, nome, vals, meta in (("pr", "PR do contrato", pr_c, None), ("disp", "Disponibilidade expurgada", disp_c, meta_disp)):
+    for chave, nome, vals, meta in (("pr", "PR expurgado", pr_c, None), ("disp", "Disponibilidade expurgada", disp_c, meta_disp)):
         cels = {}
         for m in ms:
             v = vals.get(m["id"])
