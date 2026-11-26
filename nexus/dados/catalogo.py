@@ -2296,6 +2296,18 @@ CONHECIDAS = (
               "no outro os números tinham mudado): 1 linha = usina do 5080 × dia de um mês fechado, o número que o "
               "dashboard mostrava na hora de fechar; o 5080 grava no dia 10 do mês seguinte (outubro/2026 fechado na "
               "mão em 13/11) e lê dali, no lugar de qualquer conta (thopen/disp_fechamento.py da plataforma)"),
+    Conhecida("thopen_pvop_disp", ("disp_dia",), "apoio",
+              "a disponibilidade do relatório diário da PV Operation, o monitoramento da Thopen (26/11/2026, conferida com "
+              "a conta da Grid pelas ocorrências do COS): 1 linha = usina da PV Operation × dia, com a usina do 5080 e o "
+              "kWp da parte; a conta Grid sobe o zip do e-mail no 5080, que grava e troca o dia que chega de novo "
+              "(thopen/pvop_relatorio.py da plataforma)"),
+    Conhecida("thopen_pvop_periodo", ("periodo",), "apoio",
+              "os trechos dos inversores do mesmo relatório da PV Operation (26/11/2026): 1 linha = 1 trecho de 10 min ou "
+              "mais de um inversor com potência ativa zerada ou sem comunicação; o 5080 grava junto com o thopen_pvop_disp"),
+    Conhecida("thopen_pvop_justificativa", ("justificativa",), "apoio",
+              "a justificativa da diferença entre a PV Operation e a conta da Grid (26/11/2026): 1 linha = usina do 5080 × "
+              "dia, só o texto e a hora (quem escreveu não vai ao banco), a mais nova vence; a conta Grid escreve na aba "
+              "Conferência PV Operation do 5080"),
     Conhecida("email_tipos_app_campo", ("Tipos",), "apoio",
               "o catálogo dos e-mails automáticos do App (v380, 24/11/2026): uma linha por tipo, com o destino padrão "
               "como PAPEL, se está ligado, de onde vem a regra (Nexus ou App Setting), o modo e os números de 7 dias; "
