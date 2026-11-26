@@ -3412,8 +3412,9 @@ lista central de OS (`rotas_solic._com_a_data_da_os`, pelo id da OS e, sem ele, 
 velha que a janela da lista fica sem a data). O Exportar segue as mesmas colunas. O ativo e a usina vão resumidos (Levi, no
 mesmo dia: "Quando for o inversor, vai ser inversor X. Quando for track, vai ser track X. Não precisa do fabricante. E quando
 for usina, vai ser o nome da usina. Sem estado, sem endereço"): `solic_web.ativo_resumido` é a regra do Histórico de OS
-(`ativo_curto.curto`), com "Estrutura Trackers N" como "Tracker N" e o ativo que é a própria usina ("Cliente - Usina - UF,
-endereço") como o nome dela; a Usina sai sem o cliente e o estado (`usina_curta`). O nome inteiro segue no título da célula,
+(`ativo_curto.curto`), com "Estrutura Trackers N" como "Tracker N" (sem número, só "Tracker": o endereço vem logo depois) e
+o ativo que é a própria usina como o nome dela (no ar ele chega como "Cliente - Usina - UF endereço", o endereço colado na
+UF e sem vírgula: a 1ª versão mostrou "Thopen" em 88 solicitações e foi corrigida no mesmo dia); a Usina sai sem o cliente e o estado (`usina_curta`). O nome inteiro segue no título da célula,
 na busca e na ficha. Tudo centralizado, menos a Usina e a Descrição ("Quero todas as colunas centralizadas, exceto usina. E
 descrição"). Prova: `tests/test_oscreator_solic_no_historico_25_11.py`.
 

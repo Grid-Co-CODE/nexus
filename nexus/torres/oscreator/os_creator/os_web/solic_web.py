@@ -540,13 +540,25 @@ def ativo_resumido(ativo) -> str:
     """O ativo do Histórico de solicitações como se fala dele (Levi, 25/11/2026: "Quando for o inversor, vai ser inversor X.
     Quando for track, vai ser track X. Não precisa do fabricante. E quando for usina, vai ser o nome da usina. Sem estado,
     sem endereço"): a regra do Histórico de OS (`ativo_curto.curto`: até o número, sem marca, sem o código entre chaves e
-    sem o endereço), com "Estrutura Trackers N" como "Tracker N" e o ativo que é a própria usina ("Cliente - Usina - UF",
-    com o endereço depois da vírgula) como o nome dela."""
+    sem o endereço), com "Estrutura Trackers N" como "Tracker N", e o ativo que é a própria usina como o nome dela. O da
+    usina chega como "Cliente - Usina - UF endereço" ("Thopen - Jucurutu 1 - RN RN-118, Zona Rural...", lido no ar em
+    25/11/2026: o endereço vem colado na UF, sem vírgula, e a 1ª versão mostrava "Thopen" em 88 solicitações): a usina é
+    o que fica entre o cliente e a parte que começa pela UF."""
     t = str(ativo or "").split("{")[0].strip()
-    partes = [p.strip() for p in t.split(",")[0].split(" - ") if p.strip()]
-    if len(partes) >= 3 and len(partes[-1]) == 2 and partes[-1].isalpha():
-        return _usina_curta(" - ".join(partes))
-    return re.sub(r"^(?:Estrutura\s+)?Trackers?\b", "Tracker", nomes.curto(t), flags=re.I)
+    partes = t.split(" - ")
+    for k in range(2, len(partes)):
+        if re.match(r"[A-Z]{2}(?![A-Za-z])", partes[k].strip()):
+            usina = " ".join(" - ".join(partes[1:k]).split())
+            if usina:
+                return usina
+            break
+    curto = nomes.curto(t)
+    # o tracker é "Tracker" e o número, quando há: a "Estrutura Trackers" sem número traz o endereço logo depois
+    # ("Estrutura Trackers Campos Belos, Caridade - CE", no ar em 25/11/2026)
+    m = re.match(r"(?:Estrutura\s+)?Trackers?(?![A-Za-z])\s*(\d[\w.\-/]*)?", curto, flags=re.I)
+    if m:
+        return "Tracker" + (" " + m.group(1) if m.group(1) else "")
+    return curto
 
 
 def linha_hist(s: dict) -> dict:

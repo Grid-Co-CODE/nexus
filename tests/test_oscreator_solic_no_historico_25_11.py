@@ -60,6 +60,14 @@ def test_o_ativo_e_a_usina_vem_resumidos_e_as_colunas_centralizadas(cli):
     assert sw.ativo_resumido("Estrutura Trackers 1") == "Tracker 1"
     # o ativo que é a própria usina: o nome dela, sem o cliente, o estado e o endereço
     assert sw.ativo_resumido("Cliente X - Usina Teste 1 - SP, Rua de Teste, 100 { TST-USI }") == "Usina Teste 1"
+    # o formato do ar (lido em 25/11/2026): o endereço colado na UF, sem vírgula, às vezes com espaço dobrado no nome
+    assert sw.ativo_resumido("Cliente X - Usina Teste 2 - RN RN-000, Zona Rural Cidade Teste { TST-USI2 }") == "Usina Teste 2"
+    assert sw.ativo_resumido("Cliente X - Usina  Teste 3 - PA  Cidade Teste  Estado Teste") == "Usina Teste 3"
+    assert sw.ativo_resumido("Cliente X - Usina Teste 4 e 5 - AL FZ. Teste, S/N") == "Usina Teste 4 e 5"
+    assert sw.ativo_resumido("Estrutura Trackers Zona Rural, s/n Cidade Teste") == "Tracker"
+    assert sw.ativo_resumido("Estrutura Trackers Bairro Teste, Cidade Teste - UF, 00000-000") == "Tracker"
+    assert sw.ativo_resumido("Tracker 10.100 Fabricante Teste - 2x(1Px56)") == "Tracker 10.100"
+    assert sw.ativo_resumido("Disjuntor do Transformador (P.E.) 27") == "Disjuntor do Transformador (P.E.) 27"
     assert sw.ativo_resumido("") == "—" and sw.ativo_resumido(None) == "—"                 # sem ativo: o traço
     linhas = {l["id"]: l for l in cli.get("/os/api/solic/historico").get_json()["linhas"]}
     assert linhas[5001]["ativo_resumo"] == "Inversor 1.1" and linhas[5002]["ativo_resumo"] == "Tracker 1"
