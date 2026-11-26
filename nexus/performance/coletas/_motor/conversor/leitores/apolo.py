@@ -24,6 +24,11 @@ Três formatos, um leitor cada:
      no lugar de 0,545). Com a regra nova o supervisório e o datalogger de 1 min batem em +-1,1% nos 92 dias em comum.
    - Temperatura = do MÓDULO pela regra da Tucano (coletar_semp.temp_modulo_solar): média das leituras de 06:00 a
      18:00, -20 a 90 °C, só com leitura em >= 8 das 12 horas; Módulo 1, senão Módulo 2.
+   - Desde 26/11/2026 (export da usina inteira, 01-25/11): POA/GHI em W/m² ("Piranômetro INC - POA", "HOR - GHI")
+     pelo trapézio da ESTM_01, só onde não há acumulada e só em célula vazia; inversores pelo contador "Energia Diária
+     (KWh)" e o Multimedidor pela "Energia Ativa Exp. Diária (MWh)" x 1000, o maior do dia depois da zeragem, só em
+     dia com leitura depois das 18h (`_contador`). Rio do Peixe: RPX (virtual, numeração do BD) primeiro; RPA = grupos
+     1-2, RPB = grupos 3-4.
    A Irecê 2 e a Macaíba 1 (09/11/2026) usam o MESMO export, com a estação "ESTM_01" e o W/m² de 5 em 5 min
    ("Pyranometer POA" / "Pyranometer GHI_1"), sem acumulado e sem a usina no conteúdo: a usina vem do nome do arquivo
    ou da pergunta. Dia = trapézio do W/m² (regras do etm_funcs.py, que reproduzem o BD das duas ao milésimo).
@@ -63,6 +68,10 @@ NOMES_ESTM = (("irece", IRECE), ("macaiba", MACAIBA))
 NOMES_ESTM_FORA = ("cedro", "castelo")
 ESTACAO_APOLO = {"GRA": GRAVATA, "IRA": IRAMAIA, "RPA": RIO, "RPB": RIO, "RPX": RIO}
 ORDEM_RIO = ("RPA", "RPB", "RPX")  # a RPA é a que o script de 06/11 usou; as outras só cobrem dia que falta nela
+ORDEM_W_RIO = ("RPX", "RPA", "RPB")  # W/m² e contadores (26/11/2026): a RPX é a que bate com o BD (ver o ler)
+# Módulo que vale primeiro na temperatura. A Iramaia é o Módulo 2: o BD bate com ele em 12 de 15 dias de 01-15/11/2026
+# (±0,1 °C), e com o Módulo 1 fica 0,5-1,4 °C abaixo; na Gravatá e na Rio do Peixe o Módulo 1 bate em 7 de 7.
+MODULO_PRIMEIRO = {"IRA": ("m2", "m1")}
 
 DL_MIN_LEITURAS = 1380            # 23 h de 1 min: o dia do datalogger que tem menos que isso está incompleto
 DL_MAX_LEITURAS = 1445            # mais que 1 por minuto: a soma / 60000 deixaria de ser o dia (intervalo mudou)
@@ -522,20 +531,37 @@ class Datalogger(Leitor):
 
 # ---------------------------------------------------------------- 3. Export do supervisório
 _RE_APOLO = re.compile(r"^([a-z]{3})_etm_a - \1_med_(.+)$")
+# Export com a usina inteira (Levi, 26/11/2026, "2026 - 23_46_07).csv", 01-25/11): além da estação, a energia do dia de
+# cada inversor ("GRA_SMART1_INV_B_6a10 - GRA_Inv_1.10_MED_Energia Diária (KWh)"; na Rio do Peixe também o virtual
+# "RPX_Dados Virtuais - RPX_Inv_4.5_...", já na numeração do BD) e o multimedidor ("GRA_MM1_C - GRA_MM1_MED_Energia
+# Ativa Exp. Diária (MWh)"; RPA_MM0 e RPX_MM0 são o mesmo medidor da Rio do Peixe).
+_RE_INV = re.compile(r"^([a-z]{3})_.* - \1_inv_(\d+)\.(\d+)_med_energia diaria \(kwh\)$")
+_RE_MM = re.compile(r"^([a-z]{3})_.* - \1_mm\d+_med_energia ativa exp\. diaria \(mwh\)$")
+# RPB é a Rio do Peixe II: o SMART1 dela é o grupo 3 do BD e o SMART2 o grupo 4 (RPA e RPX já vêm na numeração do BD)
+_GRUPO_A_MAIS = {"RPB": 2}
 
 
 def _ponto(nome):
-    """(estação, tipo) do ponto; tipo None = ponto que o BD não usa (piranômetro HOR, temperatura do ar...)."""
+    """(estação, tipo) do ponto; tipo None = ponto que o BD não usa (temperatura do ar...). Inversor e multimedidor
+    vêm como "cont:<coluna do BD>" (contador do dia)."""
     n = norm(nome)
     m = _RE_APOLO.match(n)
     if m:
         est, resto = m.group(1).upper(), m.group(2)
         for pref, tipo in (("irradiacao acumulada - poa", "ac_IPOA"), ("irradiacao acumulada - ghi", "ac_GHI"),
+                           ("piranometro inc - poa", "wa_IPOA"), ("piranometro hor - ghi", "wa_GHI"),
                            ("temperatura do modulo 1", "m1"), ("temperatura do modulo 2", "m2"),
                            ("temperatura do ar", "ar")):
             if resto.startswith(pref):
                 return est, tipo
         return est, None
+    m = _RE_INV.match(n)
+    if m and m.group(1).upper() in ESTACAO_APOLO:
+        est = m.group(1).upper()
+        return est, "cont:Inversor %d.%d" % (int(m.group(2)) + _GRUPO_A_MAIS.get(est, 0), int(m.group(3)))
+    m = _RE_MM.match(n)
+    if m and m.group(1).upper() in ESTACAO_APOLO:
+        return m.group(1).upper(), "cont:Multimedidor"
     if n == "estm_01 - pyranometer poa":
         return "ESTM_01", "w_IPOA"
     if n.startswith("estm_01 - pyranometer ghi"):
@@ -563,7 +589,9 @@ def _ler_scada(arq):
     ac = collections.defaultdict(list)                             # (est, col, dia) -> [(instante, J/m²)]
     temp = collections.defaultdict(dict)                           # (est, "m1"/"m2") -> {instante: valor}
     cobre = collections.defaultdict(lambda: [None, None])          # (est, dia) temperatura -> [1ª hora, última hora]
-    w = collections.defaultdict(list)                              # (est, col, dia) -> [(instante, W/m²)]
+    w = collections.defaultdict(list)                              # (est, col, dia) -> [(instante, W/m²)] ESTM_01
+    wa = collections.defaultdict(list)                             # (est, col, dia) -> [(instante, W/m²)] Apolo
+    cont = collections.defaultdict(list)                           # (est, coluna, dia) -> [(instante, kWh ou MWh)]
     estacoes, ignorados = set(), set()
     dias = set()
     linhas = csv.reader(io.StringIO(arq.texto()))
@@ -593,6 +621,10 @@ def _ler_scada(arq):
         dias.add(d)
         if tipo.startswith("ac_"):
             ac[(est, tipo[3:], d)].append((t, v))
+        elif tipo.startswith("wa_"):
+            wa[(est, tipo[3:], d)].append((t, v))
+        elif tipo.startswith("cont:"):
+            cont[(est, tipo[5:], d)].append((t, v))
         elif tipo in ("m1", "m2", "ar"):
             c = cobre[(est, d)]
             c[0] = t.hour if c[0] is None else min(c[0], t.hour)
@@ -601,8 +633,8 @@ def _ler_scada(arq):
                 temp[(est, tipo)][t] = v
         else:
             w[(est, tipo[2:], d)].append((t, v))
-    return {"ac": dict(ac), "temp": dict(temp), "cobre": dict(cobre), "w": dict(w), "estacoes": estacoes,
-            "ignorados": ignorados, "dias": dias}
+    return {"ac": dict(ac), "temp": dict(temp), "cobre": dict(cobre), "w": dict(w), "wa": dict(wa), "cont": dict(cont),
+            "estacoes": estacoes, "ignorados": ignorados, "dias": dias}
 
 
 ZERADO_MAX = 0.1 * 3.6e6           # J/m²: acumulado abaixo disso = já zerou na virada do dia
@@ -628,6 +660,48 @@ def _acumulado(pts):
                 t.strftime("%H:%M"), topo / 3.6e6, v / 3.6e6)
         topo = max(topo, v)
     return topo, None
+
+
+CONT_ZERO = {"Multimedidor": 0.005}   # MWh; inversor: kWh (CONT_ZERO_INV)
+CONT_ZERO_INV = 0.5
+
+
+def _contador(pts, zero):
+    """(energia do dia, motivo para ficar fora) do contador "Energia Diária" do inversor: o MAIOR do dia DEPOIS da
+    zeragem (a leitura de 00:0x pode trazer a véspera, como o acumulado da estação), só em dia com leitura depois das
+    18h. Conferido em 26/11/2026 contra o BD (SmartLogger e coleta, 01-20/11): igual ao centavo nos inversores das três
+    usinas. O 02/11 (export parou às 14:58) e o 21/11 (às 04:20) dão o dia pela metade: ficam fora. O multimedidor tem
+    regra própria (`_multimedidor`)."""
+    pts = sorted(pts)
+    if not any(t.hour >= 18 for t, _ in pts):
+        return None, "o export acaba às %s (dia incompleto)" % pts[-1][0].strftime("%H:%M")
+    k = next((i for i, (_, v) in enumerate(pts) if v <= zero), None)
+    if k is None:
+        return None, "o contador do dia não zerou (menor leitura %.2f)" % min(v for _, v in pts)
+    topo = pts[k][1]
+    for t, v in pts[k + 1:]:
+        if v < topo - max(2 * zero, 0.05 * topo):
+            return None, "o contador caiu às %s (de %.2f para %.2f: reiniciou?)" % (t.strftime("%H:%M"), topo, v)
+        topo = max(topo, v)
+    return topo, None
+
+
+MM_PATAMAR_HORA = 18
+MM_PATAMAR_MIN = 3
+
+
+def _multimedidor(pts, zero):
+    """(energia exportada do dia, motivo) do multimedidor: a MEDIANA das leituras depois das 18h (o contador já parou:
+    é o patamar do dia), sem as zeradas. O "maior do dia" não serve: o medidor zera fora da meia-noite (a Rio do Peixe
+    todo dia às 20:49-22:50) e a Iramaia manda leitura solta de ~36 MWh (20/11: 35,54 às 17:35 e 36,08 às 20:30 num dia
+    de 10,6 — a soma dos inversores deu 10,8; 25/11: 36,07 até as 12:38). Nos dias sem pico dá o mesmo que o maior."""
+    pts = sorted(pts)
+    tarde = [v for t, v in pts if t.hour >= MM_PATAMAR_HORA and v > zero]
+    if len(tarde) < MM_PATAMAR_MIN:
+        if not any(t.hour >= MM_PATAMAR_HORA for t, _ in pts):
+            return None, "o export acaba às %s (dia incompleto)" % pts[-1][0].strftime("%H:%M")
+        return None, "o multimedidor não contou depois das 18h (0 ou sem leitura)"
+    return statistics.median(tarde), None
 
 
 def _temperatura(m1, m2, cobre):
@@ -720,8 +794,10 @@ class Supervisorio(Leitor):
         apolo = sorted({ESTACAO_APOLO[e] for e in dados["estacoes"] if e in ESTACAO_APOLO})
         tem_estm = "ESTM_01" in dados["estacoes"]
         estm = _usina_no_nome(arq, NOMES_ESTM) if tem_estm else None
-        tipos = [t for t, k in (("ETM acumulada", "ac"), ("temperatura do módulo", "temp"),
-                                ("POA/GHI de 5 em 5 min", "w")) if dados[k]]
+        tipos = [t for t, ok in (("ETM acumulada", dados["ac"]), ("temperatura do módulo", dados["temp"]),
+                                 ("POA/GHI de 5 em 5 min", dados["w"] or dados["wa"]),
+                                 ("geração dos inversores", any(c != "Multimedidor" for _, c, _ in dados["cont"])),
+                                 ("multimedidor", any(c == "Multimedidor" for _, c, _ in dados["cont"]))) if ok]
         ests = sorted(dados["estacoes"])
         dias = sorted(dados["dias"])
         rec = Reconhecimento(self.fonte, usinas=apolo + ([estm] if estm else []),
@@ -738,7 +814,7 @@ class Supervisorio(Leitor):
     def ler(self, arq, ctx, rec, escolha=None):
         dados = rec.estado["dados"]
         cel, avisos = [], []
-        # --- Apolo: ETM acumulada e temperatura do módulo
+        # --- Apolo: ETM (acumulada; senão o W/m² de 5 em 5 min), temperatura do módulo, inversores e multimedidor
         for aba in APOLO:
             ests = [e for e in (("GRA",) if aba == GRAVATA else ("IRA",) if aba == IRAMAIA else ORDEM_RIO)
                     if e in dados["estacoes"]]
@@ -746,7 +822,7 @@ class Supervisorio(Leitor):
                 continue
             ab = _aba_bd(ctx, aba)
             ini = _antes_da_aba(ab)
-            valores, motivos = {}, {}
+            valores, motivos, so_vazio = {}, {}, set()
             for est in ests:                                       # Rio do Peixe: RPA; RPB e RPX só no que falta
                 for (e, col, d), pts in dados["ac"].items():
                     if e != est or (d, col) in valores:
@@ -758,15 +834,48 @@ class Supervisorio(Leitor):
                         motivos.setdefault((d, col), "acumulado do dia <= 0")
                     else:
                         valores[(d, col)] = round(maior / 3.6e6, 4)
-                tt, curtos = _temperatura(dados["temp"].get((est, "m1"), {}), dados["temp"].get((est, "m2"), {}),
+                p1, p2 = MODULO_PRIMEIRO.get(est, ("m1", "m2"))
+                tt, curtos = _temperatura(dados["temp"].get((est, p1), {}), dados["temp"].get((est, p2), {}),
                                           {d: c for (e, d), c in dados["cobre"].items() if e == est})
                 for d, v in tt.items():
                     valores.setdefault((d, "Temperatura"), v)
                 for d, motivo in curtos:
                     motivos.setdefault((d, "Temperatura"), motivo)
+            # POA/GHI em W/m² (o export de 26/11/2026 não traz a acumulada): só no que a acumulada não deu, e só em
+            # célula VAZIA — o trapézio do W/m² não é a régua que encheu o BD (Gravatá 01-09/11: -1,9 a +6,2%). Na Rio do
+            # Peixe a RPX primeiro: o IPOA do BD é o dela (12 dias a -0,05..+0,01%; a RPA dá -2,6..+0,2%).
+            for est in [e for e in ORDEM_W_RIO if e in ests] if aba == RIO else ests:
+                for (e, col, d), pts in dados["wa"].items():
+                    if e != est or (d, col) in valores:
+                        continue
+                    v, motivo = _trapezio(pts)
+                    if motivo:
+                        motivos.setdefault((d, col), motivo)
+                    elif v <= 0:
+                        motivos.setdefault((d, col), "irradiação do dia <= 0")
+                    else:
+                        valores[(d, col)] = v
+                        so_vazio.add((d, col))
+            # energia do dia dos inversores e do multimedidor; na Rio do Peixe a RPX (virtual, já na numeração do BD)
+            # primeiro, a RPA/RPB só no que falta nela
+            for est in [e for e in ORDEM_W_RIO if e in ests] if aba == RIO else ests:
+                for (e, col, d), pts in dados["cont"].items():
+                    if e != est or (d, col) in valores:
+                        continue
+                    v, motivo = (_multimedidor if col == "Multimedidor" else _contador)(
+                        pts, CONT_ZERO.get(col, CONT_ZERO_INV))
+                    if motivo:
+                        motivos.setdefault((d, col), motivo)
+                    elif col == "Multimedidor":
+                        if v <= 0:
+                            motivos.setdefault((d, col), "o multimedidor não contou (0 o dia todo)")
+                        else:
+                            valores[(d, col)] = round(v * 1000, 2)      # MWh -> kWh, a unidade da coluna
+                    else:
+                        valores[(d, col)] = round(v, 2)
             for (d, col), v in sorted(valores.items()):
                 if not (ini and d < ini):             # histórico de antes da aba existir sai calado
-                    cel.append(Celula(BD_PERFORMANCE, aba, d, col, v))
+                    cel.append(Celula(BD_PERFORMANCE, aba, d, col, v, None, (d, col) in so_vazio))
             fora = collections.defaultdict(list)
             for (d, col), m in sorted(motivos.items()):
                 if (d, col) not in valores and not (ini and d < ini):
