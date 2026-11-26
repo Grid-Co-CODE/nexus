@@ -788,10 +788,13 @@
     h += '<section class="ind-cartao"><h4><i class="ph ph-plugs-connected" aria-hidden="true"></i>Disponibilidade expurgada · acumulada</h4><div class="ind-val">' + grande(r.disp, r.disp_tom) + meta(mt.disp) + "</div>" +
       "<p>" + (r.disp_sem_expurgo ? "sem expurgo " + esc(r.disp_sem_expurgo) + "%" : "sem expurgo no ano") + abaixo(r.disp_abaixo) + "</p>" + barrinhas(r.disp_barras) + "</section>";
     var itens = [["MPM", pv.MPM, pt.MPM], ["MPS", pv.MPS, pt.MPS], ["MPA", pv.MPA, pt.MPA], ["Supressão", r.rocada, r.rocada_tom], ["Lavagem", r.lavagem, r.lavagem_tom]];
-    h += '<section class="ind-cartao ind-largo"><h4><i class="ph ph-wrench" aria-hidden="true"></i>Preventivas e serviços do ano · feitos / mínimo</h4><div class="ind-prev">' + itens.map(function (x) {
+    // cinco colunas iguais, o nome e o valor centralizados, sem texto embaixo (Levi, 26/11/2026: "a nomenclatura deles
+    // centralizada e os valores centralizados [...] tem um texto enorme aí ocupando espaço"); a explicação fica na dica
+    h += '<section class="ind-cartao ind-largo" title="As preventivas feitas sobre as planejadas na janela; a supressão vegetal e a lavagem feitas contra o mínimo do contrato da zeladoria">' +
+      '<h4><i class="ph ph-wrench" aria-hidden="true"></i>Preventivas e serviços · feitos / plano ou mín.</h4><div class="ind-prev ind-cinco">' + itens.map(function (x) {
       var v = Array.isArray(x[1]) ? (x[1][1] ? x[1][0] + "/" + x[1][1] : "—") : (x[1] || "—");
       return "<div><small>" + x[0] + '</small><b class="' + (x[2] ? "c-" + x[2] : "") + '">' + esc(v) + "</b></div>";
-    }).join("") + "</div><p>Preventivas feitas / planejadas no ano; supressão e lavagem contra o mínimo do contrato da zeladoria</p></section>";
+    }).join("") + "</div></section>";
     h += '<section class="ind-cartao"><h4><i class="ph ph-warning" aria-hidden="true"></i>Fora da meta no ano</h4><div class="ind-prev ind-fora"><div><small>Usina·mês PR</small><b class="' + (r.fora_pr ? "c-critico" : "") + '">' + (r.fora_pr || 0) + "</b></div>" +
       '<div><small>Usina·mês Disp.</small><b class="' + (r.fora_disp ? "c-alerta" : "") + '">' + (r.fora_disp || 0) + "</b></div></div>" +
       "<p>" + (r.pior ? esc(r.pior.usina) + " responde por " + r.pior.fora + " dos " + ((r.fora_pr || 0) + (r.fora_disp || 0)) + ' · <a href="' + rota(estado.ct, "pontos") + '">abrir Pontos</a>' : (mt.pr || mt.disp ? "Nenhuma usina fora da meta no ano." : "Sem meta no contrato: grave a meta de PR e a garantia de disponibilidade em Editar dados.")) + "</p></section>";
@@ -804,14 +807,17 @@
     if (d.sem_inicio) return '<div class="ctr-vazio"><p>Este contrato não tem o início da vigência: o ano contratual conta a partir dele.' + (pode(c) ? " Ponha a data em Editar dados." : "") + "</p></div>";
     var a = d.ano, anos = d.anos || [], mt = d.metas || {};
     function rotAno() { return d.meses[0].rot + " – " + d.meses[d.meses.length - 1].rot; }
+    var nomeJanela = a.n ? a.n + "º ano contratual" : "Últimos 12 meses";
     var metaTxt = mt.pr || mt.disp ? [mt.pr ? "PR ≥ " + pctTxt(mt.pr.pct) + "%" : "", mt.disp ? "Disp. expurgada ≥ " + pctTxt(mt.disp.pct) + "%" : ""].filter(Boolean).join(" · ") +
       ' <span class="mudo">· ' + esc((mt.pr || mt.disp).origem) + "</span>" : '<span class="mudo">sem meta de PR e de disponibilidade no contrato</span>';
-    var h = '<div class="ind-barra"><div class="ind-ano"><button type="button" class="ind-chip" data-ind-ano-abrir aria-expanded="' + indAnoAberto + '"><i class="ph ph-calendar-blank" aria-hidden="true"></i>Ano contratual <b>' + rotAno() + '</b> <i class="ph ph-caret-down" aria-hidden="true"></i></button>' +
-      (indAnoAberto ? '<ul class="ind-anos">' + anos.slice().reverse().map(function (x) {
-        return '<li><button type="button" data-ind-ano="' + x.n + '"' + (x.n === a.n ? ' aria-current="true"' : "") + ">" + x.n + "º ano" + (x.n === anos.length ? " (o de agora)" : "") + "</button></li>"; }).join("") + "</ul>" : "") + "</div>" +
+    var h = '<div class="ind-barra"><div class="ind-ano"><button type="button" class="ind-chip" data-ind-ano-abrir aria-expanded="' + indAnoAberto + '"><i class="ph ph-calendar-blank" aria-hidden="true"></i>' + nomeJanela + " <b>" + rotAno() + '</b> <i class="ph ph-caret-down" aria-hidden="true"></i></button>' +
+      (indAnoAberto ? '<ul class="ind-anos"><li><button type="button" data-ind-ano="0"' + (!a.n ? ' aria-current="true"' : "") + ">Últimos 12 meses<small>até o mês de hoje; anda sozinho</small></button></li>" +
+        anos.slice().reverse().map(function (x) {
+          return '<li><button type="button" data-ind-ano="' + x.n + '"' + (x.n === a.n ? ' aria-current="true"' : "") + ">" + x.n + "º ano contratual" + (x.n === anos.length ? " (o de agora)" : "") +
+            "<small>" + dBR(x.ini) + " a " + dBR(x.fim) + "</small></button></li>"; }).join("") + "</ul>" : "") + "</div>" +
       '<span class="ind-chip ind-metas"><i class="ph ph-target" aria-hidden="true"></i>Metas ' + metaTxt + "</span>" +
       '<span class="ind-dir">' + seg("Visão", "data-ind-visao", indVisao, VIS) + '<button type="button" class="ind-chip" data-ind-exportar><i class="ph ph-export" aria-hidden="true"></i>Exportar</button></span></div>';
-    h += '<h2 class="ind-so-print">Indicadores · ' + esc(c.cliente) + " · " + a.n + "º ano contratual (" + dBR(a.ini) + " a " + dBR(a.fim) + ")</h2>";
+    h += '<h2 class="ind-so-print">Indicadores · ' + esc(c.cliente) + " · " + nomeJanela.toLowerCase().replace(/^ú/, "ú") + " (" + dBR(a.ini) + " a " + dBR(a.fim) + ")</h2>";
     h += cartoesInd(c, d);
     var lg = d.ligacao || {}, notas = [];
     if (lg.pcm && lg.pcm.total > lg.pcm.ligadas) notas.push((lg.pcm.total - lg.pcm.ligadas) + " de " + lg.pcm.total + " tarefas do PCM do cliente não ligaram a uma usina pelo nome");
@@ -994,7 +1000,7 @@
     if ((b = e.target.closest("[data-subgrupo]"))) { var tk = b.getAttribute("data-subgrupo"); estado.temas[tk] = !estado.temas[tk]; render(); return; }
     if ((b = e.target.closest("[data-tirar-com]"))) { if (window.confirm("Tirar este comentário? Ele fica no histórico.")) leve(cAtual, "comentario", [b.getAttribute("data-tirar-com")], "retirada", {}, "Comentário tirado."); return; }
     if ((b = e.target.closest("[data-ind-ano-abrir]"))) { indAnoAberto = !indAnoAberto; render(); return; }
-    if ((b = e.target.closest("[data-ind-ano]"))) { estado.indAno = +b.getAttribute("data-ind-ano"); indAnoAberto = false; render(); return; }
+    if ((b = e.target.closest("[data-ind-ano]"))) { estado.indAno = +b.getAttribute("data-ind-ano") || null; indAnoAberto = false; render(); return; }
     if ((b = e.target.closest("[data-ind-mais]"))) { var cM = R.contratos[estado.ct], dM = IND[cM.cliente + "|" + (estado.indAno || "")] || {}; indMais[cM.cliente + "|" + ((dM.ano || {}).n)] = true; render(); return; }
     if ((b = e.target.closest("[data-ind-exportar]"))) {
       // o PDF da aba como está na tela, no papel claro (o escuro não sai na impressão); o tema volta depois

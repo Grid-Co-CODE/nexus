@@ -130,8 +130,10 @@ def test_a_rota_dos_indicadores(carga, cliente, relogio, monkeypatch):  # noqa: 
         {7: {"MPM": {"2026-10": [1, 1]}}}, {}, {7: {}}, {"pcm": {"ligadas": 1, "total": 2}}, []))
     cliente.application.extensions.pop("nexus_contratos_indicadores", None)
     d = adm.get("/t/comando/contratos/indicadores.json", query_string={"cliente": "Solar Alfa"}).get_json()
-    assert d["ano"]["n"] == 2 and d["ano"]["ini"] == "2026-02-25"           # o início da vigência da planilha inventada
-    assert [a["n"] for a in d["anos"]] == [1, 2]
+    # o padrão são os últimos 12 meses até o mês de hoje (Levi: "puxa pelos últimos 12 meses até atualmente")
+    assert d["ano"] == {"n": 0, "ini": "2025-12-01", "fim": "2026-11-30", "atual": True, "rolante": True}
+    assert [m["rot"] for m in d["meses"]][0] == "dez/25" and [m["rot"] for m in d["meses"]][-1] == "nov/26"
+    assert [a["n"] for a in d["anos"]] == [1, 2] and d["anos"][1]["ini"] == "2026-02-25"   # os anos contratuais, para consultar
     assert d["usinas"][0]["usina"] == "Zeta 1" and d["ligacao"]["pcm"] == {"ligadas": 1, "total": 2}
     assert "o COS (a coluna Agora)" not in d["avisos"]                    # o aviso de outra fonte da Visão gerencial não entra
     d1 = adm.get("/t/comando/contratos/indicadores.json", query_string={"cliente": "Solar Alfa", "ano": 1}).get_json()
@@ -142,12 +144,18 @@ def test_a_rota_dos_indicadores(carga, cliente, relogio, monkeypatch):  # noqa: 
     assert c["aniversario"] == "2027-02-25" and c["ano_contratual"]["n"] == 2
 
 
+def test_os_ultimos_12_meses_andam_sozinhos():
+    assert I.ultimos_12_meses(date(2026, 11, 26)) == {"n": 0, "ini": "2025-12-01", "fim": "2026-11-30", "atual": True, "rolante": True}
+    assert I.ultimos_12_meses(date(2027, 1, 5))["ini"] == "2026-02-01" and I.ultimos_12_meses(date(2027, 1, 5))["fim"] == "2027-01-31"
+    assert I.ultimos_12_meses(date(2026, 12, 31))["fim"] == "2026-12-31"
+
+
 def test_a_tela_dos_indicadores(cliente):
     r = cliente.get("/static/contratos.js")
     js = r.get_data(as_text=True)
     r.close()
     for t in ('["indicadores", "Indicadores"]', "function rIndicadores(c)", "indicadores.json?cliente=", "function fatoAniv(c)",
-              '"Só KPIs"', '"Só manutenções"', "data-ind-ano", "data-ind-usina", "sem dado no banco"):
+              '"Só KPIs"', '"Só manutenções"', "data-ind-ano", "data-ind-usina", "sem dado no banco", "Últimos 12 meses", "ind-cinco"):
         assert t in js, t
 
 

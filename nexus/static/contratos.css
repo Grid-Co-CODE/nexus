@@ -317,3 +317,13 @@
 /* o nome do indicador fica preso à esquerda quando a tabela rola de lado (o celular, a tela estreita) */
 .ctr-ind thead th:first-child, .ctr-ind td.ind-nome { position: sticky; left: 0; z-index: 1; background: var(--fundo); }
 .ctr-ind thead th:first-child { background: var(--barra); }
+/* as colunas dos meses e do acumulado centralizadas, o cabeçalho e o valor (Levi, 26/11/2026: "todas as colunas
+   centralizadas [...] exceto a coluna da esquerda") */
+.ctr-ind thead th:not(:first-child), .ctr-ind td.ind-m, .ctr-ind td.ind-ac { text-align: center; }
+.ind-anos small { display: block; color: var(--mudo); font-size: 11px; margin-top: 1px; }
+/* o cartão das preventivas e serviços: cinco colunas iguais, o nome em cima e o valor embaixo, os dois centralizados;
+   o de Fora da meta, duas */
+.ind-prev.ind-cinco, .ind-prev.ind-fora { display: grid; gap: 4px 8px; text-align: center; margin-top: 4px; }
+.ind-prev.ind-cinco { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.ind-prev.ind-fora { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ind-prev.ind-cinco div, .ind-prev.ind-fora div { align-items: center; }

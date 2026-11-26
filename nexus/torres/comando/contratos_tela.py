@@ -256,7 +256,10 @@ def contratos_indicadores():
         c = next((x for x in vis["contratos"] if x["cliente"] == cliente), None)
         if not c:
             abort(404)
-        ano = K.ano_contratual(K._d(c.get("inicio")), hoje, n)
+        # sem `ano`, os últimos 12 meses (o padrão; vale também para o contrato sem início da vigência); com `ano`, aquele
+        # ano contratual (o que fechou, o do relatório de aniversário)
+        prim = K._d(c.get("inicio"))
+        ano = K.ano_contratual(prim, hoje, n) if n else I.ultimos_12_meses(hoje)
         if not ano:
             out = {"ok": True, "sem_inicio": True}
         else:
@@ -274,9 +277,9 @@ def contratos_indicadores():
             out = I.montar(c, (vis.get("fichas") or {}).get(cliente), ano, usinas, pcm, zel, zel_min, hoje, com_dado,
                            ligacao, avisos + [x for x in g.get("avisos") or []      # só os avisos das fontes desta aba
                                               if any(p in x for p in ("histórico", "disponibilidade", "expurgo", "limitaç", "religamento"))])
-            prim = K._d(c.get("inicio"))
             atual = K.ano_contratual(prim, hoje)
-            out["anos"] = [{"n": i, "rot": f"{K.ano_contratual(prim, hoje, i)['ini'][:7]}"} for i in range(1, (atual or ano)["n"] + 1)]
+            out["anos"] = [{"n": i, "ini": K.ano_contratual(prim, hoje, i)["ini"], "fim": K.ano_contratual(prim, hoje, i)["fim"]}
+                           for i in range(1, atual["n"] + 1)] if atual else []
             out["primeiro_mes_com_dado"] = DM.PRIMEIRO_MES if hasattr(DM, "PRIMEIRO_MES") else None
         copias[ch] = (time.time(), out)
         resp = jsonify(out)

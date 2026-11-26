@@ -40,6 +40,18 @@ LINHAS = (("MPM", "MPM", "manut"), ("MPS", "MPS", "manut"), ("MPA", "MPA", "manu
           ("pr", "PR", "kpi"), ("disp", "Disponibilidade expurgada", "kpi"))
 
 
+def ultimos_12_meses(hoje: date) -> dict:
+    """A janela padrão da aba (Levi, 26/11/2026, vendo o ano contratual no ar: "puxa pelos últimos 12 meses até atualmente
+    [...] sempre vai se atualizando, do que tá projetando um futuro que não tem dado, e aí mais da metade do negócio é sem
+    dado"): do mês de 11 meses atrás ao mês de hoje, andando sozinha. `n` 0 = não é um ano contratual."""
+    a, m = hoje.year, hoje.month - 11
+    if m < 1:
+        a, m = a - 1, m + 12
+    prox = date(hoje.year + (hoje.month == 12), hoje.month % 12 + 1, 1)
+    return {"n": 0, "ini": date(a, m, 1).isoformat(), "fim": date.fromordinal(prox.toordinal() - 1).isoformat(),
+            "atual": True, "rolante": True}
+
+
 def meses_do_ano(ano: dict) -> list[dict]:
     """Os 12 meses do ano contratual, do mês do início ao 11º seguinte: {id "AAAA-MM", rot "set/25"}."""
     a, m = int(ano["ini"][:4]), int(ano["ini"][5:7])

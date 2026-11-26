@@ -129,6 +129,10 @@ entram **todas as usinas do cliente no cadastro** (como a Visão gerencial); o m
 histórico anterior a 10/2026 é a fase 2); o relatório de aniversário é **interno, para o gestor do contrato**; o aviso,
 **30 dias** antes; a régua de cor **da sugestão**: verde na meta, amarelo até 2 pontos abaixo, vermelho abaixo disso, azul
 com asterisco no mês que teve expurgo, sem cor sem meta.
+- **A janela padrão são os ÚLTIMOS 12 MESES até o mês de hoje** (`indicadores.ultimos_12_meses`; Levi, vendo o ano
+  contratual no ar: "puxa pelos últimos 12 meses até atualmente [...] sempre vai se atualizando, do que tá projetando um
+  futuro que não tem dado"): anda sozinha a cada mês e vale também para o contrato sem início da vigência. O ano
+  contratual fica na lista da barra (`?ano=N`), para consultar um ano que fechou (o do relatório de aniversário).
 - **O ano contratual e o aniversário** (`controle.ano_contratual` e `proximo_aniversario`, no `com_datas`): o 1º ano vai
   do início ao dia antes do 1º aniversário; 29/02 vira 28/02. O contrato leva `aniversario`, `dias_aniversario` e
   `ano_contratual`; a linha de fatos mostra o aniversário, e a aba Pontos ganha a Atenção 30 dias antes
@@ -156,7 +160,9 @@ com asterisco no mês que teve expurgo, sem cor sem meta.
   pesa, com o atalho para Pontos); a tabela começa pelo **cliente** (o contrato inteiro: preventivas somadas, serviços
   como usinas feitas no mês, PR e disponibilidade pela potência) e segue pelas usinas (as três primeiras com problema
   abertas, o resto numa linha "Mais N usinas"); a célula é pintada pelo estado (fundo, borda e texto da mesma cor,
-  só tokens). O mês em curso não pinta de vermelho a preventiva ainda não feita; o nome do indicador fica preso à
+  só tokens). As colunas dos meses e do acumulado são centralizadas, o cabeçalho e o valor; só a dos nomes fica à
+  esquerda. O cartão das preventivas e serviços é de cinco colunas iguais, o nome em cima e o valor embaixo, sem texto (a
+  explicação na dica). O mês em curso não pinta de vermelho a preventiva ainda não feita; o nome do indicador fica preso à
   esquerda quando a tabela rola de lado.
 - **O PR acima de 100% é leitura errada** (`indicadores.PR_MAX`, a régua da Visão gerencial): na prévia de 26/11/2026,
   uma usina da Thopen com PR de mais de 1.000% fazia o PR do contrato dar 730,5%. A célula diz "s/d" com a dica.
