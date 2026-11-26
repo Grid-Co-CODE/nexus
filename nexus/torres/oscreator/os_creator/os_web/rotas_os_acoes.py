@@ -1091,8 +1091,8 @@ def api_cancelar(wid):
         return _erro("Escolha o motivo do cancelamento.")
     api.cancel_os(wid, idm, str(c.get("note") or "").strip())        # cancelar_os.py:77 — (self._wo, idm, obs.strip())
     lista_central.mudou(wid)
-    # 26/11/2026 (Maria Oliveira, pelo Levi: "Algumas OSs foram canceladas pelo supervisor no Nexus e não foram canceladas
-    # no Fracttal"): a OS 18428 (UFV Vitesse) foi "cancelada" pelo Wesley Silva em 16/11 e segue Em Processo no Fracttal
+    # 26/11/2026 (uma colega da operação, pelo Levi: "Algumas OSs foram canceladas pelo supervisor no Nexus e não foram
+    # canceladas no Fracttal"): a OS 18428 (UFV Vitesse) foi "cancelada" por um supervisor em 16/11 e segue Em Processo no Fracttal
     # (a tarefa tinha uma execução iniciada às 08:31 e pausada); a 18427, cancelada no mesmo minuto, ficou cancelada. O
     # Fracttal respondeu sem erro e a tela disse "cancelada com sucesso". Agora, como o Retornar, a OS é RELIDA depois do
     # pedido: se não ficou cancelada, a tela diz isso em vez de anunciar sucesso. Status não lido (o Fracttal não respondeu
