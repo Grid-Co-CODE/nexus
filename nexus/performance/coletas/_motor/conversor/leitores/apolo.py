@@ -366,7 +366,14 @@ def _dias_datalogger(caminho, texto=None):
         _DL_CACHE[k] = out
         return out
     ji, jg = h.index("piranometroipoa"), h.index("piranometroghi")
-    jmax = max(ji, jg)
+    # temperatura do módulo (26/11/2026, field log da Iramaia "aa_1.csv": "TempModulo 1" e "TempMódulo2", o acento às
+    # vezes quebrado pela leitura): o número do módulo vem do fim do nome
+    jt = {}
+    for j, c in enumerate(h):
+        m = re.match(r"^temp.*dulo\s*([12])$", c)
+        if m:
+            jt.setdefault(int(m.group(1)), j)
+    jmax = max([ji, jg] + list(jt.values()))
     datas = {}
     for r in linhas:
         if len(r) <= jmax:
@@ -382,7 +389,7 @@ def _dias_datalogger(caminho, texto=None):
         x = out.get(d)
         if x is None:
             x = out[d] = {"n": 0, "nI": 0, "sI": 0.0, "nG": 0, "sG": 0.0, "ini": s, "fim": None, "buraco": 0.0,
-                          "ordem": True}
+                          "ordem": True, "t1": [0, 0.0, set()], "t2": [0, 0.0, set()]}
         elif s <= x["fim"]:                           # repetida ou fora de ordem: a soma deixaria de ser confiável
             x["ordem"] = False
             continue
@@ -397,6 +404,19 @@ def _dias_datalogger(caminho, texto=None):
         if vg is not None:
             x["nG"] += 1
             x["sG"] += vg
+        if jt and TEMP_INI * 3600 <= s < TEMP_FIM * 3600:
+            # regra da Tucano por instante: o módulo preferido se válido, senão o outro; "t1" = Módulo 1 primeiro,
+            # "t2" = Módulo 2 primeiro (a Iramaia é o Módulo 2: ver MODULO_PRIMEIRO)
+            lo, hi = TEMP_FAIXA
+            v1, v2 = (_num_dl(r[jt[mod]]) if mod in jt else None for mod in (1, 2))
+            ok1, ok2 = (v is not None and lo <= v <= hi for v in (v1, v2))
+            for chave, (a, b, oka, okb) in (("t1", (v1, v2, ok1, ok2)), ("t2", (v2, v1, ok2, ok1))):
+                v = a if oka else (b if okb else None)
+                if v is not None:
+                    t = x[chave]
+                    t[0] += 1
+                    t[1] += v
+                    t[2].add(s // 3600)
     _DL_CACHE[k] = out
     return out
 
@@ -437,6 +457,9 @@ def _juntar_dia(pedacos):
         tot["buraco"] = max(tot["buraco"], x["buraco"], _buraco_na_janela(tot["fim"], x["ini"]))
         for c in ("n", "nI", "sI", "nG", "sG"):
             tot[c] += x[c]
+        for c in ("t1", "t2"):
+            a, b = tot.get(c, [0, 0.0, set()]), x.get(c, [0, 0.0, set()])
+            tot[c] = [a[0] + b[0], a[1] + b[1], a[2] | b[2]]
         tot["fim"] = max(tot["fim"], x["fim"])
         tot["ordem"] = tot["ordem"] and x["ordem"]
     return tot
@@ -463,13 +486,14 @@ class Datalogger(Leitor):
             if d1:
                 break
         aba = _usina_no_nome(arq, NOMES_APOLO)
+        tem_temp = any(re.match(r"^temp.*dulo\s*[12]$", c) for c in _cab_datalogger(cab[0]))
+        # sem a usina no nome: converte direto na aba "Sem usina", SEM perguntar (Levi, 26/11/2026, field log "aa_1.csv":
+        # "quando for dado de field log e não tem nenhuma informação de usina, você não precisa se limitar à questão de
+        # usina. Só faz a conversão que eu colo lá no arquivo correto"). Até a 1.0.16 o cartão perguntava entre as três
+        # da Apolo; a escolha da aba continua possível no cartão, só não é pedida.
         rec = Reconhecimento(self.fonte, usinas=[aba] if aba else [],
                              periodo=(d0, d1) if d0 and d1 and d0 <= d1 else None, estado={"aba": aba},
-                             detalhe="IPOA e GHI de 1 em 1 min")
-        if not aba:
-            rec.candidatas = list(APOLO)
-            rec.pergunta = ("CSV do datalogger da ETM (PiranometroIPOA/PiranometroGHI) sem o nome da usina no "
-                            "arquivo ('ETM UFV <USINA>_N.csv').")
+                             detalhe="IPOA e GHI de 1 em 1 min" + (" e temperatura do módulo" if tem_temp else ""))
         return rec
 
     def ler(self, arq, ctx, rec, escolha=None):
@@ -513,6 +537,12 @@ class Datalogger(Leitor):
                 if v > 0:                             # irradiação <= 0 fica vazia, nunca zero nem negativa
                     cel.append(Celula(BD_PERFORMANCE, aba, d, col, round(v, 6),
                                       nota=("parcial: " + "; ".join(o)) if o else None))
+            # temperatura do módulo pela regra da Tucano (média de 06h a 18h, -20 a 90 °C, >= 8 horas com leitura), o
+            # Módulo 1 primeiro (na Iramaia o 2, como no BD); só em célula vazia: no BD ela vem do supervisório
+            tn, ts, th = x["t2"] if aba == IRAMAIA else x["t1"]
+            if tn and len(th) >= TEMP_HORAS_MIN:
+                cel.append(Celula(BD_PERFORMANCE, aba, d, "Temperatura", round(ts / tn, 2),
+                                  nota=("parcial: " + "; ".join(obs)) if obs else None, so_vazio=True))
         parciais = sorted({c[0] for c in curtos} | {d for d, _ in buracos})
         if parciais:
             avisos.append(("leve", "%s: %d dia(s) com leitura incompleta no datalogger entram com o que foi medido (pode "
