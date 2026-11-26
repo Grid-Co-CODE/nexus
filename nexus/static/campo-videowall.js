@@ -48,9 +48,9 @@
   setTimeout(reler, segundos * 1000);
 
   // ── a lista que rola sozinha ───────────────────────────────────────────────────────────────────────────────────
-  var caixa = raiz.querySelector("[data-eqtv-rola]");
-  var trilho = caixa && caixa.querySelector(".eqtv-trilho");
-  if (caixa && trilho) {
+  // as duas colunas que rolam (26/11/2026): a das ocorrências e a da linha do tempo
+  function rolar(caixa, trilho) {
+    if (!caixa || !trilho) return;
     var PARADA_MS = 5000, pos = 0, fase = "topo", desde = performance.now(), antes = desde;
     var passo = function (t) {
       var sobra = trilho.scrollHeight - caixa.clientHeight;
@@ -73,6 +73,9 @@
     };
     requestAnimationFrame(passo);
   }
+  var c1 = raiz.querySelector("[data-eqtv-rola]"), c2 = raiz.querySelector("[data-eqtv-rola-tl]");
+  rolar(c1, c1 && c1.querySelector(".eqtv-trilho"));
+  rolar(c2, c2 && c2.querySelector(".eqtv-tl-lista"));
 
   // ── os controles só ao mexer ───────────────────────────────────────────────────────────────────────────────────
   var esconder = 0;

@@ -377,6 +377,10 @@
     add("perc-pontos", pg.pontos);
     add("perc-marcos", pg.marcos);
     add("perc-agora", vazio);
+    // as rotas do vídeo wall (26/11/2026): do técnico em deslocamento até a usina de destino, com a chegada prevista
+    add("rotas", fc((D.rotas || []).map(function (r) {
+      return { type: "Feature", geometry: { type: "LineString", coordinates: [r.de, r.para] }, properties: { rot: r.rot || "" } };
+    })));
     var nv = { 1: P.t["--alerta-cheio"], 2: P.t["--severo"], 3: P.t["--critico"] };
     var corAviso = ["match", ["get", "nivel"], 1, nv[1], 2, nv[2], nv[3]];
     var L = [
@@ -390,6 +394,9 @@
       { id: "avisos-futuro", type: "line", source: "avisos", filter: ["get", "futuro"], paint: { "line-color": corAviso, "line-width": 1.5, "line-dasharray": [3, 2] } },
       { id: "focos", type: "circle", source: "focos", paint: { "circle-color": P.t["--severo"], "circle-opacity": 0.8, "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 1.6, 10, 3.2] } },
       { id: "aneis", type: "circle", source: "aneis", paint: { "circle-color": comAlfa(P.t["--critico"], 0.12), "circle-stroke-color": P.t["--critico"], "circle-stroke-width": 2, "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 6, 12, 14] } },
+      { id: "rotas", type: "line", source: "rotas", paint: { "line-color": P.t["--info-cheio"], "line-width": 2.2, "line-dasharray": [2, 2] } },
+      { id: "rotas-rot", type: "symbol", source: "rotas", layout: { "symbol-placement": "line-center", "text-field": ["get", "rot"], "text-font": FONTE_M, "text-size": 12 },
+        paint: { "text-color": P.t["--info-cheio"], "text-halo-color": P.halo, "text-halo-width": 2 } },
       // o percurso (a animação da prévia, Levi, 12/11/2026): a linha que esquenta do início (apagada) ao fim (verde Grid),
       // com halo, as setas do sentido, o trecho atual andando (as "formigas"), os pontos de perto, os marcos e o "agora"
       { id: "perc-halo", type: "line", source: "perc-linha", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": P.verde, "line-opacity": 0.2, "line-width": z([[5, 6], [12, 12], [16, 18]]) } },
@@ -425,6 +432,7 @@
     L.forEach(function (l) { if (!mapa.getLayer(l.id)) mapa.addLayer(l); });
     aplicarFoco();
     aplicarBase();
+    radarCamadas();          // a troca de tema refaz o estilo: as camadas do radar voltam junto
   }
   function corDoTecnico() {
     return ["case", ["get", "velho"], P.t["--superficie"], ["get", "cor"]];
@@ -557,12 +565,15 @@
       .then(function () {
         nossas();
         if (D.percurso && D.percurso.pontos.length > 1) {
-          // a câmera vai ao percurso e o traço se desenha sozinho uma vez (~8 s), como na prévia
+          // o percurso aparece inteiro na hora (Levi, 26/11/2026: "Demorou um pouco para mostrar o percurso. Seria
+          // interessante se mostrasse um pouquinho mais rápido"): até ali a câmera voava 1,8 s e o traço se desenhava
+          // sozinho em ~8 s (a prévia de 12/11). A reprodução segue na barra, para quem quiser tocar
           prepararReplay();
           var cx = D.percurso.caixa;
-          mapa.fitBounds([[cx[0], cx[1]], [cx[2], cx[3]]], { padding: 90, maxZoom: 15, duration: 1800 });
-          mapa.once("moveend", function () { R.t = R.t0; tocar(Math.max(1, (R.t1 - R.t0) / 8)); });
+          mapa.fitBounds([[cx[0], cx[1]], [cx[2], cx[3]]], { padding: 90, maxZoom: 15, duration: REDUZIDO ? 0 : 500 });
         }
+        if (D.radar && RAD.ligado) radarCarregar();
+        if (D.tv) tvComecar();
       });
   });
   // a troca de tema refaz o estilo com as cores do tema novo; só depois do 1º carregamento e só quando o tema MUDA (o
@@ -620,13 +631,19 @@
   mapa.on("dragstart", esconder);
   mapa.on("click", "tecnicos", function (e) {
     var t = porPid[e.features[0].properties.pid];
+    if (D.tv) { if (t) tvZoom(t.c, "<b>" + esc(t.nome) + "</b><small>" + esc(t.rotulo + (t.hora ? " · " + t.hora : "")) + "</small>"); return; }
     if (t && t.url) location.href = t.url;
   });
   mapa.on("click", "usinas", function (e) {
+    if (D.tv) { tvZoomUsina(e.features[0].properties.id); return; }
     var c = e.features[0].geometry.coordinates;
     mapa.flyTo({ center: c, zoom: Math.max(mapa.getZoom(), 13), duration: REDUZIDO ? 300 : 900, essential: true });
   });
   quadro.addEventListener("click", function (e) {
+    var ch = e.target.closest("[data-eq-chuva]");
+    if (ch) { radarLigar(!RAD.ligado); guardar("nexus.equipe.chuva", RAD.ligado ? "1" : "0"); return; }
+    var rt = e.target.closest("[data-eq-radar-tocar]");
+    if (rt) { if (RAD.timer) radarParar(); else radarTocar(); return; }
     var f = e.target.closest("[data-eq-foco]");
     if (f) { foco = f.getAttribute("data-eq-foco"); guardar(D.tv ? "nexus.equipe.foco.tv" : "nexus.equipe.foco", foco); aplicarFoco(); return; }
     var bb = e.target.closest("[data-eq-base]");
@@ -648,4 +665,154 @@
       mapa.fitBounds([[cx[0], cx[1]], [cx[2], cx[3]]], { padding: 90, maxZoom: 15, duration: 900 });
     }
   });
+
+  // ── a chuva do radar (26/11/2026) ─────────────────────────────────────────────────────────────────────────────────
+  // O Levi, no redesenho do mapa: "a parte de clima poderia ser mais visual, tipo, você pode estar azul, mais chuva,
+  // quando tiver fortalecendo, ficar uma região mais vermelha". Os quadros das últimas 2 h da RainViewer, pelo Nexus
+  // (o navegador nunca pede a ela; equipe_tela.equipe_radar_*), do azul (fraca) ao vermelho (forte), debaixo da máscara
+  // de fora do Brasil. Só o quadro da vez fica visível (o oculto não pede bloco); de perto fica mais transparente, porque
+  // o radar só vai até o zoom 7. Na tela começa ligado (a escolha fica no navegador); no vídeo wall, na vez da Chuva
+  var RAD = { q: [], i: 0, ligado: !D.tv && guardado("nexus.equipe.chuva", "1") === "1", timer: null, pedido: false };
+  var barraRadar = palco.querySelector("[data-eq-radar]");
+  function horaRadar(t) {
+    var min = Math.round((Date.now() / 1000 - t) / 60), h = horaDe(t);
+    return min <= 12 ? h + " · agora" : h + " · há " + (min >= 60 ? Math.floor(min / 60) + " h " + (min % 60) + " min" : min + " min");
+  }
+  function radarCamadas() {
+    // só depois das nossas camadas (a máscara "fora"): antes do estilo carregar, o addSource quebraria
+    if (!D.radar || !RAD.q.length || !mapa.getSource("fora")) return;
+    var antes = mapa.getLayer("fora") ? "fora" : undefined;
+    RAD.q.forEach(function (q, k) {
+      var id = "radar" + k;
+      if (!mapa.getSource(id)) mapa.addSource(id, { type: "raster", tileSize: 256, maxzoom: 7, attribution: "Radar: RainViewer",
+        tiles: [new URL(D.radar.bloco + String(q.path).replace(/^\//, "") + "/256/{z}/{x}/{y}/8/1_1.png", location.href).href] });
+      if (!mapa.getLayer(id)) mapa.addLayer({ id: id, type: "raster", source: id, layout: { visibility: "none" },
+        paint: { "raster-opacity": ["interpolate", ["linear"], ["zoom"], 7, 0.8, 12, 0.35], "raster-fade-duration": 0 } }, antes);
+    });
+    radarMostrar(RAD.i);
+  }
+  function radarMostrar(i) {
+    RAD.i = i;
+    RAD.q.forEach(function (q, k) {
+      if (mapa.getLayer("radar" + k)) mapa.setLayoutProperty("radar" + k, "visibility", RAD.ligado && k === i ? "visible" : "none");
+    });
+    if (barraRadar && RAD.q.length) {
+      barraRadar.querySelector("[data-eq-radar-quadro]").value = String(i);
+      barraRadar.querySelector("[data-eq-radar-hora]").textContent = horaRadar(RAD.q[i].time);
+    }
+  }
+  function radarCarregar() {
+    if (RAD.pedido || !D.radar) return;
+    RAD.pedido = true;
+    fetch(new URL(D.radar.lista, location.href).href, { credentials: "same-origin" })
+      .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+      .then(function (j) {
+        RAD.q = j.quadros || [];
+        RAD.i = Math.max(0, RAD.q.length - 1);
+        if (barraRadar) barraRadar.querySelector("[data-eq-radar-quadro]").max = String(RAD.i);
+        radarCamadas();
+        if (D.tv && RAD.ligado) radarTocar();
+      })
+      .catch(function () {
+        RAD.pedido = false;
+        if (barraRadar) barraRadar.querySelector("[data-eq-radar-hora]").textContent = "O radar da chuva não respondeu agora.";
+      });
+  }
+  function radarTocar() {
+    clearInterval(RAD.timer);
+    if (!RAD.q.length) return;
+    RAD.timer = setInterval(function () { radarMostrar(RAD.i >= RAD.q.length - 1 ? 0 : RAD.i + 1); }, 650);
+    if (barraRadar) barraRadar.querySelector("[data-eq-radar-tocar] i").className = "ph ph-pause";
+  }
+  function radarParar() {
+    clearInterval(RAD.timer); RAD.timer = null;
+    if (barraRadar) barraRadar.querySelector("[data-eq-radar-tocar] i").className = "ph ph-play";
+  }
+  function radarLigar(on) {
+    RAD.ligado = on;
+    if (on) radarCarregar(); else radarParar();
+    radarMostrar(RAD.i);
+    if (barraRadar) barraRadar.hidden = !on;
+    quadro.querySelectorAll("[data-eq-chuva]").forEach(function (b) { b.setAttribute("aria-pressed", String(on)); });
+  }
+  if (barraRadar) {
+    barraRadar.querySelector("[data-eq-radar-quadro]").addEventListener("input", function (e) { radarParar(); radarMostrar(+e.target.value); });
+    radarLigar(RAD.ligado);
+  }
+
+  // ── o vídeo wall (26/11/2026) ─────────────────────────────────────────────────────────────────────────────────────
+  // O protótipo aprovado ("ok sobe") e a referência do COS: o Brasil inteiro fixo na caixa do meio ("tem que ser que caiba
+  // exatamente a figura do Brasil e não vai ficar sendo necessário dar zoom, mudar"), o tipo que gira a cada 20 s ("a cada
+  // 20 segundos vai mudar [...] alarmes, chuva e equipes") e o clique com zoom automático e o botão de voltar ("pode até
+  // clicar e dar um zoom automático. Mas é importante ter um botão para voltar pro mapa"); sem clique, volta em 45 s
+  function esc(s) { var d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+  var TV = null;
+  function tvEnquadrar(dur) { mapa.fitBounds(BRASIL, { padding: 16, duration: dur || 0 }); }
+  function tvMarcar(parado) {
+    if (!TV.barra) return;
+    TV.barra.classList.remove("anda", "parado"); void TV.barra.offsetWidth; TV.barra.classList.add(parado ? "parado" : "anda");
+  }
+  function tvTipo(t) {
+    TV.tipo = t;
+    document.querySelectorAll("[data-tv-tipo]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-tv-tipo") === t)); });
+    if (TV.raiz) TV.raiz.classList.toggle("eqtv--chuva", t === "chuva");
+    radarLigar(t === "chuva");
+    if (t === "chuva" && RAD.q.length) radarTocar();
+    ["avisos", "avisos-futuro", "focos", "aneis"].forEach(function (id) {
+      if (mapa.getLayer(id)) mapa.setLayoutProperty(id, "visibility", t === "chuva" ? "visible" : "none");
+    });
+    foco = t === "equipes" ? "tecnico" : "usina";
+    aplicarFoco();
+  }
+  function tvGirar() {
+    clearInterval(TV.giro); tvMarcar(false);
+    TV.giro = setInterval(function () { tvTipo(TV.TIPOS[(TV.TIPOS.indexOf(TV.tipo) + 1) % TV.TIPOS.length]); tvMarcar(false); }, TV.ms);
+  }
+  function tvZoom(c, html) {
+    if (!c) return;
+    TV.zoom = true; clearInterval(TV.giro); tvMarcar(true);
+    mapa.flyTo({ center: c, zoom: 10, duration: REDUZIDO ? 0 : 1200, essential: true });
+    TV.pop.setLngLat(c).setHTML(html).addTo(mapa);
+    if (TV.brasil) TV.brasil.hidden = false;
+    clearTimeout(TV.volta); TV.volta = setTimeout(tvVoltar, 45000);
+  }
+  function tvZoomUsina(uid) {
+    var u = porUsina[String(uid)];
+    if (!u) return;
+    var cos = u.agora ? u.agora.rotulo + (u.agora.motivo ? " · " + u.agora.motivo : "") : "";
+    var tec = ((D.tv_usinas || {})[String(uid)] || []).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("");
+    tvZoom(u.c, "<b>" + esc(u.nome) + "</b>" + (cos ? "<small>" + esc(cos) + "</small>" : "") + tec);
+  }
+  function tvVoltar() {
+    if (!TV) return;
+    TV.zoom = false; clearTimeout(TV.volta); TV.pop.remove();
+    if (TV.brasil) TV.brasil.hidden = true;
+    tvEnquadrar(REDUZIDO ? 0 : 900);
+    tvGirar();
+  }
+  function tvComecar() {
+    var sec = document.querySelector(".eqtv-mapa");
+    TV = { raiz: document.querySelector("[data-eq-tv]"), TIPOS: ["alarmes", "chuva", "equipes"], tipo: "alarmes", giro: null,
+           zoom: false, volta: null, barra: document.querySelector("[data-tv-gira]"), brasil: document.querySelector("[data-tv-brasil]"),
+           ms: (parseInt(sec && sec.getAttribute("data-tv-giro-s"), 10) || 20) * 1000,
+           pop: new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 14, className: "eq-tvpop" }) };
+    if (TV.barra) TV.barra.style.setProperty("--giro", TV.ms / 1000 + "s");
+    // o Brasil fixo: nada de arrastar, girar ou dar zoom com a mão (o clique ainda dá o zoom automático)
+    ["scrollZoom", "boxZoom", "dragPan", "keyboard", "doubleClickZoom", "touchZoomRotate"].forEach(function (h) { mapa[h].disable(); });
+    tvEnquadrar(0);
+    tvTipo("alarmes");
+    tvGirar();
+    window.addEventListener("resize", function () { if (!TV.zoom) setTimeout(function () { tvEnquadrar(0); }, 80); });
+    document.addEventListener("click", function (e) {
+      var tb = e.target.closest("[data-tv-tipo]");
+      if (tb) { tvTipo(tb.getAttribute("data-tv-tipo")); if (!TV.zoom) tvGirar(); return; }
+      if (e.target.closest("[data-tv-brasil]")) { tvVoltar(); return; }
+      var el = e.target.closest("[data-tv-uid]");
+      if (el) tvZoomUsina(el.getAttribute("data-tv-uid"));
+    });
+    document.addEventListener("keydown", function (e) {
+      var el = e.target.closest && e.target.closest("[data-tv-uid]");
+      if (el && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); tvZoomUsina(el.getAttribute("data-tv-uid")); }
+    });
+  }
 })();

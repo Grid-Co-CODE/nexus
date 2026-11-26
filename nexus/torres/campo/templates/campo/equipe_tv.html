@@ -41,7 +41,7 @@
     </div>
     <a class="gc-btn gc-btn--contorno eqtv-sair" href="{{ url_for('torre_campo.equipe', **q_sair) }}">Sair do vídeo wall</a>
   </header>
-  <main class="eqtv-meio">
+  <main class="eqtv-meio eqtv-tres">
     <section class="eqtv-cos" aria-label="Ocorrências abertas no COS">
       <header class="eqtv-cos-cab">
         <div><p class="gc-eyebrow">COS · Ocorrências abertas</p><h2>Usinas com problema agora</h2></div>
@@ -61,11 +61,14 @@
           <section class="eqtv-grupo" aria-label="{{ g.nome }}">
             <h3 class="eqtv-grupo-tit"><i class="ph ph-{{ icone[g.id] }}" aria-hidden="true"></i><span>{{ g.nome }}</span><span class="eqtv-grupo-n">{{ g.cartoes|length }}</span></h3>
             {% for c in g.cartoes %}
-            <article class="eqtv-card eqtv-card--{{ g.tom }}">
+            <article class="eqtv-card eqtv-card--{{ g.tom }}" data-tv-uid="{{ c.uid }}" tabindex="0">
               <div class="eqtv-card-corpo">
                 <p class="eqtv-card-l1">{% if c.codigo %}<b class="eqtv-cod">{{ c.codigo }}</b>{% endif %}<span class="eqtv-nome">{{ c.nome }}{% if c.mwp %} · {{ c.mwp }}{% endif %}</span></p>
                 <p class="eqtv-card-l2">{{ c.falha }}</p>
                 <p class="eqtv-card-l3">{% if c.nota %}{{ c.nota }} · {% endif %}{{ c.os }}{% if c.mais %} · e mais {{ c.mais }} {{ 'ocorrência' if c.mais == 1 else 'ocorrências' }}{% endif %}</p>
+                {# o técnico ligado à ocorrência (26/11/2026, Levi: "mostra informações, tipo assim, técnico na usina"): na
+                   usina (a última posição a até 1 km, desde a chegada) ou a caminho (o destino da programação) #}
+                {% if c.tecnicos %}<p class="eqtv-card-tec">{% for x in c.tecnicos %}<span class="eqtv-tec eqtv-tec--{{ x.tipo }}"><i class="ph ph-{{ 'map-pin' if x.tipo == 'na_usina' else 'navigation-arrow' }}" aria-hidden="true"></i>{{ x.texto }}</span>{% endfor %}</p>{% endif %}
               </div>
               <div class="eqtv-card-lado">
                 <span class="eqtv-dur">{{ c.dur }}</span>
@@ -83,9 +86,45 @@
       <footer class="eqtv-ok"><i class="ph ph-check-circle" aria-hidden="true"></i><span>{{ r.sem_ocorrencia }} {{ 'usina sem ocorrência aberta' if r.sem_ocorrencia == 1 else 'usinas sem ocorrência aberta' }} no COS{% if r.sem_leitura %} · {{ r.sem_leitura }} sem leitura do COS{% endif %}</span></footer>
       {% endif %}
     </section>
-    <section class="eqtv-mapa" aria-label="O mapa">
+    {# o mapa no meio (26/11/2026): o Brasil inteiro fixo, sem arrastar nem zoom de mão; o tipo gira a cada 20 s (Alarmes,
+       Chuva, Equipes; Levi: "a cada 20 segundos vai mudar"); o clique numa usina, num cartão ou num evento dá o zoom, e o
+       Brasil inteiro volta pelo botão ou sozinho ("é importante ter um botão para voltar pro mapa") #}
+    <section class="eqtv-mapa" aria-label="O mapa" data-tv-giro-s="{{ giro_s }}">
+      <header class="eqtv-mapa-cab">
+        <h2>Alarmes e equipes</h2>
+        <span class="eqtv-conta">{% for k in contagem %}<span class="eqtv-conta-i eqtv-conta-i--{{ k.id }}"><b>{{ k.n }}</b>{{ k.rotulo }}</span>{% endfor %}</span>
+        <div class="cn-seg eqtv-tipo" role="group" aria-label="O que o mapa mostra">
+          <button type="button" data-tv-tipo="alarmes" aria-pressed="true"><i class="ph ph-warning" aria-hidden="true"></i>Alarmes</button>
+          <button type="button" data-tv-tipo="chuva" aria-pressed="false"><i class="ph ph-cloud-rain" aria-hidden="true"></i>Chuva</button>
+          <button type="button" data-tv-tipo="equipes" aria-pressed="false"><i class="ph ph-users-three" aria-hidden="true"></i>Equipes</button>
+        </div>
+        <button type="button" class="gc-btn gc-btn--primario eqtv-brasil" data-tv-brasil hidden><i class="ph ph-arrows-out" aria-hidden="true"></i>Brasil inteiro</button>
+        <a class="gc-btn gc-btn--contorno eqtv-sair-mapa" href="{{ url_for('torre_campo.equipe', **q_sair) }}"><i class="ph ph-x" aria-hidden="true"></i>Sair</a>
+        <span class="eqtv-gira" data-tv-gira aria-hidden="true"></span>
+      </header>
       <div class="eq-quadro eqtv-quadro">
         {% include "campo/_equipe_mapa_ml.html" %}
+        <div class="eqtv-desloc" aria-label="Equipes em deslocamento">
+          <h3>Equipes em deslocamento</h3>
+          <ul>{% for d in deslocamentos %}<li><span><b>{{ d.nome }}</b>{% if d.saiu %} · saiu {{ d.saiu }}{% endif %}<small>{{ 'para ' ~ d.para if d.para else 'destino não programado' }}</small></span>{% if d.chega %}<em>chega {{ d.chega }}</em>{% endif %}</li>{% else %}<li class="eqtv-desloc-vazio">Ninguém em deslocamento agora.</li>{% endfor %}</ul>
+        </div>
+      </div>
+    </section>
+    {# à direita, os eventos de hoje das ocorrências (26/11/2026, Levi: "do lado direito vai ter os eventos de hoje focados nas
+       ocorrências [...] do COS"): a abertura e a nota do COS, e o técnico só quando é de uma usina com ocorrência #}
+    <section class="eqtv-tl" aria-label="Eventos de hoje nas ocorrências">
+      <header class="eqtv-cos-cab"><div><p class="gc-eyebrow">COS · Linha do tempo</p><h2>Eventos de hoje nas ocorrências</h2></div></header>
+      <p class="eqtv-agora"><span>Agora · {{ hora }}</span></p>
+      <div class="eqtv-lista" data-eqtv-rola-tl>
+        <ol class="eqtv-tl-lista">
+          {% for e in linha_tempo %}
+          <li class="eqtv-tl-item" data-tv-uid="{{ e.uid }}" tabindex="0"><time>{{ e.hora }}</time>
+            <div class="eqtv-ev eqtv-ev--{{ e.tom }}"><div><b>{% if e.codigo %}{{ e.codigo }} {% endif %}{{ e.usina }}</b> <span>{{ e.texto }}</span><small>{{ e.fonte }}</small></div>
+              <span class="cn-pill cn-{{ e.tom }}">{{ e.tag }}</span></div></li>
+          {% else %}
+          <li class="eqtv-vazio">{{ 'Nenhum evento das ocorrências hoje.' if p.ligada else 'Sem a leitura do COS agora.' }}</li>
+          {% endfor %}
+        </ol>
       </div>
     </section>
   </main>

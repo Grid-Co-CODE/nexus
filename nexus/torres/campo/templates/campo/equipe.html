@@ -144,7 +144,8 @@
      ainda vai começar, só o contorno) e os focos da última hora do INPE, com o anel nos que estão a até 5 km de uma
      usina. Vêm do modelo do Mapa de risco, já nas unidades deste desenho #}
   {% macro clima_no_mapa() %}{% if clima and clima.avisos %}<g class="eq-avisos">{% for g in clima.avisos.grupos %}<g class="eq-av eq-av-{{ g.nivel }}{% if g.futuro %} eq-av--futuro{% endif %}">{% for a in g.itens if not a.oculto %}<path fill-rule="evenodd" d="{{ a.d }}"><title>{{ a.titulo }}</title></path>{% endfor %}</g>{% endfor %}</g>{% endif %}{% if clima and clima.focos %}{% if clima.focos.d %}<path class="eq-focos" d="{{ clima.focos.d }}"/>{% endif %}<g class="eq-focos-aneis">{% for a in clima.focos.aneis %}<circle class="eq-foco-anel" cx="{{ a.x }}" cy="{{ a.y }}" r="9"/>{% endfor %}</g>{% endif %}{% endmacro %}
-  <div class="eq-corpo{% if painel_ev %} eq-corpo--ev{% endif %}{% if clima %} eq-corpo--clima{% endif %}">
+  {# a gaveta do técnico escolhido mais larga (26/11/2026, Levi: "poderia ter mais espaço para a ordem cronológica") #}
+  <div class="eq-corpo{% if painel_ev %} eq-corpo--ev{% endif %}{% if clima %} eq-corpo--clima{% endif %}{% if sel %} eq-corpo--sel{% endif %}">
     {% if clima %}{% set cm = clima.m %}
     {# o painel do clima (11/11/2026): os alertas POR USINA, de quem pede ação para baixo; quem não tem alerta não vira
        linha, só a conta. A honestidade é a do Mapa de risco: a fonte fora é dita, e sem leitura não há "sem alerta" #}

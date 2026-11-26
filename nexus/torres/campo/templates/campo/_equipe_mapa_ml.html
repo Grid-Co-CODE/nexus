@@ -15,6 +15,9 @@
 {# os dois focos (Levi, 12/11/2026: "Quero ter dois focos, foco técnico e focos usina, dessa forma dá para focar
    melhor") e o Mapa | Satélite ("Quero a visão de mapa e satélite"; a Esri, com a chave de Base > Chaves) #}
 <div class="eq-camadas" role="group" aria-label="O que o mapa destaca">
+  {# a chuva do radar (26/11/2026, Levi: "azul mais chuva, quando tiver fortalecendo, ficar uma região mais vermelha"),
+     pelo Nexus; liga e desliga aqui, e a escolha fica no navegador #}
+  {% if mapa_js.radar %}<div class="cn-seg eq-seg-mapa" role="group" aria-label="Chuva"><button type="button" data-eq-chuva aria-pressed="false"><i class="ph ph-cloud-rain" aria-hidden="true"></i>Chuva agora</button></div>{% endif %}
   {% if mapa_js.modo == 'tecnicos' %}<div class="cn-seg eq-seg-mapa" role="group" aria-label="Foco"><button type="button" data-eq-foco="tecnico" aria-pressed="true">Foco técnico</button><button type="button" data-eq-foco="usina" aria-pressed="false">Foco usina</button></div>{% endif %}
   {# o Mapa | Satélite fica sempre à vista (Levi, 12/11/2026: "CADÊ A OPÇÃO MAPA/SATÉLITE??"); sem a chave da Esri, o
      Satélite diz o que falta, e o administrador ganha o link para Base > Chaves #}
@@ -25,6 +28,14 @@
 <div class="eq-palco eq-palco--ml">
   <div class="eq-ml" id="eq-mapa" role="region" aria-label="{{ 'As usinas no mapa' if usinas else 'Os técnicos de campo no mapa' }}"></div>
   <div class="eq-dica" role="status" hidden></div>
+  {% if mapa_js.radar %}
+  <div class="eq-radar" data-eq-radar hidden>
+    <button type="button" class="eq-radar-tocar" data-eq-radar-tocar aria-label="Tocar as últimas 2 horas do radar"><i class="ph ph-play" aria-hidden="true"></i></button>
+    <input type="range" min="0" max="0" value="0" step="1" data-eq-radar-quadro aria-label="A hora do radar">
+    <span class="eq-radar-hora" data-eq-radar-hora>…</span>
+    <span class="eq-radar-leg" aria-hidden="true"><i></i><small>fraca</small><small>forte</small></span>
+  </div>
+  {% endif %}
   <p class="eq-ml-aviso" hidden></p>
 </div>
 <script type="application/json" id="eq-dados">{{ mapa_js|tojson }}</script>

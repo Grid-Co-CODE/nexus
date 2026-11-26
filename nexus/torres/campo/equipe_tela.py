@@ -32,6 +32,9 @@ ao registro da LGPD como `abriu_percurso`, com o período, antes de a página sa
 import json
 import logging
 import re
+import threading
+import time as _tempo
+from collections import OrderedDict
 from collections import Counter
 from datetime import datetime, time, timedelta, timezone
 
@@ -932,6 +935,9 @@ def _dados_do_mapa(modo, coords, nome_de_usina, onde_de_usina, *, linhas=(), pon
             "fontes": url_for("static", filename="mapa/fontes/FONTE/FAIXA.pbf").split("?")[0]
             .replace("FONTE", "{fontstack}").replace("FAIXA", "{range}"),
             "usinas": usinas, "tecnicos": tecnicos, "percurso": (perc or {}).get("js"), "clima": geo,
+            # o radar da chuva (26/11/2026), pelo Nexus: a lista dos quadros e o começo do endereço de cada bloco
+            "radar": {"lista": url_for("torre_campo.equipe_radar_lista"),
+                      "bloco": url_for("torre_campo.equipe_radar_lista").replace("radar.json", "radar/")},
             "satelite": _satelite(), "tv": bool(tv)}
 
 
@@ -1032,7 +1038,11 @@ RECARREGA_TV_S = 120
 DIAS = ("segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo")
 
 
-def _tela_tv(b, coords, nomes_usina, mapa_js, filtro, agora):
+# a troca do tipo do mapa do vídeo wall (Levi, 26/11/2026: "a cada 20 segundos vai mudar [...] alarmes, chuva e equipes")
+GIRO_TV_S = 20
+
+
+def _tela_tv(b, coords, nomes_usina, mapa_js, filtro, agora, linhas=(), eventos=()):
     """O vídeo wall (Levi, 12/11/2026: "Prepare um modo vídeo wall que apareça informações como no anexo 1 do lado
     esquerdo do mapa!"): o mapa de verdade em tela cheia, sem a casca do Nexus, com o painel das ocorrências abertas da
     Ronda COS ao lado (`campo/equipe/parede.py`, a mesma fotografia que pinta as usinas no mapa). Chega aqui DEPOIS do
@@ -1050,10 +1060,32 @@ def _tela_tv(b, coords, nomes_usina, mapa_js, filtro, agora):
             return b.por_id.get(int(uid)) or {}
         except (TypeError, ValueError):
             return {}
-    painel = PA.montar(cos, list(coords), lambda uid: nomes_usina.get(str(uid)) or f"Usina {uid}", ficha, agora)
+    nome_de = lambda uid: nomes_usina.get(str(uid)) or f"Usina {uid}"     # noqa: E731
+    painel = PA.montar(cos, list(coords), nome_de, ficha, agora)
+    # as três colunas (26/11/2026, o protótipo aprovado e a referência do COS): o técnico na usina ou a caminho em cada
+    # cartão; no meio, a contagem do mapa, quem está em deslocamento (com a rota) e o que dizer de cada usina no zoom;
+    # à direita, os eventos de hoje das ocorrências
+    tec = PA.tecnicos_nas_usinas(linhas, eventos)
+    for g in painel.get("grupos") or ():
+        for c in g["cartoes"]:
+            c["tecnicos"] = tec.get(str(c["uid"]), [])
+    desloc = PA.deslocamentos(linhas, eventos, nome_de)
+    c_de = {t["pid"]: t["c"] for t in (mapa_js or {}).get("tecnicos") or ()}
+    em_desloc = [l for l in linhas if (l.get("s") or {}).get("chave") == "deslocamento"]
+    rotas = []
+    for l, d in zip(em_desloc, desloc):
+        if d["uid"] and l["pid"] in c_de and d["uid"] in coords:
+            rotas.append({"de": c_de[l["pid"]], "para": _lonlat(*coords[d["uid"]][:2]),
+                          "rot": f"chega {d['chega']}" if d["chega"] else ""})
+    if mapa_js is not None:
+        mapa_js["tv_usinas"] = {uid: [x["texto"] for x in lst] for uid, lst in tec.items()}
+        mapa_js["rotas"] = rotas
+    contagem = PA.contagem({u["id"]: u.get("agora") for u in (mapa_js or {}).get("usinas") or ()})
+    linha_tempo = PA.linha_do_tempo(cos, list(coords), nome_de, ficha, list(eventos), agora)
     local = agora.astimezone(_BRT)
     r = current_app.make_response(render_template(
         "campo/equipe_tv.html", torre=TORRE, tela=TORRE.tela("equipe"), p=painel, mapa_js=mapa_js,
+        contagem=contagem, deslocamentos=desloc, linha_tempo=linha_tempo, giro_s=GIRO_TV_S,
         recarrega_s=RECARREGA_TV_S, hora=local.strftime("%H:%M"), data=f"{DIAS[local.weekday()]}, {local:%d/%m}",
         prazo=_prazo_da_tv(), q_sair=dict(filtro["q"]), link_chaves=bool(session.get("admin"))))
     r.headers["Cache-Control"] = "no-store"         # a posição de pessoas não fica na cópia do navegador nem de proxy
@@ -1071,6 +1103,9 @@ def equipe():
     com_clima = _com_clima()
     if str(request.args.get("ver") or "").strip() == "usinas":
         return _tela_usinas(com_clima)
+    # o vídeo wall (26/11/2026): a vez da Chuva mostra os avisos do INMET, então o clima vem sempre, sem ir aos links
+    tv_pedido = str(request.args.get("tv") or "").strip() == "1"
+    clima_lido = com_clima or tv_pedido
     srv, aviso = _servico_da_tela()
     if srv is None:
         return _tela({"erro": aviso})
@@ -1127,7 +1162,7 @@ def equipe():
     avisos = [a for a in (aviso_piloto,) if a]
     # o clima por usina (11/11/2026), na vista do desenho que a página mostra: a do percurso aberto, ou a do mapa
     clima = None
-    if com_clima:
+    if clima_lido:
         try:
             vista = perc.get("vista") if perc and perc.get("desenho") else None
             if vista is None and not (perc and perc.get("desenho")) and mapa["viewbox"]:
@@ -1148,7 +1183,7 @@ def equipe():
                               b=b, tv=tv)
                if ml else None)
     if tv:
-        return _tela_tv(b, coords, nomes_usina, mapa_js, filtro, agora)
+        return _tela_tv(b, coords, nomes_usina, mapa_js, filtro, agora, linhas, eventos)
     admin = bool(session.get("admin"))
     adesao = _adesao(srv, b, tecnicos, filtro, piloto) if _ve_adesao(srv, b) else None
     todos = []
@@ -1198,6 +1233,85 @@ def equipe_mapa_base():
         return _texto(404, "O mapa base não está neste servidor: suba o arquivo em Base > Mapa base.")
     r = send_file(p, mimetype="application/octet-stream", conditional=True, etag=True, max_age=3600)
     r.headers["Cache-Control"] = "private, max-age=3600"
+    return r
+
+
+# ── o radar de chuva (26/11/2026) ──────────────────────────────────────────────────────────────────────────────────
+# O Levi aprovou o protótipo do mapa redesenhado com a chuva do radar ("azul mais chuva, quando tiver fortalecendo,
+# ficar uma região mais vermelha"). A RainViewer (grátis, sem chave; medida em 26/11/2026 com eco sobre SP, Goiânia e
+# Curitiba) dá os quadros das últimas 2 h, de 10 em 10 min. O navegador NUNCA pede a ela: o Nexus busca e repassa,
+# como o mapa base (o guia do Willian: nenhum terceiro vê a região que o COS está olhando). Só quem vê o mapa pede; o
+# caminho do bloco é conferido pela forma do radar (o Nexus não repassa outra coisa); a lista fica 2 min e cada bloco
+# 15 min numa cópia em memória (no máximo RADAR_BLOCOS, o mais velho sai).
+RADAR_LISTA = "https://api.rainviewer.com/public/weather-maps.json"
+RADAR_BLOCO = "https://tilecache.rainviewer.com/"
+RADAR_LISTA_S, RADAR_BLOCO_S, RADAR_BLOCOS = 120, 900, 3000
+_RADAR_CAMINHO = re.compile(r"v2/radar/[0-9a-f]{6,24}/256/\d{1,2}/\d{1,6}/\d{1,6}/\d{1,2}/\d_\d\.png")
+_RADAR: dict = {"lista": None, "lista_em": 0.0, "blocos": OrderedDict()}
+_RADAR_TRAVA = threading.Lock()
+
+
+def _buscar_radar(url: str) -> tuple:
+    """(status, corpo): o JSON lido, para a lista; os bytes, para o bloco. Só GET, 15 s."""
+    import requests
+    r = requests.get(url, timeout=15, headers={"User-Agent": "Nexus Grid Co. (mapa de equipe)"})
+    return r.status_code, (r.json() if url.endswith(".json") else r.content)
+
+
+@bp.route("/equipe/radar.json", endpoint="equipe_radar_lista")
+def equipe_radar_lista():
+    """Os quadros do radar ({"quadros": [{time, path}]}, do mais velho ao mais novo), sem o servidor de lá: o navegador
+    pede cada bloco a `/t/campo/equipe/radar/<path>/256/{z}/{x}/{y}/8/1_1.png`."""
+    if not _quem_ve()["pode"]:
+        abort(403)
+    agora = _tempo.monotonic()
+    with _RADAR_TRAVA:
+        lista = _RADAR["lista"] if _RADAR["lista"] and agora - _RADAR["lista_em"] < RADAR_LISTA_S else None
+    if lista is None:
+        try:
+            st, j = _buscar_radar(RADAR_LISTA)
+            if st != 200:
+                raise ValueError(f"status {st}")
+            lista = [{"time": int(q["time"]), "path": str(q["path"])} for q in (j.get("radar") or {}).get("past") or ()
+                     if _RADAR_CAMINHO.fullmatch(str(q.get("path", "")).lstrip("/") + "/256/1/1/1/8/1_1.png")]
+        except Exception as e:      # noqa: BLE001 — o radar é uma camada a mais: o mapa segue sem ele
+            _log.warning("equipe: o radar da chuva não respondeu (%s)", type(e).__name__)
+            return jsonify({"erro": "O radar da chuva não respondeu agora."}), 503
+        with _RADAR_TRAVA:
+            _RADAR.update(lista=lista, lista_em=agora)
+    r = jsonify({"quadros": lista})
+    r.headers["Cache-Control"] = "private, max-age=60"
+    return r
+
+
+@bp.route("/equipe/radar/<path:caminho>", endpoint="equipe_radar_bloco")
+def equipe_radar_bloco(caminho):
+    if not _quem_ve()["pode"]:
+        abort(403)
+    if not _RADAR_CAMINHO.fullmatch(caminho):
+        abort(404)
+    agora = _tempo.monotonic()
+    with _RADAR_TRAVA:
+        guardado = _RADAR["blocos"].get(caminho)
+        if guardado and agora - guardado[0] < RADAR_BLOCO_S:
+            _RADAR["blocos"].move_to_end(caminho)
+            corpo = guardado[1]
+        else:
+            corpo = None
+    if corpo is None:
+        try:
+            st, corpo = _buscar_radar(RADAR_BLOCO + caminho)
+            if st != 200:
+                raise ValueError(f"status {st}")
+        except Exception as e:      # noqa: BLE001
+            _log.warning("equipe: o bloco do radar não veio (%s)", type(e).__name__)
+            return _texto(503, "O radar da chuva não respondeu agora.")
+        with _RADAR_TRAVA:
+            _RADAR["blocos"][caminho] = (agora, corpo)
+            while len(_RADAR["blocos"]) > RADAR_BLOCOS:
+                _RADAR["blocos"].popitem(last=False)
+    r = Response(corpo, mimetype="image/png")
+    r.headers["Cache-Control"] = "private, max-age=600"
     return r
 
 

@@ -1943,6 +1943,55 @@ cada um nas palavras do Piloto (`celulares.situacao`).
 Prova: `tests/test_equipe_adesao_field_23_11.py`. Na bancada (`perc_bancada.py`, 10 técnicos falsos): 2 de 10 prontos
 (20%), 5 faltando, 3 sem o app.
 
+### O redesenho do mapa e o vídeo wall em três colunas (26/11/2026)
+
+**Para que serve e quem pediu.** O Levi pediu o Mapa de equipe "do zero": os botões arredondados, o clima mais visual
+("você pode estar azul, mais chuva, quando tiver fortalecendo, ficar uma região mais vermelha"), o percurso mais rápido
+ao clicar no técnico ("Demorou um pouco para mostrar o percurso") e mais espaço para a linha do tempo ("está cortando muita
+tela"). Ele deixou as decisões comigo ("tome as próprias decisões e me mande um protótipo"); o protótipo (na bancada,
+`perc_bancada.py` + `prototipo_mapa_equipe.html`, fora do repositório) foi aprovado com "ok sobe". O vídeo wall seguiu a
+referência do COS (a sugestão 10, "Videowall do COS: ocorrências, mapa e timeline em três colunas", do Fillipe, 08/11/2026),
+com os pedidos dele em cima: "do lado esquerdo [...] as usinas com problema agora, e aí tem quanto tempo, e do lado direito
+[...] os eventos de hoje focados nas ocorrências [...] do COS [...] técnico na usina"; "tem que ser que caiba exatamente a
+figura do Brasil e não vai ficar sendo necessário dar zoom"; "a cada 20 segundos vai mudar [...] alarmes, chuva e
+equipes"; "pode até clicar e dar um zoom automático. Mas é importante ter um botão para voltar pro mapa".
+
+**O que subiu nesta parte (a 1ª de duas):**
+- **A chuva do radar** (`equipe_tela.equipe_radar_lista` e `equipe_radar_bloco`; `campo-mapa.js`, "a chuva do radar"): os
+  quadros das últimas 2 h da RainViewer (grátis, sem chave; em 26/11/2026 com eco sobre SP, Goiânia e Curitiba), do azul
+  (fraca) ao vermelho (forte), debaixo da máscara de fora do Brasil. **O navegador nunca pede à RainViewer**: o Nexus busca e
+  repassa (`/t/campo/equipe/radar.json` e `/t/campo/equipe/radar/<caminho>`), como o mapa base (nenhum terceiro vê a região
+  olhada). Só quem vê o mapa (`_quem_ve`); o caminho é conferido pela forma do bloco do radar (`_RADAR_CAMINHO`: o Nexus não
+  repassa outra coisa); a lista fica 2 min e cada bloco 15 min em memória (no máximo 3.000). Fonte fora = 503 e o mapa
+  segue. Na tela, o botão **Chuva agora** liga e desliga (começa ligado; a escolha fica no navegador), com a barra de
+  reprodução no pé do mapa; só o quadro da vez fica visível (o oculto não pede bloco), mais transparente de perto (o radar
+  vai só até o zoom 7). Prova: `tests/test_equipe_radar_26_11.py`.
+- **O percurso aparece inteiro na hora**: a câmera vai em 0,5 s e o traço já vem desenhado (até ali, 1,8 s de voo e ~8 s
+  de traço se desenhando, a prévia de 12/11); a reprodução segue na barra, para quem quiser tocar.
+- **Técnicos | Usinas e os botões do mapa em pílulas arredondadas**; a gaveta do técnico escolhido mais larga
+  (`eq-corpo--sel`, até 540 px).
+- **O vídeo wall em três colunas** (`campo/equipe_tv.html`; a conta em `campo/equipe/parede.py`, pura):
+  - **esquerda:** as usinas com problema agora (o painel de 12/11), cada cartão com o técnico ligado à ocorrência
+    (`tecnicos_nas_usinas`): **na usina** = a situação do mapa (a última posição a até 1 km), "desde" a última chegada do dia
+    (o primeiro ponto do dia já na usina conta); **a caminho** = em deslocamento, com o destino da programação e a chegada
+    prevista da última saída;
+  - **meio:** o mapa com o **Brasil inteiro fixo** (sem arrastar nem zoom de mão; reenquadra quando a tela muda), a
+    contagem pelo Agora de Comando > Usinas (`contagem`: críticas, em atenção, sem comunicação, normais), o tipo que **gira
+    a cada 20 s** (`GIRO_TV_S`: Alarmes, as usinas na cor do Agora; Chuva, o radar animado e os avisos do INMET, por isso o
+    vídeo wall lê o clima sempre, sem levar o `clima=1` aos links; Equipes, o foco no técnico), a barrinha do giro, as
+    **Equipes em deslocamento** (`deslocamentos`) com a rota tracejada até a usina de destino; o **clique** numa usina, num
+    cartão ou num evento dá o zoom com o resumo (o estado, o motivo e o técnico na usina ou a caminho), para o giro, e o
+    **Brasil inteiro** volta pelo botão ou sozinho em 45 s; o **Sair** fica sempre à vista no alto do mapa (o do topo só
+    aparecia ao mexer o mouse: "Eu não encontrei esse botão");
+  - **direita:** os **eventos de hoje das ocorrências** (`linha_do_tempo`), do mais novo ao mais velho: do COS, a abertura
+    de hoje ("Nova · OS N", o grupo e a falha) e a última nota de hoje ("Atualizada"), com a hora do COS; do Nexus Field, só
+    o técnico das usinas com ocorrência aberta (chegou, saiu, a caminho com a chegada prevista). O "Normalizada" e o
+    "Fechada" da referência não vêm: a fotografia do COS só traz as abertas. Rola sozinha, como a lista da esquerda.
+  - Prova: `tests/test_equipe_videowall_26_11.py`.
+
+**A 2ª parte (a seguir):** na tela, o painel da usina na visão de Usinas (as ocorrências, os técnicos mais perto, a chuva
+no local e o aviso) e o percurso aberto sem recarregar a página.
+
 ### O vídeo wall (12/11/2026)
 
 Levi, com o mockup do COS ("COS · Ocorrências abertas · Usinas com problema agora"): "Prepare um modo vídeo wall que apareça

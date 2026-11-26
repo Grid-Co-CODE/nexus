@@ -11,7 +11,7 @@ pior ocorrência dela (a mesma que pinta a usina no mapa), com "e mais N" quando
 do mockup ficou fora (o Nexus não tem o PR de hoje), e sem a fotografia o painel diz que não leu.
 
 Funções puras: a rota lê as fontes e passa o dado já lido, e o teste prova a conta (`tests/test_equipe_parede.py`)."""
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from ...comando import usinas as CU
 from ...cos import andamento as AND
@@ -129,3 +129,114 @@ def montar(cos: dict | None, uids, nome_de, ficha_de, agora: datetime) -> dict:
                        for gid, nome, _c, tom in GRUPOS if por_grupo[gid]],
             "rodape": {"sem_ocorrencia": sum(1 for u in uids if u in lidas and u not in ocs),
                        "sem_leitura": sum(1 for u in uids if u not in lidas)}}
+
+
+# ── as três colunas (26/11/2026) ───────────────────────────────────────────────────────────────────────────────────────
+# O Levi aprovou o protótipo do Mapa de equipe redesenhado ("ok sobe"), com a referência do COS (a sugestão 10, "Videowall
+# do COS: ocorrências, mapa e timeline em três colunas") e os pedidos dele: à esquerda as usinas com problema agora e há
+# quanto tempo; à direita os eventos de hoje focados nas ocorrências do COS, com o técnico só quando ele tem a ver com
+# uma delas ("mostra informações, tipo assim, técnico na usina"). Nada se inventa: a hora da abertura e a da nota são as
+# do COS; a do técnico, a do Nexus Field; sem a fotografia do COS, a linha do tempo fica vazia.
+_BRT = timezone(timedelta(hours=-3))
+NOME_DO_GRUPO = {g[0]: g[1] for g in GRUPOS}
+# a contagem do mapa, nas palavras do Agora de Comando > Usinas (a mesma régua que pinta a usina)
+CONTAGEM = (("critico", "críticas"), ("alerta", "em atenção"), ("semcom", "sem comunicação"), ("ok", "normais"))
+
+
+def _hhmm(iso_utc) -> str:
+    q = AND.instante(iso_utc)
+    return q.astimezone(_BRT).strftime("%H:%M") if q else ""
+
+
+def tecnicos_nas_usinas(linhas: list, eventos: list) -> dict:
+    """{usina_id (texto): [{"nome", "tipo" (na_usina | a_caminho), "texto"}]}. Na usina = a situação do mapa (a última
+    posição a até 1 km dela), desde a última chegada do dia (o primeiro ponto do dia já na usina também conta); a caminho
+    = em deslocamento, com a última saída levando o destino da programação e a chegada prevista. `eventos` do mais novo
+    ao mais velho (o `_eventos_do_dia` da tela)."""
+    out: dict = {}
+    for l in linhas:
+        s, pid = l.get("s") or {}, l.get("pid")
+        if s.get("chave") == "na_usina" and s.get("usina_perto"):
+            uid = str(s["usina_perto"][0])
+            ch = next((e for e in eventos if e.get("pessoa_id") == pid and e.get("tipo") in ("chegou", "inicio")
+                       and str(e.get("usina_id")) == uid), None)
+            texto = f"{l['nome']} na usina" + (f" desde {ch['hora']}" if ch else "")
+            out.setdefault(uid, []).append({"nome": l["nome"], "tipo": "na_usina", "texto": texto})
+        elif s.get("chave") == "deslocamento":
+            saida = next((e for e in eventos if e.get("pessoa_id") == pid and e.get("tipo") == "saiu"), None)
+            if saida and saida.get("destino_usina_id") is not None:
+                chega = _hhmm(saida.get("chegada_prevista"))
+                out.setdefault(str(saida["destino_usina_id"]), []).append(
+                    {"nome": l["nome"], "tipo": "a_caminho", "texto": f"{l['nome']} a caminho" + (f", chega {chega}" if chega else "")})
+    return out
+
+
+def linha_do_tempo(cos: dict | None, uids, nome_de, ficha_de, eventos: list, agora: datetime) -> list:
+    """Os eventos de HOJE (Brasília) das usinas com ocorrência aberta, do mais novo ao mais velho: [{"hora", "uid",
+    "usina", "codigo", "texto", "tag", "tom", "fonte"}]. Do COS, a abertura de hoje ("Nova · OS N", o grupo e a falha) e
+    a última nota de hoje ("Atualizada"); do Nexus Field, só o técnico daquelas usinas: chegou (ou começou o dia nela),
+    saiu, ou saiu para ela com a chegada prevista. Sem a fotografia do COS, nada."""
+    if cos is None:
+        return []
+    ocs = {str(k): v for k, v in (cos.get("ocs") or {}).items() if v}
+    lidas = {str(x) for x in cos.get("lidas") or ()}
+    com_oc = [str(u) for u in uids if str(u) in lidas and str(u) in ocs]
+    hoje = agora.astimezone(_BRT).date()
+    itens = []
+
+    def item(inst, uid, texto, tag, tom, fonte, cod=""):
+        itens.append((inst, {"hora": inst.astimezone(_BRT).strftime("%H:%M"), "uid": uid, "usina": nome_de(uid),
+                             "codigo": cod, "texto": texto, "tag": tag, "tom": tom, "fonte": fonte}))
+    codigo = {}
+    for uid in com_oc:
+        for o in ocs[uid]:
+            cod = _codigo(o, ficha_de(uid) or {})
+            codigo.setdefault(uid, cod)
+            abriu = AND.instante(o.get("abertura"))
+            if abriu and abriu.astimezone(_BRT).date() == hoje:
+                falha = str(o.get("falha") or "").strip() or CU.motivo(o)
+                os_ = str(o.get("os") or "")
+                item(abriu, uid, f"{NOME_DO_GRUPO[grupo(o)]}: {falha}", "Nova" + (f" · OS {os_}" if os_.isdigit() else ""),
+                     "critico", "Ronda COS", cod)
+            nota = o.get("ultima_nota") or {}
+            quando = AND.instante(nota.get("quando"))
+            if quando and quando.astimezone(_BRT).date() == hoje and str(nota.get("texto") or "").strip():
+                item(quando, uid, str(nota["texto"]).strip(), "Atualizada", "alerta", "Ronda COS", cod)
+    tem = set(com_oc)
+    for e in eventos:
+        inst = AND.instante(e.get("instante"))
+        if not inst or inst.astimezone(_BRT).date() != hoje:
+            continue
+        u, destino, nome = str(e.get("usina_id")), str(e.get("destino_usina_id")), e.get("nome") or "Técnico"
+        if e.get("tipo") in ("chegou", "inicio") and u in tem:
+            item(inst, u, f"{nome} chegou na usina", "Técnico na usina", "ok", "Nexus Field", codigo.get(u, ""))
+        elif e.get("tipo") == "saiu" and u in tem:
+            item(inst, u, f"{nome} saiu da usina", "Técnico saiu", "neutro", "Nexus Field", codigo.get(u, ""))
+        elif e.get("tipo") == "saiu" and destino in tem:
+            chega = _hhmm(e.get("chegada_prevista"))
+            item(inst, destino, f"{nome} a caminho" + (f", chegada prevista {chega}" if chega else ""), "Técnico a caminho",
+                 "info", "Nexus Field", codigo.get(destino, ""))
+    return [i for _inst, i in sorted(itens, key=lambda x: x[0], reverse=True)]
+
+
+def contagem(agora_por_usina: dict) -> list:
+    """[{"id", "n", "rotulo"}] das usinas do mapa por cor do Agora (crítico, atenção, sem comunicação, normal)."""
+    n = {k: 0 for k, _r in CONTAGEM}
+    for a in (agora_por_usina or {}).values():
+        if a and a.get("tom") in n:
+            n[a["tom"]] += 1
+    return [{"id": k, "n": n[k], "rotulo": r} for k, r in CONTAGEM]
+
+
+def deslocamentos(linhas: list, eventos: list, nome_de) -> list:
+    """[{"nome", "saiu", "uid", "para", "chega"}] de quem está em deslocamento agora, pela última saída do dia: a hora,
+    o destino da programação (vazio quando não há) e a chegada prevista pela régua do PCM."""
+    out = []
+    for l in linhas:
+        if (l.get("s") or {}).get("chave") != "deslocamento":
+            continue
+        saida = next((e for e in eventos if e.get("pessoa_id") == l.get("pid") and e.get("tipo") == "saiu"), None)
+        uid = str(saida["destino_usina_id"]) if saida and saida.get("destino_usina_id") is not None else ""
+        out.append({"nome": l["nome"], "saiu": saida["hora"] if saida else "", "uid": uid,
+                    "para": (nome_de(uid) or "") if uid else "", "chega": _hhmm(saida.get("chegada_prevista")) if saida else ""})
+    return out
