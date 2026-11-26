@@ -86,7 +86,10 @@ CAMPOS: dict[str, tuple] = {
                 ("inicio", "Início da vigência", "data", None), ("fim", "Fim da vigência", "data", None),
                 ("aviso_dias", "Aviso prévio de renovação (dias)", "inteiro", None),
                 ("indice", "Índice de reajuste", "texto", None), ("data_base", "Data-base do reajuste", "data", None),
-                ("sla", "SLA de atendimento (resumo)", "longo", None), ("observacoes", "Observações", "longo", None)),
+                ("sla", "SLA de atendimento (resumo)", "longo", None), ("observacoes", "Observações", "longo", None),
+                # as metas da aba Indicadores (26/11/2026): o número gravado aqui vence o lido do PDF
+                ("meta_pr", "Meta de PR do contrato (%)", "numero", None),
+                ("meta_disp", "Garantia de disponibilidade (%)", "numero", None)),
     "contrato": (("vigencia.inicio", "Início da vigência", "data", None), ("vigencia.fim", "Fim da vigência", "data", None),
                  ("renovacao.aviso_previo_dias", "Aviso prévio de renovação (dias)", "inteiro", None),
                  ("valor.mensal", "Valor mensal (R$)", "numero", None),

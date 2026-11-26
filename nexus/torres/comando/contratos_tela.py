@@ -139,6 +139,151 @@ def contratos_dados():
     return resp
 
 
+# ── a aba Indicadores (26/11/2026; a conta em `nexus/contratos/indicadores.py`) ──────────────────────────────────────
+INDICADORES_S = 60                   # a cópia por contrato e ano: as fontes já têm as delas, esta poupa a montagem
+
+
+def _fontes_da_ligacao(cliente: str, uids: set, ano: dict) -> tuple[dict, dict, dict, dict, list[str]]:
+    """(pcm, zel, zel_min, ligacao, avisos) do cliente no ano: as tarefas do PCM e o cronograma do Radar ligados à usina
+    pelo nome (`responsaveis.Nomes`, a régua de todo o Nexus: nome que serve a duas usinas não liga). Fonte que não abre
+    vira aviso, e o resto vale."""
+    from flask import current_app
+
+    from ...campo import responsaveis as R
+    from ...campo import visao
+    from ...comando.gerencial import chave_cliente
+    from ...pcm import fonte as PF
+    from ...pcm import gestao as PG
+    avisos, ligacao = [], {}
+    pcm, zel, zel_min = {}, {}, {}
+    nomes = R.Nomes(visao._Base())
+    chave = chave_cliente(cliente)
+    meses = set()
+    a, m = int(ano["ini"][:4]), int(ano["ini"][5:7])
+    for _ in range(12):
+        meses.add(f"{a:04d}-{m:02d}")
+        a, m = (a + 1, 1) if m == 12 else (a, m + 1)
+    # MPM, MPS e MPA: as tarefas do ano do PCM (a cópia que já está na memória; sem ela, a leitura vem por trás)
+    try:
+        lei = PF.ler_gestao_sem_esperar(current_app.config)
+        if lei is None:
+            avisos.append("as tarefas do PCM ainda estão chegando: as preventivas aparecem em instantes")
+        else:
+            lig = tot = 0
+            for tr in (lei.dados or {}).get("tarefas") or []:
+                sm = PG.classificar(tr)
+                if not sm or sm[0] not in ("MPM", "MPS", "MPA") or sm[1] not in meses:
+                    continue
+                do_cliente = chave_cliente(tr.get("cliente")) == chave
+                uid = nomes.usina(tr.get("usina"), fracttal=tr.get("usina"))[0]
+                if uid not in uids:
+                    tot += 1 if do_cliente else 0
+                    continue
+                tot += 1
+                lig += 1
+                c = pcm.setdefault(uid, {}).setdefault(sm[0], {}).setdefault(sm[1], [0, 0])
+                c[0] += 1 if str(tr.get("estado") or "") == "Finalizada" else 0
+                c[1] += 1
+            ligacao["pcm"] = {"ligadas": lig, "total": tot}
+    except Exception:                    # noqa: BLE001 — sem o PCM, as preventivas ficam fora e a aba diz
+        _log.exception("Contratos · Indicadores: as tarefas do PCM não abriram")
+        avisos.append("as tarefas do PCM (MPM, MPS e MPA)")
+    # a supressão vegetal e a lavagem: o cronograma do Radar da Zeladoria e o contratual dele (o mínimo por ano)
+    try:
+        from ...contratos.indicadores import SERVICOS
+        from ...zeladoria import leitura
+        est = leitura.estado(current_app.config)
+        linha = next((x for x in est["abas"].get("cronograma_publico", []) if str(x.get("id")) == "cronograma"), None)
+        snap = (linha or {}).get("dados") or {}
+        lig = tot = 0
+        for u in snap.get("usinas") or []:
+            uid = nomes.usina(u.get("usina"))[0]
+            if uid not in uids:
+                tot += 1 if chave_cliente(u.get("cliente")) == chave else 0
+                continue
+            tot += 1
+            lig += 1
+            for h in u.get("historico") or []:
+                for k, servs in SERVICOS.items():
+                    if h.get("servico") in servs and h.get("data"):
+                        zel.setdefault(uid, {}).setdefault(k, []).append(str(h["data"])[:10])
+        ligacao["radar"] = {"ligadas": lig, "total": tot}
+        geral = {}
+        for r in est["abas"].get("zeladoria_contratual") or []:
+            if chave_cliente(r.get("cliente")) != chave:
+                continue
+            mins = {k: int(float(r[campo])) for k, campo in (("rocada", "rocagens_ano"), ("lavagem", "lavagens_ano"))
+                    if r.get(campo + "_tipo") == "fixo" and r.get(campo) not in (None, "")}
+            uid = nomes.usina(r.get("ufv"))[0]
+            if uid in uids:
+                zel_min[uid] = mins
+            elif mins:
+                geral = mins               # a linha do portfólio ("82 UFVs", "Todas as SGDs"): vale para as sem linha própria
+        for uid in uids:
+            zel_min.setdefault(uid, geral)
+    except Exception:                    # noqa: BLE001 — sem o Radar, a zeladoria fica fora e a aba diz
+        _log.exception("Contratos · Indicadores: o Radar da Zeladoria não abriu")
+        avisos.append("o cronograma do Radar da Zeladoria (a supressão vegetal e a lavagem)")
+    return pcm, zel, zel_min, ligacao, avisos
+
+
+@bp.route("/contratos/indicadores.json")
+def contratos_indicadores():
+    """A aba Indicadores de um contrato num ano contratual (`?cliente=&ano=`, o 1º ano é 1; sem ano, o de hoje). Enquanto
+    a conta da Visão gerencial ainda monta (o Nexus acabou de subir), volta `montando` e a página pede de novo."""
+    import time
+
+    from flask import current_app
+
+    from ...campo import visao
+    from ...comando import diagnostico_mes as DM
+    from ...comando.gerencial import chave_cliente
+    from ...contratos import controle as K
+    from ...contratos import indicadores as I
+    from .gerencial_tela import dados_gerencial_sem_esperar
+    _so_interno()
+    cliente = request.args.get("cliente", "")
+    n = request.args.get("ano", type=int)
+    copias = current_app.extensions.setdefault("nexus_contratos_indicadores", {})
+    ch = (cliente, n)
+    if ch in copias and time.time() - copias[ch][0] < INDICADORES_S:
+        resp = jsonify(copias[ch][1])
+    else:
+        hoje = visao._agora().date()
+        base = _base()
+        st = E.aplicar(base, E.abrir(E.ler_banco()))
+        vis = E.visao(base, st, hoje, [], None, False)
+        c = next((x for x in vis["contratos"] if x["cliente"] == cliente), None)
+        if not c:
+            abort(404)
+        ano = K.ano_contratual(K._d(c.get("inicio")), hoje, n)
+        if not ano:
+            out = {"ok": True, "sem_inicio": True}
+        else:
+            g = dados_gerencial_sem_esperar()
+            if g is None:
+                resp = jsonify(ok=True, montando=True)
+                resp.headers["Cache-Control"] = "no-store"
+                return resp
+            cg = next((x for x in g.get("clientes") or [] if chave_cliente(x.get("cliente")) == chave_cliente(cliente)), None)
+            usinas = (cg or {}).get("usinas") or []
+            pcm, zel, zel_min, ligacao, avisos = _fontes_da_ligacao(cliente, {u.get("uid") for u in usinas}, ano)
+            if not cg:
+                avisos.append("o cliente não tem usina mobilizada no cadastro com este nome")
+            com_dado = {m for m in (x["id"] for x in g.get("meses") or [])}
+            out = I.montar(c, (vis.get("fichas") or {}).get(cliente), ano, usinas, pcm, zel, zel_min, hoje, com_dado,
+                           ligacao, avisos + [x for x in g.get("avisos") or []      # só os avisos das fontes desta aba
+                                              if any(p in x for p in ("histórico", "disponibilidade", "expurgo", "limitaç", "religamento"))])
+            prim = K._d(c.get("inicio"))
+            atual = K.ano_contratual(prim, hoje)
+            out["anos"] = [{"n": i, "rot": f"{K.ano_contratual(prim, hoje, i)['ini'][:7]}"} for i in range(1, (atual or ano)["n"] + 1)]
+            out["primeiro_mes_com_dado"] = DM.PRIMEIRO_MES if hasattr(DM, "PRIMEIRO_MES") else None
+        copias[ch] = (time.time(), out)
+        resp = jsonify(out)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @bp.route("/contratos/historico.json")
 def contratos_historico():
     """O histórico de um cliente: cada mudança com quem, quando, o que era e o que ficou, o motivo e a prova."""

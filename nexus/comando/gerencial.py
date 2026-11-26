@@ -282,14 +282,18 @@ def montar(usinas: list[dict], contratos: dict | None, hoje: date, gerado: str, 
         saida = []
         for u in sorted(us, key=lambda x: (-(x.get("mwp") or 0), str(x["usina"]).lower())):
             um = u.get("meses") or {}
-            score = {}
+            score, com_exp = {}, {}
             for m in ms:
                 mm = um.get(m["id"]) or {}
                 exp = EXP.aplicar(cont, mm, {k: ((ex.get(k) or {}).get(m["id"]) or {}).get(u.get("uid")) or {}
                                              for k in ("rede", "limitacao")})
                 score[m["id"]] = nota_do_contrato(garantia, mm, u, m["atual"], m["semanas"], expurgo=exp)
+                # o mês com o expurgo do contrato, em número (26/11/2026): a aba Indicadores do Comando › Contratos mostra
+                # a disponibilidade expurgada por usina e mês, a mesma conta desta nota
+                com_exp[m["id"]] = {"disp": exp["m"].get("disp"), "pr": exp["m"].get("pr")}
             saida.append({"uid": u.get("uid"), "usina": u["usina"], "mwp": u.get("mwp"), "pontos": u.get("pontos"),
-                          "valor": valores.get(u["usina"]), "meses": {m["id"]: um.get(m["id"]) or {} for m in ms}, "score": score})
+                          "valor": valores.get(u["usina"]), "meses": {m["id"]: um.get(m["id"]) or {} for m in ms}, "score": score,
+                          "com_expurgo": com_exp})
         notas = {m["id"]: [x["score"][m["id"]]["nota"] for x in saida if x["score"][m["id"]]["nota"] is not None] for m in ms}
         com_perf = [u for u in us if (lambda x: x.get("meta") is not None or x.get("pr") is not None)((u.get("meses") or {}).get(atual) or {})]
         pts = [u["pontos"] for u in us if u.get("pontos") is not None]

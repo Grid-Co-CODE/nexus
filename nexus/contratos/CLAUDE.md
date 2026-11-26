@@ -58,7 +58,7 @@ OBRIGATÓRIO (arquivo ou o texto colado), o administrador liga o gestor a uma pe
 - **A tela.** O topo é UMA linha (a troca de contrato é o título; o gestor e o Editar dados na mesma linha), a linha de
   fatos é curta, o atraso é um chip, e não há título repetido, linha de "de onde vêm os dados" nem rodapé. As abas:
   Regras (as categorias, com Incluir regra, e os Dados do contrato no fim), **Pontos** (seção abaixo), Calendário,
-  Atendimento, Entregáveis, Metas, Financeiro e **Histórico** (quem, quando, o que era e o que ficou, o motivo e a prova; a carga inicial no
+  Atendimento, Entregáveis, Metas, Financeiro, **Histórico** e **Indicadores** (seção abaixo) (quem, quando, o que era e o que ficou, o motivo e a prova; a carga inicial no
   fim). A linha editada leva a marca "editado" (quem e quando no título).
 - **O retorno da gestora que pediu a visão do contrato (chamada de 18/11/2026; Levi escolheu: comenta quem vê o contrato; prioridade e comentário
   sem prova, só quem e quando; recorrências sugeridas e o gestor confirma; Atendimento e Histórico depois dos exemplos de
@@ -118,6 +118,47 @@ em Entregáveis só os lançados abertos na 1ª vez.
   `display:block`, e numa `<td>` isso tira a célula da tabela. A célula de texto miúdo é `td.ctr-quais`.
 - Prova: `tests/test_contratos_pontos_19_11.py` (dados inventados). A prévia com os PDFs reais: a cópia de prova com
   `NEXUS_DADOS` numa pasta de rascunho com as fichas e uma planilha mínima (nunca no repositório).
+
+## A aba Indicadores e o aniversário do contrato (26/11/2026; `indicadores.py`)
+
+A sugestão de 26/11/2026 (com mockup): "Uma aba Indicadores no contrato [...] meses do ano contratual nas colunas, usinas nas
+linhas", com MPM, MPS e MPA feitas sobre as planejadas, a supressão vegetal e a lavagem com a data, o PR e a
+disponibilidade expurgada contra a meta, e o contrato inteiro no alto. O Levi, junto: "ANIVERSÁRIO DE CONTRATO, RELATÓRIO
+DE ANIVERSÁRIO DE CONTRATO". Escolhas dele no mesmo dia: o ano conta do **início da vigência** (não da data-base);
+entram **todas as usinas do cliente no cadastro** (como a Visão gerencial); o mês sem dado no banco diz **"s/d"** (o
+histórico anterior a 10/2026 é a fase 2); o relatório de aniversário é **interno, para o gestor do contrato**; o aviso,
+**30 dias** antes; a régua de cor **da sugestão**: verde na meta, amarelo até 2 pontos abaixo, vermelho abaixo disso, azul
+com asterisco no mês que teve expurgo, sem cor sem meta.
+- **O ano contratual e o aniversário** (`controle.ano_contratual` e `proximo_aniversario`, no `com_datas`): o 1º ano vai
+  do início ao dia antes do 1º aniversário; 29/02 vira 28/02. O contrato leva `aniversario`, `dias_aniversario` e
+  `ano_contratual`; a linha de fatos mostra o aniversário, e a aba Pontos ganha a Atenção 30 dias antes
+  (`pontos.ANIVERSARIO_DIAS`). Sem início da vigência, a aba diz que falta.
+- **De onde vem cada linha** (as fontes que as telas donas já usam, juntadas em `contratos_tela._fontes_da_ligacao`):
+  - PR e disponibilidade: a conta da Visão gerencial (`gerencial_tela.dados_gerencial_sem_esperar`, por `usina_id`), que
+    desde 26/11/2026 devolve também o mês COM o expurgo do contrato (`com_expurgo`, a mesma conta da nota). O banco tem
+    esses meses só desde 10/2026 (`diagnostico_mes.PRIMEIRO_MES`); antes, "s/d". Enquanto a Visão gerencial monta (o
+    Nexus acabou de subir), a rota volta `montando` e a página pede de novo a cada 3 s;
+  - MPM, MPS e MPA: as tarefas do ano do PCM (`pcm.fonte.ler_gestao_sem_esperar` e `pcm.gestao.classificar`: a sigla no
+    nome, o mês da Data Programada, feita = Finalizada), ligadas à usina pelo nome (`responsaveis.Nomes`);
+  - supressão vegetal (roçagem e poda química) e lavagem (limpeza de módulos): o histórico do cronograma do Radar
+    (`cronograma_publico`), pelo nome da usina; o mínimo do ano, o `zeladoria_contratual` do Radar por UFV (só o
+    "fixo"); a linha do portfólio ("82 UFVs") vale para as usinas sem linha própria;
+  - as metas: o número dos Dados do contrato (`meta_pr`, `meta_disp`, editáveis com prova) vence o lido do PDF (a 1ª
+    regra de "Disponibilidade e desempenho" com o percentual; `indicadores.metas`).
+  A ligação pelo nome é medida: as tarefas do PCM e as usinas do Radar do cliente que não ligaram aparecem numa linha da
+  aba, com quantas de quantas.
+- **A tela:** o ano navega pelas setas (como o mês do Calendário); um controle só, Completa | Só KPIs | Só manutenções;
+  o contrato numa linha de fatos (PR e disponibilidade do ano com a meta, preventivas, supressão, lavagem, os
+  usina·mês fora da meta); cada usina é uma linha que abre as sete (as três primeiras com problema já abertas; a ordem é
+  a de mais meses fora do plano ou da meta); o Total do contrato fecha a tabela (preventivas somadas, serviços como
+  usinas feitas no mês, PR e disponibilidade pela potência). O mês em curso não pinta de vermelho a preventiva ainda não
+  feita. O nome do indicador fica preso à esquerda quando a tabela rola de lado.
+- **Medido em 26/11/2026** com os dados reais, na cópia de prova: cerca de 1 s por contrato; na 2C, as 661 tarefas do PCM
+  e as 5 usinas do Radar ligaram todas.
+- **Falta (fase 2):** o relatório de aniversário em PDF, guardado congelado no ano que fechou; o histórico de PR e
+  disponibilidade antes de 10/2026 (a Performance); MPM, MPS e MPA no banco (hoje o arquivo do PCM, por nome); o Radar
+  ligado ao cadastro; a ligação contrato × usina para o cliente com vários contratos.
+- Prova: `tests/test_contratos_indicadores_26_11.py`.
 
 ## A planilha de controle de obrigações na visão do contrato (16/11/2026; `controle.py`)
 

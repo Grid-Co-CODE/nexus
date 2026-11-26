@@ -1624,7 +1624,9 @@ cruzamento com a planilha de tickets. Em 22/11: "agora segue com o cálculo dos 
   × dias)). À nominal o PR inflava (a usina gera uns 20 a 35% da nominal na média das 12 h; o relatório de Performance da
   Ana pondera pela irradiação do dia, que o Nexus não tem por usina). Sem a potência ou os dias, a energia não entra.
 - **A tela**: cada item afetado ganha "O expurgo do contrato" (o que saiu, as OS, a cláusula e o número sem o expurgo);
-  o "!" da nota explica. O cliente leva `expurga` (as categorias que o contrato dele cita).
+  o "!" da nota explica. O cliente leva `expurga` (as categorias que o contrato dele cita). Cada usina leva também
+  `com_expurgo` ({mês: disp e PR com o expurgo}, 26/11/2026): a aba Indicadores do Comando › Contratos mostra a
+  disponibilidade expurgada por usina e mês com esta mesma conta (`nexus/contratos/CLAUDE.md`).
 - **Medido no dado real em 22/11/2026** (banco de verdade, contratos de produção de 18/11), com a queda do COS: em
   novembro 52 de 131 usinas com nota mudaram (ganho médio de 14,4 pontos; o maior, 33), em outubro 60 de 130 (16,4; o
   maior, 50); por cliente em outubro, sem → com: Thopen 71 → 81, Athon 78 → 89, Axis 50 → 59, GreenYellow 78 → 82. Os

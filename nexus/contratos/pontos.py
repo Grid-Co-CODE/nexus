@@ -6,7 +6,7 @@ contratos de zeladoria escreveu à mão, por usina, o nível (Atenção ou Diver
 contrato dizem coisas diferentes (alinhar com o cliente qual vale)"; "vencido ou vencendo, falta documento"). Aqui o
 contrato inteiro, de todos os setores, junta quatro fontes, sem copiar nenhuma:
 
-- **as contas** (Atenção): a vigência vencida ou que vence em até `VENCENDO_DIAS` (Levi escolheu 60 em 19/11/2026; o Radar
+- **as contas** (Atenção): o aniversário do contrato em até `ANIVERSARIO_DIAS` (26/11/2026), a vigência vencida ou que vence em até `VENCENDO_DIAS` (Levi escolheu 60 em 19/11/2026; o Radar
   usa 90), o prazo de avisar a renovação que passou ou que chega nesses dias, o cliente sem contrato assinado na pasta
   (só minuta, ou só anexo) e o cliente sem PDF de contrato lido;
 - **os leitores dos PDFs** (Divergência): o que eles anotaram em `divergencias` de cada contrato (a proposta diz uma
@@ -35,6 +35,8 @@ from .controle import _chave
 from .fichas import clausula_curta
 
 VENCENDO_DIAS = 60
+# o aviso do aniversário do contrato (26/11/2026): o Levi ficou com a sugestão de 30 dias
+ANIVERSARIO_DIAS = 30
 NIVEIS = ("atencao", "divergencia")
 # o id de um ponto: o das fontes ("c:vigencia:2026-12-10", "d:<contrato>:0") ou o do incluído ("p" + 11 hexas, edicao.gravar)
 ID_PONTO = re.compile(r"^([a-z]:[\w:.|-]{1,160}|p[0-9a-f]{11})$")
@@ -103,6 +105,12 @@ def _das_contas(c: dict, ficha: dict | None, hoje: date) -> list[dict]:
         elif dias_aviso <= VENCENDO_DIAS:
             out.append(_ponto(f"c:renovacao:{avisar}", "atencao", "Aviso de renovação",
                               f"Avisar a renovação até {_dbr(avisar)}, em {_dias(dias_aviso)}.", "conta"))
+    aniv, da = c.get("aniversario"), c.get("dias_aniversario")
+    if aniv and da is not None and 0 <= da <= ANIVERSARIO_DIAS:
+        n = (c.get("ano_contratual") or {}).get("n")
+        out.append(_ponto(f"c:aniversario:{aniv}", "atencao", "Aniversário do contrato",
+                          f"O contrato faz aniversário em {_dbr(aniv)}, {'hoje' if da == 0 else 'em ' + _dias(da)}: fecha o "
+                          f"{n}º ano contratual. Os indicadores do ano estão na aba Indicadores.", "conta"))
     if not ficha:
         out.append(_ponto("c:sem_pdf", "atencao", "Sem contrato lido",
                           "Nenhum PDF de contrato deste cliente foi lido: localizar e mandar o contrato assinado.", "conta"))

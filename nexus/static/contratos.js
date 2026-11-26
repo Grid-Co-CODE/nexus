@@ -18,7 +18,7 @@
   var R = null, HIST = {}, regraAberta = {}, aberta = null, ultimaAba = "", ultimoCt = null;
   var estado = {ct: -1, aba: "regras", grupos: {}, soAditivo: false, verRegras: "todas", temas: {}, mesCal: 0};
   var ABAS = [["regras", "Regras"], ["pontos", "Pontos"], ["calendario", "Calendário"], ["atendimento", "Atendimento"], ["entregaveis", "Entregáveis"],
-    ["metas", "Metas"], ["financeiro", "Financeiro"], ["historico", "Histórico"]];
+    ["metas", "Metas"], ["financeiro", "Financeiro"], ["historico", "Histórico"], ["indicadores", "Indicadores"]];
   var CATS = ["SLA", "Entregáveis", "Rotinas", "Disponibilidade e desempenho", "Penalidades", "Benefícios", "Medição e faturamento",
     "Adicionais e hora extra", "Rescisão", "Seguros e documentação", "Outras obrigações"];
   // os setores que executam, na ordem da operação (Levi, 19/11/2026: "separar por setor [...] ordenar por setor, pelo
@@ -171,6 +171,12 @@
     return par("Próximo reajuste", '<span class="num">' + dBR(c.proximo_reajuste) + "</span>" + doContrato(c, ["data_base", "indice"]) + editado(c, ["data_base", "indice"]) +
       "<small>" + quando(c.dias_reajuste) + (c.indice ? "; " + esc(String(c.indice).slice(0, 40)) : "") + "</small>");
   }
+  // o aniversário do contrato (26/11/2026, Levi: "ANIVERSÁRIO DE CONTRATO"): conta do início da vigência
+  function fatoAniv(c) {
+    if (!c.aniversario) return "";
+    var a = c.ano_contratual || {};
+    return par("Aniversário", '<span class="num">' + dBR(c.aniversario) + "</span><small>" + quando(c.dias_aniversario) + (a.n ? "; fecha o " + a.n + "º ano" : "") + "</small>");
+  }
   function fatoValor(c) {
     if (c.valor_mensal == null) return "";
     var i = c.valor_info || {};
@@ -233,14 +239,14 @@
         (c.gestor_como === "sem ligação" && R.admin ? ' <span class="ctr-pill t-alerta" title="O nome da planilha não casa com uma pessoa do Nexus: ligue em Editar dados">sem ligação</span>' : "") + "</span>" :
         '<span class="ctr-gestor mudo">sem gestor</span>') +
       '<span class="ctr-acoes">' + (pode(c) ? '<button type="button" class="ctr-lapis" data-ed-tipo="cliente" data-ed-ids="' + esc(c.id) + '" data-ed-cliente="' + esc(c.cliente) + '"><i class="ph ph-pencil-simple" aria-hidden="true"></i>Editar dados</button>' : "") + "</span></div>";
-    h += '<dl class="ctr-fatos">' + fatoVig(c) + fatoRenov(c) + fatoReaj(c) + fatoValor(c) + par("Usinas", '<span class="num">' + (c.usinas || []).length + "</span>") +
+    h += '<dl class="ctr-fatos">' + fatoVig(c) + fatoRenov(c) + fatoReaj(c) + fatoAniv(c) + fatoValor(c) + par("Usinas", '<span class="num">' + (c.usinas || []).length + "</span>") +
       (n ? '<div><a class="ctr-atraso" href="' + rota(estado.ct, atr ? "calendario" : "regras") + '"><i class="ctr-ponto p-critico" aria-hidden="true"></i>' + n + " em atraso</a></div>" : "") + "</dl>";
     h += '<nav class="ctr-abas" aria-label="Partes do contrato">' + ABAS.map(function (a) {
       return '<a href="' + rota(estado.ct, a[0]) + '"' + (estado.aba === a[0] ? ' aria-current="page"' : "") + ">" + a[1] +
         (a[0] === "calendario" && atr ? "<b>" + atr + "</b>" : "") +
         (a[0] === "pontos" && (c.pontos_atencao || c.pontos_divergencia) ? '<b class="' + (c.pontos_atencao ? "" : "b-alerta") + '">' + ((c.pontos_atencao || 0) + (c.pontos_divergencia || 0)) + "</b>" : "") + "</a>";
     }).join("") + "</nav>";
-    var f = {regras: rRegras, pontos: rPontos, calendario: rCalendario, atendimento: rAtendimento, entregaveis: rEntregaveis, metas: rMetas, financeiro: rFinanceiro, historico: rHistorico}[estado.aba];
+    var f = {indicadores: rIndicadores, regras: rRegras, pontos: rPontos, calendario: rCalendario, atendimento: rAtendimento, entregaveis: rEntregaveis, metas: rMetas, financeiro: rFinanceiro, historico: rHistorico}[estado.aba];
     return h + f(c);
   }
 
@@ -728,6 +734,82 @@
     return h;
   }
 
+  /* ── os indicadores do ano contratual (26/11/2026; nexus/contratos/indicadores.py) ─────────────────────────────────
+     A sugestão de 26/11/2026: "meses do ano contratual nas colunas, usinas nas linhas", com as preventivas, a supressão
+     vegetal e a lavagem, o PR e a disponibilidade expurgada contra a meta; no alto, o contrato inteiro. No padrão do
+     Nexus: o contrato numa linha de fatos (não em cartões grandes), cada usina numa linha que abre as sete do mês a mês
+     (as três primeiras com problema já abertas), a cor só na célula. */
+  var IND = {}, indVisao = "completa", indAbertas = {};
+  var VIS = [["completa", "Completa"], ["kpis", "Só KPIs"], ["manut", "Só manutenções"]];
+  function pedirInd(c, n) {
+    var ch = c.cliente + "|" + (n || "");
+    if (IND[ch] && !IND[ch].montando) return IND[ch];
+    if (!IND[ch] || IND[ch].montando === "pedido") {
+      IND[ch] = {carregando: true};
+      pedir(CAMINHO + "indicadores.json?cliente=" + encodeURIComponent(c.cliente) + (n ? "&ano=" + n : "")).then(function (d) {
+        if (d && d.montando) { IND[ch] = {montando: true}; setTimeout(function () { IND[ch].montando = "pedido"; if (estado.aba === "indicadores") render(); }, 3000); }
+        else IND[ch] = d || {erro: "sem resposta"};
+        if (estado.aba === "indicadores") render();
+      }).catch(function (e) { IND[ch] = {erro: (e && e.message) || "não respondeu"}; if (estado.aba === "indicadores") render(); });
+    }
+    return IND[ch];
+  }
+  function celInd(x, mes) {
+    if (!x) return "<td></td>";
+    var t = x.tom ? " t-" + x.tom : "";
+    return '<td class="r' + (mes ? " ind-m" : " ind-ac") + '">' + (x.txt === "" ? "" : '<span class="ind' + t + (x.txt === "—" || x.txt === "s/d" ? " ind-vazio" : "") + '"' +
+      (x.dica ? ' title="' + esc(x.dica) + '"' : "") + ">" + esc(x.txt) + "</span>") + "</td>";
+  }
+  function linhasInd(d, linhas) {
+    return linhas.filter(function (l) { return indVisao === "completa" || (indVisao === "kpis" ? l.grupo === "kpi" : l.grupo === "manut"); }).map(function (l) {
+      return '<tr class="ind-l"><td class="ind-nome">' + esc(l.nome) + (l.sub ? ' <small class="mudo">' + esc(l.sub) + "</small>" : "") + "</td>" +
+        d.meses.map(function (m) { return celInd(l.cels[m.id], true); }).join("") + celInd(l.acum, false) + "</tr>";
+    }).join("");
+  }
+  function rIndicadores(c) {
+    var n = estado.indAno || null, d = pedirInd(c, n);
+    if (d.carregando || d.montando) return '<p class="mudo" style="padding:14px 0">Lendo os indicadores do ano contratual…</p>';
+    if (d.erro) return '<p class="c-critico">Não li os indicadores: ' + esc(d.erro) + "</p>";
+    if (d.sem_inicio) return '<div class="ctr-vazio"><p>Este contrato não tem o início da vigência: o ano contratual conta a partir dele.' + (pode(c) ? " Ponha a data em Editar dados." : "") + "</p></div>";
+    var a = d.ano, anos = d.anos || [], i = anos.map(function (x) { return x.n; }).indexOf(a.n);
+    var h = '<div class="ctr-regua"><span class="ctr-mesnav">' +
+      (i > 0 ? '<button type="button" class="ctr-lapis" data-ind-ano="' + anos[i - 1].n + '" title="Ano anterior"><i class="ph ph-caret-left" aria-hidden="true"></i><span class="so-leitor">Ano anterior</span></button>' : "") +
+      "<h2>" + a.n + "º ano contratual <small class=\"mudo\">" + dBR(a.ini) + " a " + dBR(a.fim) + (a.atual ? "" : d.ano_fechado ? "; fechado" : "") + "</small></h2>" +
+      (i >= 0 && i < anos.length - 1 ? '<button type="button" class="ctr-lapis" data-ind-ano="' + anos[i + 1].n + '" title="Próximo ano"><i class="ph ph-caret-right" aria-hidden="true"></i><span class="so-leitor">Próximo ano</span></button>' : "") +
+      "</span>" + seg("Visão", "data-ind-visao", indVisao, VIS) + "</div>";
+    var r = d.resumo || {}, mt = d.metas || {}, pv = r.prev || {};
+    function meta(x) { return x ? "meta " + String(x.pct).replace(".", ",") + "%" : "sem meta no contrato"; }
+    h += '<dl class="ctr-fatos">' + par("PR do contrato", '<span class="num">' + esc(r.pr) + (r.pr !== "s/d" ? "%" : "") + "</span><small>" + meta(mt.pr) + "</small>") +
+      par("Disponibilidade expurgada", '<span class="num">' + esc(r.disp) + (r.disp !== "s/d" ? "%" : "") + "</span><small>" + meta(mt.disp) + "</small>") +
+      par("Preventivas", ["MPM", "MPS", "MPA"].map(function (s) { var x = pv[s] || [0, 0]; return s + ' <span class="num">' + x[0] + "/" + x[1] + "</span>"; }).join(" · ") + "<small>feitas / planejadas no ano</small>") +
+      par("Supressão vegetal", '<span class="num">' + esc(r.rocada) + "</span><small>feitas / mínimo</small>") +
+      par("Lavagem", '<span class="num">' + esc(r.lavagem) + "</span><small>feitas / mínimo</small>") +
+      ((r.fora_pr || r.fora_disp) ? '<div><dt>Fora da meta no ano</dt><dd class="c-critico"><span class="num">' + (r.fora_pr || 0) + "</span> de PR · <span class=\"num\">" + (r.fora_disp || 0) + "</span> de disponibilidade<small>usina·mês" +
+        (r.pior ? "; " + esc(r.pior.usina) + " responde por " + r.pior.fora : "") + "</small></dd></div>" : "") + "</dl>";
+    var lg = d.ligacao || {}, notas = [];
+    if (lg.pcm && lg.pcm.total > lg.pcm.ligadas) notas.push((lg.pcm.total - lg.pcm.ligadas) + " de " + lg.pcm.total + " tarefas do PCM do cliente não ligaram a uma usina pelo nome");
+    if (lg.radar && lg.radar.total > lg.radar.ligadas) notas.push((lg.radar.total - lg.radar.ligadas) + " de " + lg.radar.total + " usinas do Radar não ligaram pelo nome");
+    (d.avisos || []).forEach(function (x) { notas.push("Fora agora: " + x); });
+    if (notas.length) h += '<p class="ctr-nota c-alerta" style="margin:0 0 8px">' + notas.map(esc).join(". ") + ".</p>";
+    if (!(d.usinas || []).length) return h + '<div class="ctr-vazio"><p>Nenhuma usina do cliente no cadastro: sem usina, não há o que medir.</p></div>';
+    var ch = c.cliente + "|" + a.n, ab = indAbertas[ch];
+    if (!ab) { ab = indAbertas[ch] = {}; d.usinas.filter(function (u) { return u.fora; }).slice(0, 3).forEach(function (u) { ab[u.uid] = true; }); }
+    h += '<div class="ctr-rol"><table class="ctr-tab ctr-ind"><thead><tr><th>Usina · indicador</th>' + d.meses.map(function (m) { return '<th class="r' + (m.id === d.mes_hoje ? " ind-hoje" : "") + '">' + esc(m.rot) + "</th>"; }).join("") +
+      '<th class="r">Acum.</th></tr></thead><tbody>';
+    d.usinas.forEach(function (u) {
+      var aberta = !!ab[u.uid];
+      h += '<tr class="ind-usina"><td colspan="' + (d.meses.length + 2) + '"><button type="button" data-ind-usina="' + u.uid + '" aria-expanded="' + aberta + '"><i class="ph ph-caret-' + (aberta ? "down" : "right") + '" aria-hidden="true"></i><b>' + esc(u.usina) + "</b>" +
+        (u.mwp ? ' <span class="mudo">' + String(u.mwp).replace(".", ",") + " MWp</span>" : "") +
+        (u.fora ? ' <span class="ctr-pill t-critico" title="meses com preventiva não feita, PR ou disponibilidade abaixo da meta">' + u.fora + (u.fora === 1 ? " mês fora do plano ou da meta" : " meses fora do plano ou da meta") + "</span>" : ' <span class="ctr-pill t-ok">no plano e na meta</span>') + "</button></td></tr>";
+      if (aberta) h += linhasInd(d, u.linhas);
+    });
+    h += '<tr class="ind-usina ind-total"><td colspan="' + (d.meses.length + 2) + '"><b>Total do contrato</b> <span class="mudo">' + d.usinas.length + (d.usinas.length === 1 ? " usina" : " usinas") + "</span></td></tr>" + linhasInd(d, d.total || []);
+    h += "</tbody></table></div>";
+    h += '<div class="ctr-legenda" style="margin-top:8px"><span><span class="ind t-ok">1/1</span> feita, na meta</span><span><span class="ind t-alerta">77,4</span> até 2 pontos abaixo</span>' +
+      '<span><span class="ind t-critico">0/1</span> não feita, abaixo</span><span><span class="ind t-info">98,9*</span> com expurgo no mês</span><span><span class="ind ind-vazio">s/d</span> sem dado no banco (antes de 10/2026)</span><span><span class="ind ind-vazio">—</span> sem plano</span></div>';
+    return h;
+  }
+
   /* ── o histórico ────────────────────────────────────────────────────────────────────────────────────────────────── */
   var EVENTO = {inclusao: "Incluiu", alteracao: "Alterou", retirada: "Retirou", carga: "Carga inicial"};
   function valorTxt(v) { if (v == null || v === "") return "—"; var s = String(v); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? dBR(s) : s; }
@@ -860,7 +942,7 @@
     fechaEscolha(false);
     var antes = estado.ct;
     lerEndereco();
-    if (estado.ct !== antes) { estado.soAditivo = false; estado.verRegras = "todas"; estado.mesCal = 0; }
+    if (estado.ct !== antes) { estado.soAditivo = false; estado.verRegras = "todas"; estado.mesCal = 0; estado.indAno = null; }
     raiz.innerHTML = (R.erro_edicoes ? '<p class="c-alerta" role="status" style="margin:0 0 8px">' + esc(R.erro_edicoes) + "</p>" : "") +
       (estado.ct >= 0 ? vCliente(R.contratos[estado.ct]) : vTodos());
   }
@@ -876,6 +958,10 @@
       leve(cAtual, "regra", b.getAttribute("data-prior").split(","), "alteracao", {prioritaria: on ? "sim" : "nao"}, on ? "Marcada como prioritária." : "Tirada das prioritárias."); return; }
     if ((b = e.target.closest("[data-subgrupo]"))) { var tk = b.getAttribute("data-subgrupo"); estado.temas[tk] = !estado.temas[tk]; render(); return; }
     if ((b = e.target.closest("[data-tirar-com]"))) { if (window.confirm("Tirar este comentário? Ele fica no histórico.")) leve(cAtual, "comentario", [b.getAttribute("data-tirar-com")], "retirada", {}, "Comentário tirado."); return; }
+    if ((b = e.target.closest("[data-ind-ano]"))) { estado.indAno = +b.getAttribute("data-ind-ano"); render(); return; }
+    if ((b = e.target.closest("[data-ind-visao]"))) { indVisao = b.getAttribute("data-ind-visao"); render(); return; }
+    if ((b = e.target.closest("[data-ind-usina]"))) { var cI = R.contratos[estado.ct], dI = IND[cI.cliente + "|" + (estado.indAno || "")] || {}, chI = cI.cliente + "|" + ((dI.ano || {}).n);
+      indAbertas[chI] = indAbertas[chI] || {}; var uI = b.getAttribute("data-ind-usina"); indAbertas[chI][uI] = !indAbertas[chI][uI]; render(); return; }
     if ((b = e.target.closest("[data-dobra]"))) { var dk = b.getAttribute("data-dobra"); DOBRAS[dk] = !DOBRAS[dk];
       try { localStorage.setItem("nexus.contratos.dobras", JSON.stringify(DOBRAS)); } catch (er) { /* sem localStorage: vale até recarregar */ } render(); return; }
     if ((b = e.target.closest("[data-mes]"))) { var dm = +b.getAttribute("data-mes"); estado.mesCal = dm ? (estado.mesCal || 0) + dm : 0; render(); return; }

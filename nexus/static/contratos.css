@@ -246,3 +246,20 @@
   .ctr-tab-pontos tr.ctr-ponto-l td:nth-child(3){padding-bottom:10px}}
 @media (max-width:640px){.ctr-campos{grid-template-columns:1fr}.ctr-hist > li{grid-template-columns:1fr}.ctr-resumo-dl{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (prefers-reduced-motion:reduce){.ctr *{transition:none!important}}
+
+/* a aba Indicadores (26/11/2026): o mês a mês do ano contratual por usina. A célula é uma etiqueta pequena colorida pelo
+   estado (as mesmas cores das pílulas); a usina é uma linha que abre as sete; o total do contrato fecha a tabela */
+.ctr-ind th, .ctr-ind td { white-space: nowrap; }
+.ctr-ind td.ind-m, .ctr-ind td.ind-ac { padding: 5px 6px; }
+.ctr-ind td.ind-ac { border-left: 1px solid var(--linha-forte); font-weight: 600; }
+.ctr-ind th.ind-hoje { color: var(--tinta); }
+.ctr-ind td.ind-nome { padding-left: 30px; color: var(--tinta-2); }
+.ind { display: inline-block; min-width: 38px; padding: 1px 6px; border-radius: 5px; font: 600 11.5px/18px var(--font-mono); text-align: center; color: var(--tinta-2); }
+.ind.ind-vazio { color: var(--mudo); font-weight: 400; }
+.ctr-ind tr.ind-usina td { padding: 0; background: var(--barra); border-top: 2px solid var(--linha-forte); }
+.ctr-ind tr.ind-usina button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: transparent; padding: 9px 12px; cursor: pointer; text-align: left; font: 600 13px/1.2 var(--font-sans); color: var(--tinta); }
+.ctr-ind tr.ind-usina button:hover { background: var(--superficie-2); }
+.ctr-ind tr.ind-total td { padding: 9px 12px; border-top: 2px solid var(--tinta-2); }
+/* o nome do indicador fica preso à esquerda quando a tabela rola de lado (o celular, a tela estreita) */
+.ctr-ind thead th:first-child, .ctr-ind td.ind-nome { position: sticky; left: 0; z-index: 1; background: var(--fundo); }
+.ctr-ind thead th:first-child { background: var(--barra); }

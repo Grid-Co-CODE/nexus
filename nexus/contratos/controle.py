@@ -241,6 +241,36 @@ def proximo_reajuste(data_base: date | None, hoje: date) -> date | None:
     return _aniversario(data_base, ano)
 
 
+# ── o ano contratual e o aniversário (26/11/2026) ─────────────────────────────────────────────────────────────────────
+# O pedido do Levi no mesmo dia: "ANIVERSÁRIO DE CONTRATO, RELATÓRIO DE ANIVERSÁRIO DE CONTRATO", junto da aba Indicadores
+# (meses do ano contratual nas colunas). Escolha dele: o ano conta a partir do INÍCIO DA VIGÊNCIA (não da data-base do
+# reajuste, que é outra coisa e pode cair noutro dia).
+def ano_contratual(inicio: date | None, hoje: date, n: int | None = None) -> dict | None:
+    """{n (1 = o 1º ano), ini, fim (o dia antes do aniversário seguinte), atual}: o ano `n`, ou o que contém `hoje`. Antes do
+    início, o 1º ano. Sem início, None (a tela diz que falta o início da vigência)."""
+    if not inicio:
+        return None
+    if n is None:
+        n = 1
+        while _aniversario(inicio, inicio.year + n) <= hoje:
+            n += 1
+    n = max(1, int(n))
+    ini = _aniversario(inicio, inicio.year + n - 1)
+    prox = _aniversario(inicio, inicio.year + n)
+    return {"n": n, "ini": ini.isoformat(), "fim": date.fromordinal(prox.toordinal() - 1).isoformat(),
+            "atual": ini <= hoje < prox}
+
+
+def proximo_aniversario(inicio: date | None, hoje: date) -> date | None:
+    """O aniversário do contrato que ainda não passou (hoje conta): o 1º é 12 meses depois do início da vigência."""
+    if not inicio:
+        return None
+    ano = inicio.year + 1
+    while _aniversario(inicio, ano) < hoje:
+        ano += 1
+    return _aniversario(inicio, ano)
+
+
 def tom_obrigacao(o: dict, hoje: date, alerta_padrao: int = ALERTA_PADRAO) -> str:
     """O semáforo da planilha (Calendario, coluna Semáforo): ok entregue; cancelado ("—"); sem_data (SEM DATA); critico
     (VERMELHO, vencida e não entregue); alerta (ÂMBAR, dentro do alerta da linha; sem ele, o padrão da Cadastros, 7
@@ -325,6 +355,9 @@ def com_datas(dados: dict, hoje: date) -> dict:
             from datetime import timedelta
             avisar = fim - timedelta(days=int(c["aviso_dias"]))
         reaj = proximo_reajuste(base, hoje)
+        ini_vig = _d(c.get("inicio"))
+        aniv = proximo_aniversario(ini_vig, hoje)
+        ano = ano_contratual(ini_vig, hoje)
         atrasadas = [o for o in obr if o["cliente"] == c["cliente"] and o["tom"] == "critico"]
         criticos = []
         if fim and fim < hoje:
@@ -340,6 +373,9 @@ def com_datas(dados: dict, hoje: date) -> dict:
                           "proximo_reajuste": reaj.isoformat() if reaj else None,
                           "dias_reajuste": (reaj - hoje).days if reaj else None,
                           "atrasadas": len(atrasadas), "criticos": criticos,
+                          "aniversario": aniv.isoformat() if aniv else None,
+                          "dias_aniversario": (aniv - hoje).days if aniv else None,
+                          "ano_contratual": ano,
                           "proxima_data": min(datas).isoformat() if datas else None})
     return {**dados, "contratos": contratos, "obrigacoes": obr, "adicionais": adic, "hoje": hoje.isoformat(),
             # a importação antiga (antes de 17/11/2026) não tem as abas novas: a página pede para importar de novo
