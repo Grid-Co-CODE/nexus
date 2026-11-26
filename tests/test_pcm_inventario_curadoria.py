@@ -922,12 +922,13 @@ def test_o_login_do_fracttal_so_chega_na_ponte(cur, api_do_clone, monkeypatch):
         metodo = json[0]["method"]
         pedidos.append((metodo, headers["Authorization"]))
         if metodo == "inventories.items_list":
-            return _result({"success": True, "total": 2, "data": [{"id": 5, "code": "SP-CAB-001"},
-                                                                    {"id": 6, "code": "SP-CAB-012"}]})
+            return _result({"success": True, "total": 2, "data": [{"id": 5, "code": "SP-CAB-001", "id_parent": 4382},
+                                                                    {"id": 6, "code": "SP-CAB-012", "id_parent": 4382}]})
         if metodo == "companies.units_list":
             return _result({"success": True, "total": 1, "data": [{"id": 362333, "description": "METRO"}]})
         assert metodo == "inventories.item_insert", metodo
         assert json[0]["params"]["code"] == "SP-CAB-013" and json[0]["params"]["id_unit"] == 362333
+        assert json[0]["params"]["id_parent"] == 4382              # debaixo do local das peças (26/11/2026)
         return _result({"success": True, "data": {"id": 777, "description": "Cabo azul 6 mm    { SP-CAB-013 }"}})
     monkeypatch.setattr(api_do_clone.requests, "post", post)
     monkeypatch.setattr(E, "RITMO", E.Ritmo(dormir=lambda s: None))
@@ -943,7 +944,9 @@ def test_o_login_do_fracttal_so_chega_na_ponte(cur, api_do_clone, monkeypatch):
     r = c.post(CADASTRAR, data={"contagem": "C-1", "linha": "L-2", "sigla": "CAB", "nome": "Cabo azul 6 mm",
                                 "unidade": "METRO"})
     assert r.status_code == 200 and r.get_json()["ok"] is True
-    assert [m for m, _ in pedidos] == ["inventories.items_list", "companies.units_list", "inventories.item_insert"]
+    # a lista de peças duas vezes: a dos códigos da sigla e a do pai das peças (`_pai_das_pecas`, 26/11/2026)
+    assert [m for m, _ in pedidos] == ["inventories.items_list", "companies.units_list", "inventories.items_list",
+                                       "inventories.item_insert"]
     assert {h for _, h in pedidos} == {f"Bearer {jwt}"}                 # no login de quem apertou
     d = F.ler(cur.config, forcar=True)[F.ABA_CURADORIA]
     assert [(x["decisao"], x["id_item"], x["codigo_criado"]) for x in d] == [("cadastrar", "777", "SP-CAB-013")]

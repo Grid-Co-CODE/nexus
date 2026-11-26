@@ -27,6 +27,7 @@ o repositório e a API de dados são compartilhados.
 from __future__ import annotations
 
 import abc
+import itertools
 import math
 import re
 import threading
@@ -687,6 +688,7 @@ class EstoqueFracttal(Estoque):
         self._ligacoes: dict[str, dict[str, str]] = {}      # almoxarifado -> {id_item: ligação}
         self._linhas_saldo: dict[str, dict[str, dict]] = {}  # almoxarifado -> {id_item: a linha do saldo como veio}
         self._unidades: dict[str, tuple[int, str]] | None = None
+        self._pai: int | None | bool = False                 # o pai das peças do catálogo; False = ainda não lido
 
     # o pedido: o ritmo, a tradução dos erros e o `success`
     def _esperar(self) -> None:
@@ -955,6 +957,28 @@ class EstoqueFracttal(Estoque):
             raise ErroFracttal(f"a unidade {nome!r} não existe no Fracttal", UNIDADES)
         return achada
 
+    def _pai_das_pecas(self) -> int | None:
+        """O local debaixo do qual as peças do catálogo moram na árvore de Ativos (o "Almoxarifado" do Fracttal): o
+        `id_parent` mais comum da 1ª página das peças, lido uma vez por instância; o nulo não conta. None: nenhuma tem pai.
+
+        Por quê (25/11/2026): uma pessoa do PCM viu as peças da Curadoria "caindo direto no ativo, ao invés de cair no peças
+        e suprimentos". O `item_insert` sem o `id_parent` põe a peça na RAIZ da árvore de Ativos (a tela do Fracttal faz o
+        mesmo, e a pessoa arrastava a peça depois); as 715 peças do catálogo estavam todas debaixo do mesmo local. Provado no
+        Fracttal de verdade em 26/11/2026: com o `id_parent`, a peça nasce debaixo dele. Lido do catálogo, e não escrito
+        aqui: se o PCM mudar as peças de lugar, a nova vai junto."""
+        if self._pai is False:
+            contagem: dict[int, int] = {}
+            linhas = self._linhas(PECAS, {"filter": [], "sort": [], "is_tree": False, "node": 0, "id_type_item": TIPO_PECA})
+            for l in itertools.islice(linhas, self._pagina):    # uma página: o gerador não pede a seguinte
+                pai = l.get("id_parent") if isinstance(l, dict) else None
+                if pai not in (None, "", 0, "0"):
+                    try:
+                        contagem[_id(pai)] = contagem.get(_id(pai), 0) + 1
+                    except ValueError:
+                        continue
+            self._pai = max(contagem, key=contagem.get) if contagem else None
+        return self._pai
+
     def criar_peca(self, codigo: str, nome: str, unidade: str = "UNIDADE", descricao: str = "",
                    grupos: dict | None = None) -> str:
         codigo, nome, descricao = str(codigo or "").strip(), str(nome or "").strip(), str(descricao or "").strip()
@@ -962,6 +986,9 @@ class EstoqueFracttal(Estoque):
             raise ValueError("a peça precisa de código e de nome")
         extra = corpo_dos_grupos(grupos)                 # antes de qualquer pedido: o id ruim nem vai
         id_unit, descricao_da_unidade = self._unidade(unidade)
+        pai = self._pai_das_pecas()
+        if pai is not None:
+            extra["id_parent"] = pai                     # debaixo do local das peças, e não na raiz de Ativos
         r = self._rpc(CRIAR, {
             "id_type_item": TIPO_PECA, "field_1": nome, "code": codigo, "id_unit": id_unit,
             "units_description": descricao_da_unidade, "active": True, "description": descricao, "is_serial_control": False,

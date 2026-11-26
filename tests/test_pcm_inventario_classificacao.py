@@ -140,7 +140,8 @@ def test_o_adaptador_le_as_opcoes_em_todas_as_paginas():
 def test_criar_peca_manda_so_os_grupos_que_vieram():
     """O MESMO corpo do `item_insert` mais `id_group`, `id_group_1` e `id_group_2` (o que a prova de 12/11/2026 gravou), só os
     que vieram e como número; o vazio não vai, e sem grupos o corpo é o de antes."""
-    fr = Fracttal({UNIDADES: ok([{"id": 362334, "description": "UNIDADE"}]), CRIAR: ok({"id": 53750352})})
+    fr = Fracttal({UNIDADES: ok([{"id": 362334, "description": "UNIDADE"}]), CRIAR: ok({"id": 53750352}),
+                   PECAS: em_paginas([{"id": 1, "code": "SP-A-001", "id_parent": 43827555}])})
     est = estoque(fr)
     est.criar_peca("SP-TST-001", "Peça", grupos={"tipo": "318452", "classificacao_1": 289062, "classificacao_2": "364873"})
     est.criar_peca("SP-TST-002", "Peça", grupos={"tipo": "", "classificacao_1": None, "classificacao_2": "364873"})
