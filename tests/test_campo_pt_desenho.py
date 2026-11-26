@@ -127,8 +127,14 @@ def test_o_png_do_formulario():
     assert PDz.png_do_formulario(ASSINATURA_PNG).startswith(PDz.PNG)
 
 
-def test_o_interruptor_do_envio_chega_pela_configuracao(monkeypatch):
-    """Só os nomes de `config.OPCIONAIS` entram na configuração: sem ele na lista, o "1" do .env do servidor não ligaria o
-    envio ao App."""
+def test_o_interruptor_do_envio_esta_nas_chaves_do_nexus_e_no_env():
+    """Levi, 26/11/2026: "Em vez de precisar mudar o .env, joga lá no chaves do Nexus da base, que eu coloco 1 e salvo". O
+    .env segue valendo sem a da tela (só os nomes de `config.OPCIONAIS` entram na configuração)."""
     from nexus import config
+    from nexus.auth import chaves
     assert "NEXUS_PT_ASSINATURA_APP" in config.OPCIONAIS
+    item = chaves.CHAVES["NEXUS_PT_ASSINATURA_APP"]
+    assert [v for v, _r in item["escolha"]] == ["1", "0"]
+    assert item["conferir"]("1").startswith("1:") and item["conferir"]("0").startswith("0:")
+    with pytest.raises(chaves.Recusada):
+        item["conferir"]("sim")

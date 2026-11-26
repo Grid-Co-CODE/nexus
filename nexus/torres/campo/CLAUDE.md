@@ -2387,7 +2387,7 @@ supervisor pode assinar, ao assinar ele vê também se tem mais alguma aberta pa
   tem o quadro (dedo, caneta ou mouse; papel claro nos dois temas) e o De acordo só sai com ele assinado
   (`assinatura_png`, `campo/pt_desenho.py`): o Nexus guarda a imagem cifrada no disco (`<dados>/pt_assinaturas/`, a
   chave do cadastro, o número e o código do ativo de contexto; nunca no banco, que tem leitura aberta) e, com
-  `NEXUS_PT_ASSINATURA_APP=1`, a manda ao App antes de gravar a decisão (`POST <base>/app/nexus/pt/<n>/assinatura-
+  o 1 em Base → Chaves do Nexus ("PT: mandar a assinatura do De acordo ao App", `NEXUS_PT_ASSINATURA_APP`; o .env vale sem ela), a manda ao App antes de gravar a decisão (`POST <base>/app/nexus/pt/<n>/assinatura-
   aprovador`, contrato v1 proposto ao App em 26/11; o App recusou ou não respondeu = nada grava). O App a desenha no
   quadro "Aprovação" do PDF. As outras telas que decidiam (o detalhe da APR e PT, a tela da PT e a Visão do
   responsável) levam ao card pelo "Assinar o De acordo"; o Não autorizo segue nelas. Prova:

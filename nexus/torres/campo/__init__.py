@@ -1047,8 +1047,23 @@ def pagina_pt():
         cartoes_resp_pt=visao.pt_por_responsavel(aguardando), sem_responsavel=visao.SEM_RESPONSAVEL,
         sem_regiao=visao.SEM_REGIAO, coluna_responsavel=True, status=visao.PT_STATUS,
         fl=fl, opcoes=_opcoes_pt(fonte or [], fl, passa), filtros_pt=FILTROS_PT,
+        # o relatório em PDF do Histórico (26/11/2026): os meses e os clientes que a escolha oferece
+        rel=_opcoes_relatorio_pt(d or {}),
         # o aviso da estrutura de campo segue: sem ela, só um administrador dá o De acordo
         estrutura_publicada=(d or {}).get("estrutura_publicada", True)))
+
+
+def _opcoes_relatorio_pt(d: dict) -> dict:
+    """As escolhas do "Extrair relatório" do Histórico da APR e PT (26/11/2026, Levi: "selecionar um mês e o cliente [...]
+    só PT, só APR, os dois"): os meses com PT (o mais novo primeiro, o de agora sempre) e os clientes das usinas com PT.
+    O PDF é montado em `torres/hseq` (`apr_pt_relatorio`, `hseq/relatorio_apr_pt.py`)."""
+    from ...hseq import relatorio_apr_pt as RAP
+    todas = (d.get("historico") or []) + (d.get("aguardando") or [])
+    agora = visao._agora().date().replace(day=1)
+    meses = sorted({p["criada"].date().replace(day=1) for p in todas if p.get("criada")} | {agora}, reverse=True)[:12]
+    return {"meses": [(f"{m:%Y-%m}", RAP.mes_por_extenso(m)) for m in meses],
+            "clientes": sorted({p.get("cliente") for p in todas if p.get("cliente")}, key=str.lower),
+            "tipos": list(RAP.TIPOS.items())}
 
 
 @bp.route("/pt/<numero>/pdf")

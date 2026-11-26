@@ -808,6 +808,48 @@ def apr_pt():
     return pagina_pt()
 
 
+@bp.route("/apr-pt/relatorio.pdf")
+def apr_pt_relatorio():
+    """O relatório de APR e PT do mês e do cliente, em PDF, sempre como anexo (26/11/2026, Levi: "na parte de histórico,
+    tem que ter um botão de extrair relatório [...] selecionar um mês e o cliente [...] só PT, só APR, os dois"; "um
+    formato em PDF [...] parecido com o dos extintores"). As PTs que nasceram no mês e as APRs feitas nele, do cliente
+    da usina no cadastro (`hseq/relatorio_apr_pt.py`)."""
+    from ...dados import fatos as D
+    from ...hseq import apr as APR
+    from ...hseq import relatorio_apr_pt as RAP
+    mes = RAP.mes_do_texto(request.args.get("mes"))
+    if not mes:
+        return redirect(na_raiz("/t/hseq/apr-pt?aba=historico"))
+    tipo = request.args.get("tipo") if request.args.get("tipo") in RAP.TIPOS else "ambos"
+    cliente = request.args.get("cliente", "").strip()
+    pts, aprs = [], []
+    if tipo != "apr":
+        d = visao.pts().dados or {}
+        pts = RAP.pts_do_mes((d.get("historico") or []) + (d.get("aguardando") or []), mes, cliente)
+    if tipo != "pt":
+        try:
+            brutos = [x for x in visao._livro(APR.LIVRO, APR.ABA) if RAP._no_mes(APR._dia(x.get("Dia")), mes)]
+        except Exception:        # noqa: BLE001 — sem o livro da APR, o relatório sai com a seção vazia
+            brutos = []
+        b = visao._Base()
+        quem = visao._quem() if brutos else {}
+
+        def ligar(x):
+            uid, _como = b.lig.usina(D._txt(x.get("Usina")), D._txt(x.get("Código do ativo")))
+            o = b.onde(uid, visao.nome_da_usina_crua(x.get("Usina")))
+            precisa = {"sim": True, "não": False, "nao": False}.get(D._txt(x.get("Precisa de PT")).lower())
+            return {"dia": APR._dia(x.get("Dia")), "os": D._txt(x.get("OS")), "usina": o["usina"], "cliente": o["cliente"],
+                    "tipo": D._txt(x.get("Tipo")), "tarefa": D._txt(x.get("Tarefa")), "pt": D._txt(x.get("PT")),
+                    "tecnico": visao._nome(quem, x.get("Técnico (HMAC)")), "precisa_pt": precisa,
+                    "atividades": [a.strip() for a in D._txt(x.get("Atividades críticas")).split(";") if a.strip()]}
+        aprs = RAP.aprs_do_mes(brutos, mes, cliente, ligar)
+    pdf = RAP.gerar_pdf(pts, aprs, tipo=tipo, mes=mes, cliente=cliente, hoje=visao._agora().date(),
+                        gerado_em=visao._agora().strftime("%d/%m/%Y %H:%M"),
+                        logo=str(current_app.static_folder) + "/grid-h-branco.png")
+    nome = f"{'apr-e-pt' if tipo == 'ambos' else tipo}-{_slug(cliente) if cliente else 'todos'}-{mes:%Y-%m}"
+    return Response(pdf, mimetype="application/pdf", headers={"Content-Disposition": f'attachment; filename="{nome}.pdf"'})
+
+
 def _epi_filtrado():
     """As luvas com os filtros da tela (região do Brasil, cliente, responsável UFV, busca) e o da faixa (`f`): a tela e o
     relatório (`_do_relatorio_epi`) usam o mesmo recorte. Devolve (leitura, dados, todas, base, f); `base` ainda sem o

@@ -646,6 +646,16 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
   retomadas e envios atrasados); com a do App, 6 em 26/10, entre eles a 16995, iniciada e pausada no Fracttal, fora do
   App, que escapou da APR do dia (o buraco real: o conserto no App é decisão do Levi). A régua não olha o técnico. Sem o livro, a aba diz que ele ainda não chegou.
   Caso que motivou: a OS 16866 tinha PT (PT-16866-2010-1457, da APR do dia); a TST a procurou no Fracttal.
+- **O relatório em PDF do Histórico** (26/11/2026, Levi: "tem que ter um botão de extrair relatório, e aí a pessoa vai
+  selecionar um mês e o cliente [...] só PT, só APR, os dois"; "um formato em PDF [...] parecido com o dos extintores"):
+  o "Extrair relatório" da aba Histórico abre a escolha do mês (os com PT, o de agora sempre), do cliente (ou todos) e do
+  que entra (APR e PT, só PT, só APR), e baixa `/t/hseq/apr-pt/relatorio.pdf` (`hseq/relatorio_apr_pt.py`, a rota
+  `apr_pt_relatorio`). O desenho é o dos Extintores e do EPI: a faixa navy com o filete verde, o título, os filtros, os
+  quatro números e a tabela. As PTs são as que NASCERAM no mês, de qualquer situação (De acordo, Não autorizada,
+  aguardando, vencida), com a decisão, quem decidiu e a espera; as APRs são as do livro do App feitas no mês, ligadas à
+  usina do cadastro como na aba Sem APR ou PT, com o tipo, as atividades críticas e a PT ligada (ou "pedia PT e ficou
+  sem"). O cliente é o da usina no cadastro. Medido em 26/11: novembro da Thopen, 418 PTs e 1.052 APRs, 67 páginas
+  em 5 s. Prova: `tests/test_hseq_apr_pt_relatorio.py`.
 - **O histórico inteiro, de 20 em 20** ("Em histórico quero todo o período mostrando de 20 em 20 para não pesar tanto";
   saiu o período 7/30/90 dias): `POR_PAGINA_PT`, `?pag=`, com "1–20 de N" e as páginas em volta da atual; leva a coluna
   Responsável depois da Usina. Medido no banco real em 24/10: 598 decididas, 74 KB a página; com 13 colunas a tabela

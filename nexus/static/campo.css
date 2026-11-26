@@ -2456,6 +2456,14 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 
 /* a tabela enxuta das PT esperando (23/11/2026): a espera e o desde na 1ª coluna, a linha de baixo de cada célula em
    tom de apoio, o Assinar e o PDF da APR à direita; no celular, cada PT vira um bloco */
+/* o Extrair relatório do Histórico da APR e PT (26/11/2026): o botão abre a escolha do mês, do cliente e do que entra */
+.pt-rel{margin:0 0 12px}
+.pt-rel > summary{list-style:none;display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.pt-rel > summary::-webkit-details-marker{display:none}
+.pt-rel-form{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 14px;margin-top:10px;padding:12px 14px;
+  border:1px solid var(--linha);border-radius:10px;background:var(--superficie)}
+.pt-rel-form .gc-campo{min-width:180px}
+@media (max-width:640px){.pt-rel-form .cn-filtro-par,.pt-rel-form .gc-campo,.pt-rel-form .gc-btn{width:100%}}
 .pt-enxuta td{vertical-align:top}
 .pt-enxuta .pt-espera{white-space:nowrap}
 .pt-enxuta .pt-nao{font-weight:700;white-space:nowrap}

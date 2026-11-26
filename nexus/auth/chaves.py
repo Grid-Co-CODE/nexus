@@ -207,6 +207,15 @@ def _conferir_email_enviar(valor: str) -> str:
     return "1: esta máquina envia os e-mails do Nexus" if valor == "1" else "0: esta máquina não envia"
 
 
+def _conferir_pt_assinatura(valor: str) -> str:
+    """O envio da assinatura desenhada do De acordo da PT ao App (26/11/2026, `nexus/campo/pt_desenho.py`): "1" quando a
+    rota do App estiver no ar, "0" para desligar."""
+    if valor not in ("1", "0"):
+        raise Recusada("PT, mandar a assinatura ao App: use 1 (liga) ou 0 (desliga): nada foi gravado.")
+    return ("1: o De acordo manda a assinatura desenhada ao App antes de gravar" if valor == "1"
+            else "0: a assinatura fica só no Nexus")
+
+
 def valor_ou_vazio(nome: str) -> str:
     try:
         return valor(nome) or ""
@@ -454,6 +463,19 @@ CHAVES = {
         "dica": "1 para ligar, 0 para desligar; Apagar volta ao .env (sem ele, desligado)",
         "conferir": _conferir_email_enviar,
         "escolha": (("1", "1 · esta máquina envia os e-mails do Nexus"), ("0", "0 · não envia")),
+    },
+    # a assinatura desenhada do De acordo da PT (26/11/2026, nexus/campo/pt_desenho.py; Levi: "Em vez de precisar mudar o
+    # .env, joga lá no chaves do Nexus da base, que eu coloco 1 e salvo"): liga o envio ao App quando a rota de lá existir
+    "NEXUS_PT_ASSINATURA_APP": {
+        "nome": "PT: mandar a assinatura do De acordo ao App",
+        "para": "o De acordo da PT mandar a assinatura desenhada no card ao App de Campo antes de gravar a decisão, para o "
+                "PDF da PT levar a assinatura de quem aprovou ao lado da do técnico. Ligue (1) só quando o App tiver a "
+                "rota no ar: ligado e sem a rota, o De acordo é recusado. Desligado (0), a assinatura é exigida e fica só "
+                "no Nexus",
+        "arquivo": "",
+        "dica": "1 para ligar, 0 para desligar; Apagar volta ao .env (sem ele, desligado)",
+        "conferir": _conferir_pt_assinatura,
+        "escolha": (("1", "1 · manda a assinatura ao App"), ("0", "0 · fica só no Nexus")),
     },
     # o OpenRouter (14/11/2026): 3 vagas, na ordem do rodízio; a da tela vence a do .env (nexus/comando/ia.py, `vagas`)
     "OPENROUTER_API_KEY": dict(_VAGA_OPENROUTER, nome="OpenRouter: chave 1 (a primeira a ser usada)",

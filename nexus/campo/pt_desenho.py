@@ -10,8 +10,9 @@ assinar, e o Nexus:
 - manda a imagem ao App, de servidor para servidor, ANTES de gravar a decisão (`enviar_ao_app`), para o App desenhá-la no
   quadro "Aprovação" do PDF. Contrato v1 proposto ao App em 26/11/2026: `POST <base>/app/nexus/pt/<numero>/assinatura-
   aprovador` com a chave das Sugestões (`X-Nexus-Chave`) e `{"versao": 1, "codigo", "png_base64", "pessoa_hmac",
-  "assinatura_id"}` → 200 `{"ok": true}`. O envio só liga com `NEXUS_PT_ASSINATURA_APP=1` (a rota do App ainda não
-  existe): desligado, o desenho é exigido e guardado, e a decisão segue como antes.
+  "assinatura_id"}` → 200 `{"ok": true}`. O envio só liga com o 1 em Base → Chaves do Nexus ("PT: mandar a assinatura do
+  De acordo ao App", `NEXUS_PT_ASSINATURA_APP`; o .env vale sem ela), quando a rota do App existir: desligado, o desenho
+  é exigido e guardado, e a decisão segue como antes.
 
 O "Não autorizo" não pede desenho: pede o motivo, que o técnico lê."""
 from __future__ import annotations
@@ -103,7 +104,9 @@ def ler(cfg, numero, codigo) -> dict | None:
 
 
 def envio_ligado(cfg) -> bool:
-    return str(cfg.get("NEXUS_PT_ASSINATURA_APP") or "").strip() == "1"
+    """Base → Chaves do Nexus ("PT: mandar a assinatura do De acordo ao App") e, sem ela, o .env."""
+    from ..auth import chaves
+    return (chaves.valor("NEXUS_PT_ASSINATURA_APP", cfg) or "").strip() == "1"
 
 
 def enviar_ao_app(numero, codigo, png: bytes, quem_hmac: str) -> None:

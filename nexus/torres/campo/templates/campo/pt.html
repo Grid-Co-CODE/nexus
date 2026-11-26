@@ -128,6 +128,22 @@
   </nav>{% endif %}
   {% endif %}
   {% else %}
+  {# o relatório em PDF do mês e do cliente (26/11/2026, Levi: "tem que ter um botão de extrair relatório [...] selecionar
+     um mês e o cliente [...] só PT, só APR, os dois"; "um formato em PDF [...] parecido com o dos extintores") #}
+  {% if rel %}
+  <details class="pt-rel">
+    <summary class="gc-btn gc-btn--contorno"><i class="ph ph-file-pdf" aria-hidden="true"></i> Extrair relatório</summary>
+    <form class="pt-rel-form" method="get" action="{{ raiz }}/t/hseq/apr-pt/relatorio.pdf">
+      <label class="cn-filtro-par"><span class="gc-rotulo">Mês</span>
+        <select class="gc-campo" name="mes" required>{% for v, rot in rel.meses %}<option value="{{ v }}">{{ rot }}</option>{% endfor %}</select></label>
+      <label class="cn-filtro-par"><span class="gc-rotulo">Cliente</span>
+        <select class="gc-campo" name="cliente"><option value="">Todos os clientes</option>{% for c in rel.clientes %}<option value="{{ c }}"{% if fl.cliente and fl.cliente|length == 1 and fl.cliente[0] == c %} selected{% endif %}>{{ c }}</option>{% endfor %}</select></label>
+      <label class="cn-filtro-par"><span class="gc-rotulo">O que entra</span>
+        <select class="gc-campo" name="tipo">{% for v, rot in rel.tipos %}<option value="{{ v }}">{{ rot }}</option>{% endfor %}</select></label>
+      <button class="gc-btn gc-btn--primario" type="submit">Baixar o PDF</button>
+    </form>
+  </details>
+  {% endif %}
   <div class="cn-chips">
     <a href="{{ url(sit=None) }}"{% if not sit %} aria-current="page"{% endif %}>Todas <b>{{ contagem_hist.values()|sum }}</b></a>
     {% for s, (rot, cor) in situacoes.items() if s != 'aguardando' %}<a href="{{ url(sit=s) }}"{% if s == sit %} aria-current="page"{% endif %}><span class="cn-st cn-t-{{ cor }}">{{ rot }}</span> <b>{{ contagem_hist.get(s, 0) }}</b></a>{% endfor %}
