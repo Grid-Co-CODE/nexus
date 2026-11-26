@@ -555,8 +555,22 @@ def _canal_temp(h):
     interessante IPOA, GHI e temperatura dos módulos, o que não tem fica nulo mesmo"."""
     for j, x in enumerate(h):
         if "temp" in x and any(k in x for k in ("pv", "mod", "painel", "placa", "celula")) and \
-                not any(k in x for k in ("_ar", "amb", "max", "min")) and x.endswith(("_med", "_act", "_avg", "_mean")):
+                not any(k in x for k in ("_ar", "amb", "max", "min")) and                 x.endswith(("_med", "_act", "_avg", "_mean", "_atual", "_actual")):
             return j
+    return None
+
+
+def _canal_chuva(h):
+    """(índice, modo) da chuva do datalogger, ou None (Levi, 26/11/2026: "quando o dado bruto tiver chuva e temperatura
+    do módulo, pode trazer"). O acumulado do DIA ("Chuva_Acumulada_dia", zera à meia-noite) primeiro; sem ele, a chuva
+    de cada minuto ("Chuva_Acumulada_min", somada). No logging_00001/00002 os dois batem em todos os dias de 05/10 a
+    25/11/2026. O acumulado da hora e o total desde a instalação ficam de fora."""
+    for j, x in enumerate(h):
+        if "chuva" in x and x.endswith(("_dia", "_day")):
+            return j, "acumulado"
+    for j, x in enumerate(h):
+        if "chuva" in x and x.endswith("_min"):
+            return j, "incremento"
     return None
 
 
@@ -603,7 +617,7 @@ def _formato_etm(linhas):
     if poa is None and ghi is None and not etm:
         return None
     return {"tipo": "logger", "sep": sep, "date": h.index("date"), "time": h.index("time"), "poa": poa, "ghi": ghi,
-            "etm": etm, "temp": _canal_temp(h),
+            "etm": etm, "temp": _canal_temp(h), "chuva": _canal_chuva(h),
             "nomes": (h[poa] if poa is not None else None, h[ghi] if ghi is not None else None), "cab": cab.strip()}
 
 
@@ -667,7 +681,8 @@ def _pontos_logger(texto, fmt):
         t = _hora("%s %s" % (r[jd].strip(), r[jt].split(",")[0].strip()))
         if not t:
             continue
-        canais = [("IPOA", fmt["poa"]), ("GHI", fmt["ghi"]), ("Temperatura", fmt.get("temp"))]
+        canais = [("IPOA", fmt["poa"]), ("GHI", fmt["ghi"]), ("Temperatura", fmt.get("temp")),
+                  ("Chuva", (fmt.get("chuva") or (None,))[0])]
         canais += [("ETM%d" % (k + 1), j) for k, j in enumerate(fmt.get("etm") or [])]
         for canal, j in canais:
             if j is None or j >= len(r):
@@ -688,6 +703,9 @@ def _usinas_do_texto(texto, abas):
     if len(achou) == 1 or any(nomes <= {norm(x) for x in g} for g in ESTACAO_COMPARTILHADA):
         return _estacao(achou, abas), []
     return [], _parecido(texto, achou)
+
+
+SEM_INFO_USINA = "Não achei a usina no nome do arquivo nem no da pasta."
 
 
 def _usinas_etm(arq, fmt, prefixos, abas):
@@ -711,7 +729,7 @@ def _usinas_etm(arq, fmt, prefixos, abas):
             arq.nome if not arq.origem else "%s/%s" % (arq.origem, arq.nome))
     dica = [a for a in CANAIS_LOGGER.get(fmt.get("nomes"), ()) if a in abas]
     resto = [a for a in ETM_ABAS if a not in dica and a in abas]
-    return [], dica + resto, "Não achei a usina no nome do arquivo nem no da pasta."
+    return [], dica + resto, SEM_INFO_USINA
 
 
 def _irmaos(arq, fmt, usinas, abas):
@@ -780,11 +798,16 @@ class EtmPolaris(Leitor):
         else:
             o_que = [n for n, ok in (("IPOA", fmt["poa"] is not None), ("GHI", fmt["ghi"] is not None),
                                      ("ETM1 e ETM2" if len(fmt.get("etm") or []) > 1 else "ETM1", bool(fmt.get("etm"))),
-                                     ("temperatura do módulo", fmt.get("temp") is not None)) if ok]
+                                     ("temperatura do módulo", fmt.get("temp") is not None),
+                                     ("chuva", fmt.get("chuva") is not None)) if ok]
             det = "%s · datalogger" % ", ".join(o_que)
         rec = Reconhecimento(self.fonte, usinas=usinas, periodo=(min(dias), max(dias)) if dias else None,
                              estado=fmt, detalhe=det)
-        if not usinas:
+        # sem NENHUMA informação de usina (nem no nome, nem na pasta, nem na estação): converte direto na aba "Sem usina",
+        # sem perguntar (Levi, 26/11/2026: "quando for dado de field log e não tem nenhuma informação de usina, você não
+        # precisa se limitar à questão de usina. Só faz a conversão que eu colo lá no arquivo correto"). Nome que serve a
+        # mais de uma usina, ou que briga com a estação, segue perguntando: aí a usina está no arquivo, só ambígua.
+        if not usinas and perg != SEM_INFO_USINA:
             rec.candidatas, rec.pergunta = cand, perg
         return rec
 
@@ -830,10 +853,13 @@ class EtmPolaris(Leitor):
                     # as partes do mesmo datalogger sem usina vão para UMA aba "Sem usina" (logging_00001 e
                     # logging_00002, 10/11/2026: saíam duas abas repetidas); o nome junta as partes em ordem
                     usinas = ["%s · %s" % (SEM_USINA, " + ".join(sorted([arq.nome] + [p.nome for p in partes])))]
-            serie, temp, cobre = {}, {}, {}
+            serie, temp, cobre, chuva = {}, {}, {}, {}
             for (canal, t), v in junto.items():
                 if canal == "Temperatura":
                     temp[t] = v
+                    continue
+                if canal == "Chuva":
+                    chuva.setdefault(t.date(), []).append((t.hour * 3600 + t.minute * 60 + t.second, v))
                     continue
                 serie.setdefault((canal, t.date()), [[]])[0].append((t, v))
                 c = cobre.get(t.date())
@@ -848,6 +874,24 @@ class EtmPolaris(Leitor):
                     for aba in usinas:
                         cel_temp = Celula(BD_THOPEN, aba, d, "Temperatura", v)
                         serie.setdefault(("_temp", d), []).append(cel_temp)
+            if chuva:
+                # o dia inteiro no arquivo, 0 entra (dia medido sem chuva); só em célula vazia, como a chuva
+                # retroativa da coleta: a do BD vem da API
+                from conversor.leitores.apolo import _chuva_do_dia
+                modo = fmt["chuva"][1]
+                fora_chuva = []
+                for d in dias:
+                    if d not in chuva:
+                        continue
+                    v, m = _chuva_do_dia(chuva[d], modo)
+                    if v is None:
+                        fora_chuva.append(d)
+                        continue
+                    for aba in usinas:
+                        serie.setdefault(("_temp", d), []).append(Celula(BD_THOPEN, aba, d, "Chuva", v, so_vazio=True))
+                if fora_chuva:
+                    avisos.append("chuva fora em %d dia(s) sem o dia inteiro no arquivo: %s" % (
+                        len(fora_chuva), ", ".join(d.strftime("%d/%m") for d in fora_chuva[:12])))
         cel, fora, parciais = [], {}, {}
         for k, lst in list(serie.items()) if fmt["tipo"] != "scada" else []:
             if k[0] == "_temp":

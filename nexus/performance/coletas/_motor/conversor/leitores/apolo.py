@@ -373,7 +373,10 @@ def _dias_datalogger(caminho, texto=None):
         m = re.match(r"^temp.*dulo\s*([12])$", c)
         if m:
             jt.setdefault(int(m.group(1)), j)
-    jmax = max([ji, jg] + list(jt.values()))
+    # chuva (26/11/2026, Levi: "quando o dado bruto tiver chuva e temperatura do módulo, pode trazer"): o "Chuva_Total"
+    # do field log da Apolo é o acumulado do DIA (sobe ao longo do dia e zera à meia-noite; aa_1.csv, 01-25/11)
+    jc = next((j for j, c in enumerate(h) if c.startswith("chuva")), None)
+    jmax = max([ji, jg] + list(jt.values()) + ([jc] if jc is not None else []))
     datas = {}
     for r in linhas:
         if len(r) <= jmax:
@@ -389,7 +392,7 @@ def _dias_datalogger(caminho, texto=None):
         x = out.get(d)
         if x is None:
             x = out[d] = {"n": 0, "nI": 0, "sI": 0.0, "nG": 0, "sG": 0.0, "ini": s, "fim": None, "buraco": 0.0,
-                          "ordem": True, "t1": [0, 0.0, set()], "t2": [0, 0.0, set()]}
+                          "ordem": True, "t1": [0, 0.0, set()], "t2": [0, 0.0, set()], "chuva": []}
         elif s <= x["fim"]:                           # repetida ou fora de ordem: a soma deixaria de ser confiável
             x["ordem"] = False
             continue
@@ -417,8 +420,30 @@ def _dias_datalogger(caminho, texto=None):
                     t[0] += 1
                     t[1] += v
                     t[2].add(s // 3600)
+        if jc is not None:
+            vc = _num_dl(r[jc])
+            if vc is not None:
+                x["chuva"].append((s, vc))
     _DL_CACHE[k] = out
     return out
+
+
+def _chuva_do_dia(pts, modo="acumulado"):
+    """(mm, motivo para ficar fora) da chuva de UM dia; pts = [(segundos do dia, valor)]. Só com o dia inteiro no
+    arquivo (leitura até 00:10 e depois das 23:50): chuva se conta de madrugada também. "acumulado" = contador do dia
+    que zera à meia-noite: o maior depois da zeragem (a 1ª leitura ainda pode trazer a véspera, como o acumulado da
+    irradiação); "incremento" = a chuva de cada minuto, somada. 0 entra: é o dia medido sem chuva."""
+    pts = sorted((s, v) for s, v in pts if v is not None and 0 <= v < 1000)
+    if not pts:
+        return None, "sem leitura de chuva"
+    if pts[0][0] > 600 or pts[-1][0] < 23 * 3600 + 50 * 60:
+        return None, "o arquivo não cobre o dia inteiro (%s a %s)" % (_hm(pts[0][0]), _hm(pts[-1][0]))
+    if modo == "incremento":
+        return round(sum(v for _, v in pts), 1), None
+    k = next((i for i, (_, v) in enumerate(pts) if v <= 0), None)
+    if k is None:
+        return None, "o acumulado da chuva não zerou na virada do dia"
+    return round(max(v for _, v in pts[k:]), 1), None
 
 
 def _partes(arq):
@@ -460,6 +485,7 @@ def _juntar_dia(pedacos):
         for c in ("t1", "t2"):
             a, b = tot.get(c, [0, 0.0, set()]), x.get(c, [0, 0.0, set()])
             tot[c] = [a[0] + b[0], a[1] + b[1], a[2] | b[2]]
+        tot["chuva"] = list(tot.get("chuva", [])) + list(x.get("chuva", []))
         tot["fim"] = max(tot["fim"], x["fim"])
         tot["ordem"] = tot["ordem"] and x["ordem"]
     return tot
@@ -486,14 +512,17 @@ class Datalogger(Leitor):
             if d1:
                 break
         aba = _usina_no_nome(arq, NOMES_APOLO)
-        tem_temp = any(re.match(r"^temp.*dulo\s*[12]$", c) for c in _cab_datalogger(cab[0]))
+        h0 = _cab_datalogger(cab[0])
+        tem_temp = any(re.match(r"^temp.*dulo\s*[12]$", c) for c in h0)
+        tem_chuva = any(c.startswith("chuva") for c in h0)
         # sem a usina no nome: converte direto na aba "Sem usina", SEM perguntar (Levi, 26/11/2026, field log "aa_1.csv":
         # "quando for dado de field log e não tem nenhuma informação de usina, você não precisa se limitar à questão de
         # usina. Só faz a conversão que eu colo lá no arquivo correto"). Até a 1.0.16 o cartão perguntava entre as três
         # da Apolo; a escolha da aba continua possível no cartão, só não é pedida.
         rec = Reconhecimento(self.fonte, usinas=[aba] if aba else [],
                              periodo=(d0, d1) if d0 and d1 and d0 <= d1 else None, estado={"aba": aba},
-                             detalhe="IPOA e GHI de 1 em 1 min" + (" e temperatura do módulo" if tem_temp else ""))
+                             detalhe="IPOA e GHI de 1 em 1 min" + (", temperatura do módulo" if tem_temp else "")
+                             + (", chuva" if tem_chuva else ""))
         return rec
 
     def ler(self, arq, ctx, rec, escolha=None):
@@ -510,7 +539,7 @@ class Datalogger(Leitor):
         ab = None if sem_usina else _aba_bd(ctx, aba)
         ini = _antes_da_aba(ab) if ab else None
         cel, avisos = [], []
-        curtos, sobrepostos, buracos, densos = [], [], [], []
+        curtos, sobrepostos, buracos, densos, chuva_fora = [], [], [], [], []
         for d in sorted(meus):
             if ini and d < ini:                       # histórico de antes da aba existir
                 continue
@@ -543,6 +572,16 @@ class Datalogger(Leitor):
             if tn and len(th) >= TEMP_HORAS_MIN:
                 cel.append(Celula(BD_PERFORMANCE, aba, d, "Temperatura", round(ts / tn, 2),
                                   nota=("parcial: " + "; ".join(obs)) if obs else None, so_vazio=True))
+            if x.get("chuva"):
+                v, motivo = _chuva_do_dia(x["chuva"])
+                if v is not None:
+                    cel.append(Celula(BD_PERFORMANCE, aba, d, "Chuva", v, so_vazio=True))
+                else:
+                    chuva_fora.append((d, motivo))
+        if chuva_fora:
+            avisos.append(("leve", "%s: chuva fora em %d dia(s) (%s): %s" % (
+                "Sem usina" if sem_usina else aba, len(chuva_fora), chuva_fora[0][1],
+                ", ".join(d.strftime("%d/%m") for d, _ in chuva_fora[:12]))))
         parciais = sorted({c[0] for c in curtos} | {d for d, _ in buracos})
         if parciais:
             avisos.append(("leve", "%s: %d dia(s) com leitura incompleta no datalogger entram com o que foi medido (pode "

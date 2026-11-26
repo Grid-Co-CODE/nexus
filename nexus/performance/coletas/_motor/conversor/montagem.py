@@ -482,7 +482,7 @@ def _previa_bloco(ab, bl, novos, max_linhas, max_cols):
             "colar_em": "%s%d" % (L(c1 + 1), r1), "cortado": c2 > c2v or r2 - r1 + 1 > max_linhas}
 
 
-_ORDEM_SOLTA = ("IPOA", "GHI", "Temperatura", "ETM1", "ETM2")
+_ORDEM_SOLTA = ("IPOA", "GHI", "Temperatura", "Chuva", "ETM1", "ETM2")
 
 
 def _separar_soltas(vals):
