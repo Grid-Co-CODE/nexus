@@ -365,6 +365,7 @@
   .hs-clientes > tbody > tr.cn-detalhe{display:block}
   .hs-clientes > tbody > tr.cn-detalhe[hidden]{display:none}
   .hs-clientes > tbody > tr.cn-detalhe > td{display:block;overflow-x:auto}
+}
 
 /* Incidentes (24/11/2026): os relatos de segurança do App. O texto livre guarda as quebras de linha que o técnico
    escreveu; as fotos em miniatura, que abrem inteiras numa aba; no celular cada relato vira um cartão (como a APR e PT) */
