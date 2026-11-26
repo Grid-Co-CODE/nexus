@@ -24,6 +24,12 @@ TORRE = Torre(
     telas=[
         # As telas da Plataforma de Performance (porta única, 09/10/2026): cada uma é uma moldura com a tela da plataforma,
         # na ordem do mapa (nexus/performance/porta.py). Os ids que já existiam no menu não mudam (viram endereço).
+        # a Análise das usinas (Levi, 25/11/2026: "aquela nova visão que vai substituir painel NOC, histórico de PR,
+        # disponibilidade, vai trazer os expurgos"; "a gente vai chamar de análise das usinas"): as usinas em cards por
+        # cliente e o diagnóstico de cada uma. Tela da Plataforma de Performance na moldura; entrega 1, a visão inicial
+        Tela("analise-das-usinas", "Análise das usinas",
+             "Como está cada usina no mês, o que tirou energia e o que fazer?",
+             "Plataforma de Performance: o Gerencial e a régua do COS"),
         Tela("tempo-real", "Tempo real",
              "O que está fora do normal agora na frota?",
              "Plataforma de Performance, ao vivo"),

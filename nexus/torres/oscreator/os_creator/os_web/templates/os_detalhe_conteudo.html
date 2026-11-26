@@ -186,8 +186,9 @@
     {# o "Abrir chamado" (10/11/2026, Levi: "Quero que no card da OS do histórico de OS do OS Creator tenha um botão de 'Abri
        Chamado' no extremo esquerdo lá em baixo"): leva à Inspeção de chamados com esta OS de pai, e a tela carrega o ativo, a
        data do incidente e o responsável dela (o `?pai=` do insp.js). Link simples: as abas do OS Creator o abrem na aba de
-       Chamados (abas.js), e fora delas a página vai até lá. Só na OS de origem (25/11/2026): corretiva, corretiva
-       emergencial e religamento, a regra do App; na Inspeção ele fazia uma inspeção da inspeção (`insp_web.pai_de_origem`) #}
+       Chamados (abas.js), e fora delas a página vai até lá. Em toda OS menos a Inspeção e a Administrativa do chamado
+       (25/11/2026): nelas ele fazia uma inspeção da inspeção; a preventiva e as outras abrem (o back-office analisa), e o App
+       segue só com a corretiva e o religamento (`insp_web.pai_de_origem`) #}
     {% if d.folio and pode_chamado %}<a class="det-b ambar det-chamado" href="/os/chamados/inspecao?pai={{ d.folio }}" title="Abre a Inspeção de chamados com esta OS de pai: o ativo, a data do incidente e o responsável vêm preenchidos">{{ icone('ticket', 'currentColor', 16) }}Abrir chamado</a>{% endif %}
     <span class="det-ajuda">{{ n_sub }} subtarefa(s){% if grupos %} em {{ n_tarefas }} tarefas{% endif %}</span><span class="os-cresce"></span>
     <button type="button" class="det-b verde" data-acao="fluxo" title="Mostra esta OS encadeada com as outras — pais, filhas e todo o histórico do ativo">{{ icone('branch', '#0B1020', 16) }}Fluxo</button>

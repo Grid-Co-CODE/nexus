@@ -516,6 +516,8 @@ def ao_vivo(monkeypatch):
                 "labels": [{"id": i, "description": n} for i, n in o["labels"]]}
     monkeypatch.setattr(api, "_leitura_da_os", tarefas)
     monkeypatch.setattr(api, "_cabecalho_os", cabecalho)
+    # o Cancelar relê o status da OS depois do pedido (26/11/2026, a OS 18428 que seguiu Em Processo): o status como ficou
+    monkeypatch.setattr(api, "status_da_os", lambda wid: os_[wid]["status"])
     return os_, lidas
 
 
@@ -601,8 +603,10 @@ def test_pc_segue_ao_vivo(fr, ao_vivo, monkeypatch):
     assert fr.n("folio") == 1
     assert a.get("/os/api/os/1/previa").status_code == 204
     assert OC.estado()["conferencias"] == {}
-    # a ação do card: o Fracttal confirma, e nada mais vai a ele (a lista fora de uso não gasta a leitura da OS)
+    # a ação do card: o Fracttal confirma, e só o status é relido (a conferência do cancelamento, 26/11); a lista fora de uso
+    # não gasta a leitura das tarefas da OS
     monkeypatch.setattr(api, "cancel_os", lambda wid, idm, note="": None)
+    _os[2]["status"] = 4
     assert a.post("/os/api/os/2/cancelar", json={"id_status_custom": 9, "folio": "10002"}).get_json()["ok"]
     assert lidas == [] and not OC.atual().por_id
 

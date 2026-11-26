@@ -310,7 +310,8 @@ def test_so_o_sucesso_falso_e_recusado():
              "data sem dict": ok([1])}
     for nome, resposta in casos.items():
         with pytest.raises(E.ErroFracttal) as erro:
-            estoque(Fracttal({UNIDADES: unidades, CRIAR: resposta})).criar_peca("SP-CAB-013", "Cabo azul", "UNIDADE")
+            estoque(Fracttal({UNIDADES: unidades, PECAS: em_paginas(PECAS_COM_PAI), CRIAR: resposta})).criar_peca(
+                "SP-CAB-013", "Cabo azul", "UNIDADE")
         assert isinstance(erro.value, E.Recusado) is (nome == "recusa"), nome
 
 
@@ -517,24 +518,50 @@ def test_nunca_devolve_o_nome_do_responsavel():
 
 
 # ── a peça: criar e os códigos que existem ───────────────────────────────────────────────────────────────────────────────
+# o catálogo de peças com o pai de cada uma: quase todas debaixo do mesmo local, uma na raiz (a peça nova que ninguém arrastou)
+PECAS_COM_PAI = [{"id": 1, "code": "SP-A-001", "id_parent": 43827555}, {"id": 2, "code": "SP-A-002", "id_parent": 43827555},
+                 {"id": 3, "code": "SP-A-003", "id_parent": None}, {"id": 4, "code": "SP-A-004", "id_parent": 777}]
+
+
 def test_criar_peca_acha_a_unidade_e_manda_o_corpo_da_tela():
     fr = Fracttal({UNIDADES: ok([{"id": 362333, "description": "METRO"}, {"id": 362334, "description": "UNIDADE"}]),
+                   PECAS: em_paginas(PECAS_COM_PAI),
                    CRIAR: ok({"id": 53248312, "description": "Peça de teste    { SP-TST-001 }"})})
     est = estoque(fr)
     assert est.criar_peca("SP-TST-001", "Peça de teste do inventário (Nexus)") == ITEM
     assert est.criar_peca("SP-TST-002", "Outra peça", "unidade") == ITEM
-    assert fr.metodos == [UNIDADES, CRIAR, CRIAR]        # as unidades se leem uma vez só
-    assert fr.pedidos[1] == (CRIAR, {
+    assert fr.metodos == [UNIDADES, PECAS, CRIAR, CRIAR]        # as unidades e o pai se leem uma vez só
+    assert fr.pedidos[2] == (CRIAR, {
         "id_type_item": 4, "field_1": "Peça de teste do inventário (Nexus)", "code": "SP-TST-001", "id_unit": 362334,
         "units_description": "UNIDADE", "active": True, "description": "", "is_serial_control": False,
         "is_lot_control": False, "visible_to_all": False, "ids_batch": [], "associate_warehouses": [],
-        "associate_third_parties": [], "attached": [], "files": [], "custom_fields": []})
+        "associate_third_parties": [], "attached": [], "files": [], "custom_fields": [], "id_parent": 43827555})
+
+
+def test_a_peca_nova_nasce_debaixo_do_pai_das_pecas_do_catalogo():
+    """A peça que o Nexus cria vai para debaixo do MESMO local das peças do catálogo (o "Almoxarifado" do Fracttal), e não
+    para a raiz da árvore de Ativos. O caso (25/11/2026): uma pessoa do PCM viu as peças da Curadoria "caindo direto no
+    ativo, ao invés de cair no peças e suprimentos"; no Fracttal, as 715 peças estavam debaixo do mesmo local e só as do
+    Nexus na raiz, porque o `item_insert` ia sem o `id_parent` (a tela do Fracttal também o manda nulo: a pessoa arrastava
+    a peça depois). Provado no Fracttal de verdade em 26/11/2026: com o `id_parent`, a peça nasce debaixo do local.
+    O pai é o mais comum do catálogo (lê a 1ª página, uma vez); o nulo não conta. Sem nenhum, a peça vai sem (como antes)."""
+    fr = Fracttal({UNIDADES: ok([{"id": 362334, "description": "UNIDADE"}]), PECAS: em_paginas(PECAS_COM_PAI),
+                   CRIAR: ok({"id": 53248312})})
+    estoque(fr, pagina=2).criar_peca("SP-TST-001", "Peça")
+    assert fr.metodos == [UNIDADES, PECAS, CRIAR]       # uma página só: o pai das peças não pede o catálogo inteiro
+    assert fr.pedidos[-1][1]["id_parent"] == 43827555
+    # catálogo sem pai nenhum: vai sem o campo, como a tela
+    fr = Fracttal({UNIDADES: ok([{"id": 362334, "description": "UNIDADE"}]),
+                   PECAS: em_paginas([{"id": 1, "code": "X", "id_parent": None}]), CRIAR: ok({"id": 53248312})})
+    estoque(fr).criar_peca("SP-TST-001", "Peça")
+    assert "id_parent" not in fr.pedidos[-1][1]
 
 
 def test_criar_peca_manda_a_descricao_no_description():
     """A descrição da peça (30/10/2026: o fabricante, o modelo e a série da peça achada fora do catálogo, Task 8) vai no
     `description` do `item_insert`, o campo que a tela do passo 0 mandava vazio; sem ela, continua vazio. O falso a guarda."""
-    fr = Fracttal({UNIDADES: ok([{"id": 362334, "description": "UNIDADE"}]), CRIAR: ok({"id": 53248312})})
+    fr = Fracttal({UNIDADES: ok([{"id": 362334, "description": "UNIDADE"}]), PECAS: em_paginas(PECAS_COM_PAI),
+                   CRIAR: ok({"id": 53248312})})
     est = estoque(fr)
     est.criar_peca("SP-TST-003", "Peça", "UNIDADE", descricao="  Fabricante X · modelo Y  ")
     est.criar_peca("SP-TST-004", "Outra")

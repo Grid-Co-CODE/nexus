@@ -48,6 +48,9 @@ MAPA = (
     TelaDaPlataforma("performance", "strings-trackers", "Strings e trackers", "/painel/falhas", (), False),
     # a Sala de controle da plataforma (16/11/2026): a visão por fonte do tempo real; entrega 1, só leitura
     TelaDaPlataforma("performance", "sala-de-controle", "Sala de controle", "/painel/sala-de-controle", (), False),
+    # a Análise das usinas da plataforma (25/11/2026): a tela que substitui o Painel NOC, o Histórico de PR e a
+    # Disponibilidade, no desenho que o Levi aprovou no mockup; entrega 1, a visão inicial
+    TelaDaPlataforma("performance", "analise-das-usinas", "Análise das usinas", "/painel/analise-das-usinas", (), False),
     TelaDaPlataforma("performance", "gerencial", "Visão gerencial", "/gerencial", (), False),
     TelaDaPlataforma("performance", "disponibilidade", "Disponibilidade", "/gerencial/disponibilidade", (), False),
     # Os relatórios moram na torre Relatórios desde 13/10/2026 (Levi: "Criador de relatório e relatório semanal vai para

@@ -1091,5 +1091,18 @@ def api_cancelar(wid):
         return _erro("Escolha o motivo do cancelamento.")
     api.cancel_os(wid, idm, str(c.get("note") or "").strip())        # cancelar_os.py:77 — (self._wo, idm, obs.strip())
     lista_central.mudou(wid)
+    # 26/11/2026 (Maria Oliveira, pelo Levi: "Algumas OSs foram canceladas pelo supervisor no Nexus e não foram canceladas
+    # no Fracttal"): a OS 18428 (UFV Vitesse) foi "cancelada" pelo Wesley Silva em 16/11 e segue Em Processo no Fracttal
+    # (a tarefa tinha uma execução iniciada às 08:31 e pausada); a 18427, cancelada no mesmo minuto, ficou cancelada. O
+    # Fracttal respondeu sem erro e a tela disse "cancelada com sucesso". Agora, como o Retornar, a OS é RELIDA depois do
+    # pedido: se não ficou cancelada, a tela diz isso em vez de anunciar sucesso. Status não lido (o Fracttal não respondeu
+    # a leitura) segue como antes.
+    depois = api.status_da_os(wid)
+    if depois is not None and int(depois) != 4:
+        folio = c.get("folio") or wid
+        log.warning("cancelar OS %s: o Fracttal aceitou o pedido e a OS seguiu %s", folio, depois)
+        return _erro("O Fracttal aceitou o pedido, mas a OS %s seguiu %s: ela NÃO foi cancelada. Tente de novo ou "
+                     "cancele pela tela do Fracttal." % (
+                         folio, api.WO_STATUS.get(int(depois), "como estava").lower()), 502)
     _no_quadro_de_garantias(wid, 4)
     return jsonify({"ok": True, "mensagem": "OS %s cancelada com sucesso." % (c.get("folio") or wid)})

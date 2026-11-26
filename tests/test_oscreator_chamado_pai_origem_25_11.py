@@ -1,5 +1,6 @@
-"""A OS pai do chamado é a de origem, e o ativo com chamado em aberto não ganha outro (25/11/2026, Levi: "Está tendo casos
-de OS de inspeção gerando outras OS de inspeção na parte de chamados"). O "Abrir chamado" do card (10/11/2026) aparecia em
+"""A OS pai do chamado não é da própria cadeia do chamado, e o ativo com chamado em aberto não ganha outro (25/11/2026, Levi:
+"Está tendo casos de OS de inspeção gerando outras OS de inspeção na parte de chamados"; à tarde, só no OS Creator, a
+preventiva e os outros tipos abrem: "No OS Creator pode ser um pouquinho mais flexível"). O "Abrir chamado" do card (10/11/2026) aparecia em
 toda OS e a Inspeção virava pai de outra Inspeção; a web não olhava se o ativo já tinha chamado. As duas regras são as do
 App (`chamado_garantia.TIPOS_ORIGEM` e a v361). O Fracttal e o banco são de mentira."""
 import pytest
@@ -31,16 +32,26 @@ def _card_do_tipo(monkeypatch, tipo):
     return _card()
 
 
+# à tarde do mesmo dia (Levi: "muitas vezes dados levantados de OS de preventiva ou de outro tipo, às vezes é visto que vai
+# precisar abrir chamado [...] No OS Creator pode ser um pouquinho mais flexível"): na web vale qualquer OS menos a
+# Inspeção e a Administrativa do chamado; o App segue com o TIPOS_ORIGEM
 @pytest.mark.parametrize("tipo, pode", [("Corretiva", True), ("Corretiva Emergencial", True), ("Religamento", True),
-                                        ("Religamento Remoto", True), ("Inspeção", False), ("Administrativa", False),
-                                        ("Preventiva", False), ("Inspeção / Corretiva", True), ("", False),
-                                        (None, False), ("corretiva emergencial", True)])
-def test_a_os_de_origem_e_a_do_app(tipo, pode):
+                                        ("Religamento Remoto", True), ("Preventiva", True), ("Preditiva", True),
+                                        ("Inspeção", False), ("Administrativa", False), ("inspeção", False),
+                                        ("Inspeção / Administrativa", False), ("Inspeção / Corretiva", True),
+                                        ("Inspeção / Preventiva", True), ("", True), (None, True)])
+def test_na_web_a_os_pai_e_qualquer_uma_menos_a_cadeia_do_chamado(tipo, pode):
     assert iw.pai_de_origem(tipo) is pode
 
 
-def test_o_abrir_chamado_so_aparece_na_os_de_origem(monkeypatch):
+def test_o_app_segue_so_com_a_corretiva_e_o_religamento():
+    from chamado_garantia.regras import TIPOS_ORIGEM
+    assert TIPOS_ORIGEM == ("Corretiva", "Corretiva Emergencial", "Religamento", "Religamento Remoto")
+
+
+def test_o_abrir_chamado_aparece_menos_na_cadeia_do_chamado(monkeypatch):
     assert "Abrir chamado</a>" in _card_do_tipo(monkeypatch, "Corretiva Emergencial")
+    assert "Abrir chamado</a>" in _card_do_tipo(monkeypatch, "Preventiva")
     # a Inspeção não abre chamado: era assim que nascia a inspeção da inspeção
     assert "Abrir chamado</a>" not in _card_do_tipo(monkeypatch, "Inspeção")
     assert "Abrir chamado</a>" not in _card_do_tipo(monkeypatch, "Administrativa")
@@ -51,12 +62,13 @@ def test_a_inspecao_como_os_pai_e_recusada_ao_escolher(monkeypatch):
                         lambda f: {"folio": f, "tipo": "Inspeção", "code": ATIVO["code"], "id_work_order": 77})
     r = _cliente().get("/os/api/insp/pai?folio=19398")
     assert r.status_code == 400
-    assert r.get_json()["erro"].startswith("A OS 19398 é Inspeção.")
+    assert r.get_json()["erro"].startswith("A OS 19398 é Inspeção, que já é do chamado.")
 
 
-def test_a_corretiva_como_os_pai_segue(monkeypatch):
+@pytest.mark.parametrize("tipo", ["Corretiva Emergencial", "Preventiva"])
+def test_a_corretiva_e_a_preventiva_como_os_pai_seguem(monkeypatch, tipo):
     monkeypatch.setattr(api, "get_os_detalhes_por_folio",
-                        lambda f: {"folio": f, "tipo": "Corretiva Emergencial", "code": ATIVO["code"],
+                        lambda f: {"folio": f, "tipo": tipo, "code": ATIVO["code"],
                                    "id_work_order": 77, "event_date": "2026-11-25T08:18:00", "responsavel": ""})
     monkeypatch.setattr(rotas, "responsaveis_fracttal", lambda: [])
     monkeypatch.setattr(api, "load_assets_cached", lambda: [ATIVO])
@@ -87,6 +99,12 @@ def test_a_inspecao_como_os_pai_e_recusada_ao_criar(monkeypatch, criar):
     r = _cliente().post("/os/api/insp/criar", json=_corpo(pai_id=77))
     assert r.status_code == 400 and "A OS pai escolhida é Inspeção" in r.get_json()["erro"]
     assert criar == []
+
+
+def test_a_preventiva_como_os_pai_cria(monkeypatch, criar):
+    monkeypatch.setattr(api, "_meta_tarefa_por_os", lambda ids: {77: {"tipo_tarefa": "Preventiva"}})
+    r = _cliente().post("/os/api/insp/criar", json=_corpo(pai_id=77))
+    assert r.status_code == 200 and len(criar) == 1 and criar[0]["id_parent"] == 77
 
 
 def test_o_ativo_com_chamado_aberto_nao_ganha_outro(monkeypatch, criar):

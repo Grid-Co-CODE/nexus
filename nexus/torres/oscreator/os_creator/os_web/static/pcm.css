@@ -27,6 +27,11 @@
 .pcm-dim{color:var(--muted)}
 .pcm-pre{white-space:pre}
 .pcm-red,.pcm-tbl tr.sem td,.pcm-tbl tr.sem .pcm-chk{color:#e06c6c}
+/* o ativo com mais de uma tarefa (25/11/2026, Levi: "pode deixar um laranja de fundo, só para mostrar, um laranja bem claro
+   mesmo"; "Tem 2 inversor no ponto 2, então vai pintar os dois"): as linhas dele, a 1ª e as repetidas, cada uma com o seu
+   plano; a cor é a variável, com o valor de cada tema */
+#pcm{--pcm-dupla:rgba(245,147,66,.13)}
+.pcm-tbl tr.dupla td{background:var(--pcm-dupla)}
 /* o tempo da tarefa (o _TempoTarefa): HH:mm e as duas setas, que andam de 30 em 30 min */
 .pcm-tempo{display:inline-flex;align-items:center;gap:4px}
 .pcm-tbl .pcm-tempo input.tp{width:64px;text-align:center;padding:0 6px}
@@ -58,6 +63,7 @@
 /* o ícone do calendário escuro, para aparecer no campo claro */
 :where(html[data-tema="claro"]) #pcm input[type=date],:where(html[data-tema="claro"]) #pcm input[type=datetime-local]{color-scheme:light}
 :where(html[data-tema="claro"]) .pcm-chk{color:var(--osc-texto)}
+:where(html[data-tema="claro"]) #pcm{--pcm-dupla:rgba(247,140,60,.14)}
 :where(html[data-tema="claro"]) .pcm-red,:where(html[data-tema="claro"]) .pcm-tbl tr.sem td,
 :where(html[data-tema="claro"]) .pcm-tbl tr.sem .pcm-chk{color:var(--osc-critico)}
 :where(html[data-tema="claro"]) .pcm-tempo .tp-b:hover{color:var(--osc-texto)}

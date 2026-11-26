@@ -942,7 +942,13 @@ inventario-almoxarifado.md`; o que o Fracttal aceita de verdade (métodos, corpo
   como número (`GRUPOS`, `corpo_dos_grupos`: o vazio não vai, o id que não é número nem sai); `classificacoes()` dá as opções,
   os pares distintos (id, descrição) de cada campo, lidos das próprias peças (`items_list`, todas as páginas,
   `classificacoes_das_pecas`), porque o `groups_1_list` mistura as classificações dos ativos (nomes de usina). Provado no
-  Fracttal de verdade em 12/11/2026 (o `item_insert` com os três, lido de volta igual). A requisição de material (12/11/2026):
+  Fracttal de verdade em 12/11/2026 (o `item_insert` com os três, lido de volta igual). **O pai da peça (26/11/2026):** a peça
+  nova vai com o `id_parent` do local onde moram as peças do catálogo (o "Almoxarifado" da árvore de Ativos; `_pai_das_pecas`:
+  o pai mais comum da 1ª página das peças, lido uma vez por instância; sem nenhum, vai sem, como antes). Sem ele a peça nasce
+  na RAIZ de Ativos (uma pessoa do PCM, 25/11: as peças da Curadoria "caindo direto no ativo, ao invés de cair no peças e
+  suprimentos"); a tela do Fracttal também o manda nulo, e o PCM arrastava a peça à mão. Provado no Fracttal em 26/11/2026
+  (TESTE-NEXUS-0003 nasceu debaixo do local, depois desativada; as peças de teste do Nexus que estavam na raiz foram para
+  debaixo dele pelo `item_update {id, id_parent}`). A requisição de material (12/11/2026):
   `requisicoes`, `reler_requisicao`, `pecas_da_requisicao`, `aprovar_requisicao`, `recusar_requisicao`, `saida_da_requisicao`,
   `saida_com_a_os` (a Saída Geral no histórico, que agora projeta também o `document`) e `responsavel`, e o `pecas_com_grupos`
   que dá as opções e o mapa por código (a seção Requisições). Todo id é texto; `ler` devolve

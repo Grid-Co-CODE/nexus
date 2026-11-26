@@ -123,6 +123,10 @@ releitura e na tela do Fracttal. Depois, pela tela do Fracttal, as duas peças d
 "custom_fields": []}` → `data: {"id": 53248312, "description": "<nome>    { SP-TST-001 }"}`. As unidades vêm de
 `companies.units_list` (`UNIDADE` = 362334, a das peças do catálogo).
 
+**O `id_parent` (26/11/2026):** sem ele a peça nasce na raiz da árvore de Ativos (a tela do Fracttal também o manda nulo). Desde
+26/11 o adaptador manda o pai das peças do catálogo (`EstoqueFracttal._pai_das_pecas`), provado no Fracttal: a peça nasce
+debaixo do local. O `item_update {id, id_parent}` move uma peça que já existe.
+
 **O `description` do pedido não foi provado e não é usado** (revisão final de 31/10/2026). A tela o manda vazio, e o que volta
 nele é o texto de exibição da peça (`"<nome>    { CODE }"`): ninguém testou o que escrever um texto ali faz com o catálogo do
 cliente (se troca o nome mostrado, se aparece nas listas). O adaptador aceita `descricao=""` (`EstoqueFracttal.criar_peca`),

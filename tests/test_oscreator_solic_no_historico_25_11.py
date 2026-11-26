@@ -48,3 +48,34 @@ def test_sem_a_lista_central_a_coluna_fica_vazia_e_a_pagina_abre(cli, monkeypatc
     h = cli.get("/os/solicitacao/historico")
     assert h.status_code == 200
     assert all(l["os_criada"] == "" for l in _dados(h.get_data(as_text=True), "hs_dados")["linhas"])
+
+
+def test_o_ativo_e_a_usina_vem_resumidos_e_as_colunas_centralizadas(cli):
+    """Levi, 25/11/2026: "Não precisa do ativo por extenso [...] Quando for o inversor, vai ser inversor X. Quando for track,
+    vai ser track X. Não precisa do fabricante. E quando for usina, vai ser o nome da usina. Sem estado, sem endereço"; "Quero
+    todas as colunas centralizadas, exceto usina. E descrição"."""
+    from os_web import solic_web as sw
+    assert sw.ativo_resumido("Inversor 1.1 Marca Teste { TST-INV11 }") == "Inversor 1.1"
+    assert sw.ativo_resumido("Tracker 08.106 Fabricante Teste Bi-motor { TST-TRK }") == "Tracker 08.106"
+    assert sw.ativo_resumido("Estrutura Trackers 1") == "Tracker 1"
+    # o ativo que é a própria usina: o nome dela, sem o cliente, o estado e o endereço
+    assert sw.ativo_resumido("Cliente X - Usina Teste 1 - SP, Rua de Teste, 100 { TST-USI }") == "Usina Teste 1"
+    # o formato do ar (lido em 25/11/2026): o endereço colado na UF, sem vírgula, às vezes com espaço dobrado no nome
+    assert sw.ativo_resumido("Cliente X - Usina Teste 2 - RN RN-000, Zona Rural Cidade Teste { TST-USI2 }") == "Usina Teste 2"
+    assert sw.ativo_resumido("Cliente X - Usina  Teste 3 - PA  Cidade Teste  Estado Teste") == "Usina Teste 3"
+    assert sw.ativo_resumido("Cliente X - Usina Teste 4 e 5 - AL FZ. Teste, S/N") == "Usina Teste 4 e 5"
+    assert sw.ativo_resumido("Estrutura Trackers Zona Rural, s/n Cidade Teste") == "Tracker"
+    assert sw.ativo_resumido("Estrutura Trackers Bairro Teste, Cidade Teste - UF, 00000-000") == "Tracker"
+    assert sw.ativo_resumido("Tracker 10.100 Fabricante Teste - 2x(1Px56)") == "Tracker 10.100"
+    assert sw.ativo_resumido("Disjuntor do Transformador (P.E.) 27") == "Disjuntor do Transformador (P.E.) 27"
+    assert sw.ativo_resumido("") == "—" and sw.ativo_resumido(None) == "—"                 # sem ativo: o traço
+    linhas = {l["id"]: l for l in cli.get("/os/api/solic/historico").get_json()["linhas"]}
+    assert linhas[5001]["ativo_resumo"] == "Inversor 1.1" and linhas[5002]["ativo_resumo"] == "Tracker 1"
+    assert linhas[5001]["usina_curta"] == "Usina Teste 1"
+    assert linhas[5001]["ativo"].startswith("Inversor 1.1 Marca Teste")          # o nome inteiro segue no título e na busca
+    js = (WEB / "static" / "solic_hist.js").read_text(encoding="utf-8")
+    assert "esc(d.ativo_resumo || d.ativo || '—')" in js and "esc(d.usina_curta || d.usina)" in js
+    assert 'class="spc-hist-usina"' in js and 'title="\' + esc(d.ativo) + \'"' in js
+    css = (WEB / "static" / "solic_pcm.css").read_text(encoding="utf-8")
+    assert ".spc-hist .spc-tbl th,.spc-hist .spc-tbl td{text-align:center}" in css
+    assert ".spc-hist .spc-tbl td.spc-hist-usina,.spc-hist .spc-tbl td.spc-hist-desc{text-align:left}" in css

@@ -68,9 +68,12 @@ def cancel_os(id_work_order, id_status_custom, note: str = "", cancellation_type
     params = {"id": id_work_order, "id_work_orders_status_custom": id_status_custom,
               "note": (note or "").strip(), "cancellation_type": cancellation_type, "utc_min": utc_min}
     res = api._rpc_call(RPC_WO_CANCEL, params)
-    if isinstance(res, dict) and res.get("success") is False:      # recusa não-sessão (ex.: sem permissão)
-        raise FracttalError(str(res.get("message") or "Cancelamento recusado pelo Fracttal "
-                                                      "(sua conta tem permissão p/ cancelar OS?)."))
+    # 26/11/2026: o `result` do Fracttal vem dict OU lista (a mesma lição do App de Campo, v202): um {"success": false}
+    # dentro de lista passava calado e a tela dizia "cancelada" (a OS 18428 seguiu Em Processo)
+    for cand in (res if isinstance(res, list) else [res]):
+        if isinstance(cand, dict) and cand.get("success") is False:      # recusa não-sessão (ex.: sem permissão)
+            raise FracttalError(str(cand.get("message") or "Cancelamento recusado pelo Fracttal "
+                                                           "(sua conta tem permissão p/ cancelar OS?)."))
     return {"ok": True, "raw": res}
 
 

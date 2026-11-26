@@ -329,3 +329,7 @@ body.os-form select.spc-sub-tipo:hover{color:var(--spc-tinta);border-bottom:1px 
 
 /* a barra de visões do Histórico de OS no alto do Histórico de solicitações (25/11/2026): do tamanho dos botões, como lá */
 .spc-hist-visoes{align-self:flex-start;max-width:100%;overflow-x:auto}
+/* o Histórico de solicitações com tudo centralizado, menos a Usina e a Descrição (Levi, 25/11/2026: "O cabeçalho eu quero
+   centralizado. Quero todas as colunas centralizadas, exceto usina. E descrição") */
+.spc-hist .spc-tbl th,.spc-hist .spc-tbl td{text-align:center}
+.spc-hist .spc-tbl td.spc-hist-usina,.spc-hist .spc-tbl td.spc-hist-desc{text-align:left}
