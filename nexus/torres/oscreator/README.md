@@ -1401,6 +1401,14 @@ concluir e cancelar!".
   Verificação e aparece quando o `GET` da mesma rota diz que quem vê pode (depois que o card abre: o cadastro nunca é lido
   na frente do card); o `POST` confere de novo, lê o status antes e depois e avisa o quadro de Garantias. Quem não pode
   lê no erro quem pode, com os nomes da usina.
+- **O Cancelar confere se a OS ficou cancelada** (26/11/2026, Maria Oliveira pelo Levi: "Algumas OSs foram canceladas pelo
+  supervisor no Nexus e não foram canceladas no Fracttal"): a OS 18428 (UFV Vitesse) foi cancelada pela tela em 16/11 e
+  seguia Em Processo no Fracttal dez dias depois, com uma execução iniciada às 08:31 e pausada; a 18427, do mesmo minuto,
+  ficou cancelada. O `POST /os/api/os/<id>/cancelar` dizia "cancelada com sucesso" sem reler a OS. Agora relê o status
+  (`api.status_da_os`, como o Retornar): se não for 4 (Cancelada), devolve 502 dizendo que a OS NÃO foi cancelada e como
+  ficou; o status que não foi lido segue como antes. O `cancel_os` também acusa o `{"success": false}` que vem DENTRO de
+  lista (o `result` do Fracttal vem dict ou lista). Não há registro das tentativas antigas: o Nexus não consegue listar as
+  outras OS presas assim (o motivo do cancelamento também não fica gravado na OS que não cancelou). Teste `tests/test_oscreator_cancelar_confere_26_11.py`.
 - **Na tela do chamado de Garantias** (`acomp_os.html`, que recebe o `d` da OS): a caixa "Ações da OS" com os anexos (a
   contagem do card), o Incluir anexo, o Enviar para verificação (OS em processo) e o Cancelar (OS aberta), com
   `data-os-acoes data-no-lugar`. Sem o Concluir: o "Finalizar chamado" do topo já conclui a OS no Fracttal e ajusta o
