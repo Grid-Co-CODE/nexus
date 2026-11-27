@@ -458,7 +458,7 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
                 cels[m["id"]] = {"txt": str(f) if f else "—", "tom": "ok" if f else "", "dica": feitas}
         feitas = sum(len([d for d in (zel.get(u.get("uid")) or {}).get(chave) or [] if ano["ini"] <= d <= ano["fim"]]) for u in usinas)
         minimo = sum(int((zel_min.get(u.get("uid")) or {}).get(chave) or 0) for u in usinas)
-        total.append({"id": chave, "nome": nome, "grupo": "manut", "sub": "usinas feitas", "cels": cels,
+        total.append({"id": chave, "nome": nome, "grupo": "manut", "sub": "nº de usinas feitas", "cels": cels,
                       "acum": {"txt": f"{feitas}/{minimo}" if minimo else (str(feitas) if feitas else "—"),
                                "tom": ("ok" if feitas >= minimo else ("critico" if ano_fechado else "alerta")) if minimo else "",
                                "dica": f"{feitas} feitas; mínimo somado das usinas com contrato de zeladoria: {minimo}"}})

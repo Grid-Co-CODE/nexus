@@ -821,7 +821,9 @@
   var VIS = [["completa", "Completa"], ["kpis", "Só KPIs"], ["manut", "Só manutenções"]];
   // 27/11/2026: o PR e a disponibilidade com e sem o expurgo, e a ronda saiu (Levi: "Eu tô sentindo falta do PR ponderado,
   // PR expurgado"; "Sobre sujidade e vegetação na ronda, não importa isso daí não")
-  var SUB_IND = {MPM: "mensal", MPS: "semestral", MPA: "anual", rocada: "data", lavagem: "data", pr: "%", pr_exp: "%", disp: "%", disp_exp: "%"};
+  // na usina, a supressão e a lavagem mostram o DIA em que foram feitas (dia/mês); no contrato, quantas usinas (Levi,
+  // 27/11/2026: "se esse número aí for o dia [...] tem que ter um disclaimer falando que é dia")
+  var SUB_IND = {MPM: "mensal", MPS: "semestral", MPA: "anual", rocada: "dia feita (dia/mês)", lavagem: "dia feita (dia/mês)", pr: "%", pr_exp: "%", disp: "%", disp_exp: "%"};
   function pedirInd(c, n) {
     var ch = c.cliente + "|" + (n || "");
     if (IND[ch] && !IND[ch].montando) return IND[ch];
@@ -925,7 +927,7 @@
       esc(resto.map(function (u) { return u.usina; }).slice(0, 12).join(", ") + (resto.length > 12 ? " e mais " + (resto.length - 12) : "")) + "</button></td></tr>";
     h += "</tbody></table></div>";
     // a legenda: cada amostra do mesmo tamanho, com o valor no meio (Levi: "os valores centralizados [...] tá meio frouxo")
-    var LEG = [["t-ok", "1/1", "feita no mês"], ["t-critico", "0/1", "não feita"], ["ind-vazio", "—", "sem plano no mês"], ["t-ok", "12/09", "serviço feito, data"],
+    var LEG = [["t-ok", "1/1", "feita no mês"], ["t-critico", "0/1", "não feita"], ["ind-vazio", "—", "sem plano no mês"], ["t-ok", "12/09", "supressão ou lavagem: o dia em que foi feita (dia/mês)"], ["t-ok", "8", "no contrato: nº de usinas feitas no mês"],
       ["t-alerta", "3/4", "feitas / mínimo do contrato"], ["t-ok", "82,1", "na meta"], ["t-alerta", "77,4", "até 2 pontos abaixo"], ["t-critico", "71,0", "abaixo da meta"],
       ["ind-vazio", "s/d", "sem dado no banco"], ["t-critico", "atrasada", "supressão ou lavagem: passou o prazo do contrato desde a última"]];
     h += '<div class="ind-legenda">' + LEG.map(function (x) { return '<span><i class="ind ' + x[0] + '">' + esc(x[1]) + "</i>" + esc(x[2]) + "</span>"; }).join("") +

@@ -173,7 +173,9 @@ visão gerencial para o CEO, para os heads darem uma olhada, vai ser muito impor
     mínimo do ano vira o intervalo, 2 por ano = uma a cada 6 meses, 4 = a cada 3; sem nenhuma registrada, conta do 1º
     mês do arquivo do PCM); senão "—", com a última e o vencimento na dica. A usina sem prazo no contrato só mostra as
     datas. Antes do 1º mês do arquivo do PCM (`_zel_desde`, 01/2026 em 26/11) é "s/d": sem as OS do Fracttal o atraso
-    seria chute. A linha do contrato diz "N atras." no mês e a gaveta lista as usinas. Até 27/11 o "não" vinha do PR
+    seria chute. A linha do contrato diz "N atras." no mês e a gaveta lista as usinas. O rótulo diz o que é o número
+    (Levi, 27/11/2026: "se esse número aí for o dia [...] tem que ter um disclaimer falando que é dia"): na usina, "dia
+    feita (dia/mês)"; no contrato, "nº de usinas feitas"; e a legenda tem os dois. Até 27/11 o "não" vinha do PR
     expurgado abaixo da meta com a ronda em 4 ou 5: saiu com a ronda;
   - a meta de PR (26/11/2026, Levi: "As metas de PR, você vai entrar na BD Performance"): por usina e mês, o "PR Previsto
     1° Ano" da aba Info Mensal da BD Performance e o "PR (2026)" da aba Dados Mensais 2026 da BD Thopen
