@@ -14,6 +14,7 @@ Funções puras: a rota lê as fontes e passa o dado já lido, e o teste prova a
 from datetime import datetime, timedelta, timezone
 
 from ...comando import usinas as CU
+from . import situacao as SI
 from ...cos import andamento as AND
 
 # os grupos na ordem do painel (a do mockup: usina desligada, inversores, rede; depois comunicação e as outras):
@@ -236,7 +237,7 @@ def visao_tecnicos(linhas: list, eventos: list, ocorrencia_de: dict, nome_de) ->
         if ch == "na_usina" and l["nome"] in na:
             uid = na[l["nome"]][0]
             desde = na[l["nome"]][1]["texto"].rsplit(" desde ", 1)
-            texto = f"na {nome_de(uid) or 'usina'}" + (f" desde {desde[1]}" if len(desde) == 2 else "")
+            texto = (SI.com_prep("em", nome_de(uid)) if nome_de(uid) else "na usina") + (f" desde {desde[1]}" if len(desde) == 2 else "")
         elif ch == "deslocamento":
             d = indo.get(l["nome"]) or {}
             uid = d.get("uid") or ""

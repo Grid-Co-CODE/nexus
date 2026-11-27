@@ -2560,8 +2560,6 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eqtv-tec--a_caminho{color:var(--info-cheio);background:color-mix(in srgb,var(--info-cheio) 15%,transparent)}
 .eqtv-tl{display:flex;flex-direction:column;gap:1vh;min-height:0;padding:1.4vh 1vw;background:var(--superficie);
   border:1px solid var(--linha);border-radius:var(--raio-md)}
-.eqtv-agora{margin:0;text-align:center}
-.eqtv-agora span{display:inline-block;padding:.4em .9em;border-radius:999px;background:var(--verde);color:var(--sobre-verde);font-weight:700;font-size:.85em}
 .eqtv-tl-lista{list-style:none;margin:0;padding:0;display:grid;gap:.9vh}
 /* a linha do tempo rola na mão, com a barra escondida (27/11/2026) */
 .eqtv-lista--mao{overflow-y:auto;scrollbar-width:none}
@@ -2585,7 +2583,6 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eqtv-ev-txt{color:var(--tinta);font-size:.92em}
 .eqtv-ev-nota{color:var(--tinta-2);font-size:.82em}
 .eqtv-ev-corpo .eqtv-tec{justify-self:start}
-.eqtv-agora small{display:block;margin-top:.4em;color:var(--mudo);font-size:.8em}
 .eqtv-nota-tec{margin:0;color:var(--mudo);font-size:.75em}
 /* as duas visões da coluna da direita (27/11/2026) */
 .eqtv-tl .eqtv-cos-cab{align-items:center}

@@ -174,8 +174,19 @@ def test_a_visao_dos_tecnicos():
     v = PA.visao_tecnicos(linhas, EVENTOS, {"7": "Usina parada", "8": "Inversores desligados"}, NOMES.get)
     assert [g["id"] for g in v] == ["na_usina", "deslocamento", "fora_usina", "sem_sinal"]
     na, desl, fora, sinal = (g["itens"][0] for g in v)
-    assert (na["nome"], na["texto"], na["uid"], na["oc"], na["pid"]) == ("Ana Teste", "na Alto Paraná 1 desde 14:45", "7", "Usina parada", 1)
+    assert (na["nome"], na["texto"], na["uid"], na["oc"], na["pid"]) == ("Ana Teste", "em Alto Paraná 1 desde 14:45", "7", "Usina parada", 1)
     assert (desl["texto"], desl["uid"], desl["oc"]) == ("para Tanabi, chega 15:40", "8", "Inversores desligados")
     assert (fora["texto"], fora["uid"], fora["oc"]) == ("Tanabi/SP · a 4,2 km da Colorado 2", "", "")
     assert (sinal["texto"], sinal["rotulo"], sinal["tom"]) == ("última posição 13:10 · a 0,3 km da Tanabi", "Sem sinal há 1 h 50", "alerta")
     assert v[0]["titulo"] == "Na usina" and v[1]["titulo"] == "Em deslocamento"
+
+
+def test_a_preposicao_antes_do_nome_da_usina():
+    """27/11/2026, Levi: "Em usina, não no usina [...] na União, na Rio do Peixe, na Araputanga, não. Em Araputanga, em
+    Matões, em Saturnino". O nome da usina é um lugar: "em"/"de" sem artigo; só o nome que começa por UFV ou Usina (a
+    palavra feminina) leva "na"/"da"."""
+    from nexus.campo.equipe import situacao as SI
+    assert SI.com_prep("em", "Araputanga") == "em Araputanga" and SI.com_prep("de", "Matões") == "de Matões"
+    assert SI.com_prep("em", "Rio do Peixe") == "em Rio do Peixe" and SI.com_prep("de", "União") == "de União"
+    assert SI.com_prep("em", "UFV Altair") == "na UFV Altair" and SI.com_prep("de", "Usina Alfa") == "da Usina Alfa"
+    assert SI.texto_perto(0.3, "Saturnino") == "a 0,3 km de Saturnino"

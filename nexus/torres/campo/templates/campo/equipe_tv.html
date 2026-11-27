@@ -120,15 +120,13 @@
     {# as duas visões (27/11/2026, Levi: "Visão técnico, visão ocorrências, do lado direito, sabe? Para a gente ter essas
        duas opções"): abre nas Ocorrências; a troca fica no navegador (a tela se relê a cada 2 min) #}
     <section class="eqtv-tl" aria-label="Ocorrências e técnicos" data-tv-visao="ocorrencias">
-      <header class="eqtv-cos-cab"><div><p class="gc-eyebrow" data-tv-visao-so="ocorrencias">COS · Da mais nova para a mais antiga</p><p class="gc-eyebrow" data-tv-visao-so="tecnicos" hidden>Nexus Field · Onde está cada técnico</p>
+      <header class="eqtv-cos-cab"><div><p class="gc-eyebrow" data-tv-visao-so="ocorrencias">COS · Da mais nova para a mais antiga · agora {{ hora }}</p><p class="gc-eyebrow" data-tv-visao-so="tecnicos" hidden>Nexus Field · Onde está cada técnico</p>
         <h2 data-tv-visao-so="ocorrencias">Ocorrências mais recentes</h2><h2 data-tv-visao-so="tecnicos" hidden>Técnicos agora</h2></div>
         <div class="cn-seg eqtv-tipo" role="group" aria-label="O que a coluna mostra">
           <button type="button" data-tv-visao-bt="ocorrencias" aria-pressed="true">Ocorrências</button>
           <button type="button" data-tv-visao-bt="tecnicos" aria-pressed="false">Técnicos</button>
         </div></header>
       <div class="eqtv-visao" data-tv-visao-so="ocorrencias">
-      {% set na = recentes|selectattr('tecnicos')|list %}
-      <p class="eqtv-agora"><span>Agora · {{ hora }}</span>{% if recentes %}<small>{{ recentes|length }} abertas · {{ na|length }} com técnico na usina ou a caminho</small>{% endif %}</p>
       <div class="eqtv-lista eqtv-lista--mao">
         <ol class="eqtv-tl-lista">
           {% for o in recentes %}

@@ -41,6 +41,7 @@ vem pronta de quem chama (`cidade(lat, lon) -> nome | None`, a malha do IBGE no 
 from datetime import datetime, timedelta, timezone
 
 from nexus.campo.equipe import RAIO_USINA_KM, SEM_SINAL_MIN
+from nexus.campo.equipe import situacao as SI
 from nexus.campo.equipe.deslocamentos import _usina_do_ponto, haversine_km
 
 _BRT = timezone(timedelta(hours=-3))
@@ -121,7 +122,8 @@ def do_tecnico(pessoa_id, pontos: list, usinas: dict, nomes_usina: dict, agora: 
                 cid = cidade(primeiro["lat"], primeiro["lon"])
             except Exception:       # noqa: BLE001 — a cidade é enfeite: sem ela, "fora de usina"
                 cid = None
-        onde = f"na {nome(u0)}" if u0 is not None else (f"em {cid}" if cid else "fora de usina")
+        # "em Araputanga", e não "na Araputanga" (27/11/2026, `situacao.com_prep`)
+        onde = SI.com_prep("em", nome(u0)) if u0 is not None else (f"em {cid}" if cid else "fora de usina")
         evento("inicio", _inst(primeiro), f"primeira posição do dia, {onde}", u0)
         partida = None                      # o instante da última saída, para a duração da chegada
         # ainda no lugar do início do dia, fora de usina: os pontos PARADOS do começo. Quem começa andando não tem esse
@@ -132,10 +134,10 @@ def do_tecnico(pessoa_id, pontos: list, usinas: dict, nomes_usina: dict, agora: 
                 saida(a, f"saiu de {cid}" if cid else "saiu de um ponto fora de usina")
                 partida = _inst(a)
             if ua is not None and ub != ua:
-                saida(a, f"saiu da {nome(ua)}", ua)
+                saida(a, f"saiu {SI.com_prep('de', nome(ua))}", ua)
                 partida = _inst(a)
             if ub is not None and ub != ua:
-                texto = f"chegou na {nome(ub)}"
+                texto = f"chegou {SI.com_prep('em', nome(ub))}"
                 if partida is not None:
                     texto += f", depois de {_tempo(round((_inst(b) - partida).total_seconds() / 60))} de deslocamento"
                 evento("chegou", _inst(b), texto + programada(ub), ub)

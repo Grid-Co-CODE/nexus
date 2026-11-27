@@ -200,10 +200,22 @@ def km_texto(km: float) -> str:
     return f"{r:.1f}".replace(".", ",") + " km" if r < 10 else f"{round(km)} km"
 
 
+def com_prep(prep: str, nome: str) -> str:
+    """"em Araputanga", "de Matões": o nome da usina é um lugar, e vai sem artigo (27/11/2026, Levi: "Em usina, não no
+    usina [...] na União, na Rio do Peixe, na Araputanga, não. Em Araputanga, em Matões, em Saturnino"). Só o nome que
+    começa por UFV ou Usina (a palavra feminina) leva o artigo: "na UFV Altair", "da Usina X". `prep` = "em" ou "de"."""
+    n = str(nome or "").strip()
+    feminino = n.lower().split(" ", 1)[0] in ("ufv", "usina")
+    if prep == "em":
+        return f"{'na' if feminino else 'em'} {n}"
+    return f"{'da' if feminino else 'de'} {n}"
+
+
 def texto_perto(km: float, nome: str) -> str:
-    """A distância até a usina, como o desenho pede: "a 2,3 km da UFV X". O km inteiro do parado fora de usina (que
-    escondia a casa do mapa, revisão final de 08/11/2026) saiu em 10/11/2026: o ponto dele está no mapa."""
-    return f"a {km_texto(km)} da {nome}"
+    """A distância até a usina, como o desenho pede: "a 2,3 km de X" ("da UFV X" quando o nome é UFV ou Usina:
+    `com_prep`). O km inteiro do parado fora de usina (que escondia a casa do mapa, revisão final de 08/11/2026) saiu em
+    10/11/2026: o ponto dele está no mapa."""
+    return f"a {km_texto(km)} {com_prep('de', nome)}"
 
 
 def tempo_texto(minutos: int) -> str:

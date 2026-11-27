@@ -1997,6 +1997,13 @@ equipes"; "pode até clicar e dar um zoom automático. Mas é importante ter um 
     Field por situação (na usina, em deslocamento, parado fora, sem sinal, sem permissão, sem posição), com onde está
     (a usina e desde quando, o destino e a chegada prevista, a cidade) e a ocorrência aberta da usina dele (o grupo do
     cartão); o clique dá o zoom na usina, ou na posição do técnico quando não há usina ligada.
+    O "agora" das Ocorrências é a hora pequena no rótulo de cima, sem o resumo embaixo (27/11/2026, Levi: "esse agora pode
+    ser mais discreto, ele está ocupando muito espaço. E tem um texto embaixo dele também, nada a ver").
+  - **O nome da usina vai com "em"/"de", sem artigo** (27/11/2026, Levi: "na União, na Rio do Peixe, na Araputanga, não.
+    Em Araputanga, em Matões, em Saturnino"): `situacao.com_prep` ("em Araputanga desde", "chegou em Matões", "saiu de
+    Saturnino", "a 0,3 km de União"); só o nome que começa por UFV ou Usina leva "na"/"da". Vale para a visão dos
+    técnicos, os eventos do dia e o "a X km de" do mapa. A linha do tempo do percurso segue "Entrou na UFV X" (o nome
+    ganha o "UFV" na frente, e aí o artigo é o certo).
   - **27/11/2026, os ajustes do Levi:** abre com o foco nas usinas ("Eu quero que abra focado nas usinas [...] as usinas
     poderiam ficar com bolinha redonda, né? E as equipes um pouquinho menores"): o tipo Alarmes virou **Usinas**, a usina
     é a bolinha (`usinas-bola`, maior quanto mais grave; o losango fica para a tela) e o título é "Usinas, alarmes e
