@@ -104,6 +104,7 @@ def _virar_ao_subir(app) -> None:
                 try:
                     if _migrar_uma_vez(cfg, base, sessao, info, aba["chaves"]) is not None:
                         aba = E.aba_equipamentos(base, sessao)
+                    _juntar_uma_vez(cfg, base, sessao, info)
                 except Exception as ex:  # noqa: BLE001 — a virada segue; a migração tenta na próxima subida
                     log.error("Equipamentos: a migração da aba falhou (%s: %s).", type(ex).__name__, ex)
                 with _VIRADA_TRAVA:
@@ -130,6 +131,23 @@ def _migrar_uma_vez(cfg, base, sessao, info, aba_chaves) -> dict | None:
     marca.write_text(json.dumps({"em": datetime.now(_BRT).isoformat(timespec="seconds"),
                                  **{k: v for k, v in r.items() if k != "visao_linhas"}}, ensure_ascii=False, indent=1),
                      encoding="utf-8")
+    log.info("Equipamentos: %s.", r.get("log"))
+    return r
+
+
+SOLTOS_MARCA = "soltos_27_11.json"
+
+
+def _juntar_uma_vez(cfg, base, sessao, info) -> dict | None:
+    """O conserto único da migração (`estrutura_usina.juntar_soltos`, 27/11/2026: a Rio do Peixe com os 20 inversores sem
+    chave e os 20 que a migração criou). Uma vez por pasta de dados, com a marca guardando o que fez."""
+    marca = L.pasta_dados(cfg) / SOLTOS_MARCA
+    if marca.exists():
+        return None
+    r = E.juntar_soltos(dict(cfg), base, sessao, info=info)
+    marca.parent.mkdir(parents=True, exist_ok=True)
+    marca.write_text(json.dumps({"em": datetime.now(_BRT).isoformat(timespec="seconds"), "juntados": r["juntados"]},
+                                ensure_ascii=False), encoding="utf-8")
     log.info("Equipamentos: %s.", r.get("log"))
     return r
 

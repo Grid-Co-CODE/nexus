@@ -222,3 +222,50 @@ def test_a_migracao_leva_o_full_om_sim_e_o_nome_de_exibicao_dos_inversores(cfg, 
     s = _livro(banco)["sup"][0]
     assert (s["usina_exibicao"], s["full_om"]) == ("Taguaí", 1)
     assert r["full_om"] == ["Taguaí 1 (173)"] and r["exibicao"] == ["Taguaí 1 (173)"]
+
+
+def _soltos(uid, nomes, ctl):
+    return [{"inversor_id": 800 + n, "usina_id": uid, "supervisorio_id": None, "cabine_id": 1, "nome": nome,
+             "equipamento_supervisorio": "", "potencia_kwp": None, "strings_esperadas_qtd": None, "equipamento_id": None,
+             "codigo_fracttal": "", "ordem": n, **ctl, "potencia_regra": "", "fracttal_ligado_por": "", "conferido_em": ""}
+            for n, nome in enumerate(nomes, 1)]
+
+
+def test_a_chave_sem_inversor_assume_os_soltos_da_usina_em_vez_de_dobrar(cfg, banco):
+    """A Rio do Peixe I e II (27/11/2026): a chave e as cabines no Nexus, os 20 inversores SEM chave, e 20 na aba. Os do
+    Nexus passam à chave com as strings e o kWp da aba; nenhum é criado."""
+    ctl = {"criado_em": "x", "alterado_em": "x", "alterado_por_hmac": "x", "excluido": False}
+    aba = _ufv("Rio do Peixe I e II", 700.0, [("UG 01", 700.0)], chave="Rio do Peixe I e II") + [
+        _inv("Rio do Peixe I e II", "Rio do Peixe I e II", 1, m, "UG 01", 353.8, 20, sup="") for m in (1, 2)]
+    _aba(banco, "bd_performance", "Equipamentos", aba[:2])
+    E.ligar_pela_aba({"ligar": {147: ["Rio do Peixe I e II"]}}, E.agrupar_aba(aba[:2]), cfg, BASE, banco)
+    E._gravar(lambda est, a, q: est["inversores"].extend(_soltos(147, ["Inversor 1.1", "Inversor 1.2"], ctl)) or {},
+              cfg, BASE, banco)
+    E.migrar_da_aba(cfg, BASE, banco, aba_chaves=E.agrupar_aba(aba), mapa={})
+    lv = _livro(banco)
+    assert len(lv["inv"]) == 2 and all(i["supervisorio_id"] == lv["sup"][0]["supervisorio_id"] for i in lv["inv"])
+    assert {(i["nome"], i["strings_esperadas_qtd"], i["potencia_kwp"]) for i in lv["inv"]} == {
+        ("Inversor 1.1", 20, 353.8), ("Inversor 1.2", 20, 353.8)}
+
+
+def test_o_conserto_junta_o_solto_ao_gemeo_que_a_migracao_criou(cfg, banco):
+    """O estado do servidor depois da migração de 27/11/2026: o solto "Inversor 1.1" (de antes) e o "Inversor 1.1 · Rio
+    do Peixe I e II" com chave (o da migração). Fica o de antes, na chave, com as strings do gêmeo; o gêmeo sai."""
+    ctl = {"criado_em": "x", "alterado_em": "x", "alterado_por_hmac": "x", "excluido": False}
+    aba = _ufv("Rio do Peixe I e II", 700.0, [("UG 01", 700.0)], chave="Rio do Peixe I e II") + [
+        _inv("Rio do Peixe I e II", "Rio do Peixe I e II", 1, 1, "UG 01", 353.8, 20, sup="")]
+    _aba(banco, "bd_performance", "Equipamentos", aba)
+    E.ligar_pela_aba({"ligar": {147: ["Rio do Peixe I e II"]}}, E.agrupar_aba(aba), cfg, BASE, banco)
+
+    def com_o_solto(est, a, q):
+        g = est["inversores"][0]
+        g["nome"] = "Inversor 1.1 · Rio do Peixe I e II"
+        est["inversores"].extend(_soltos(147, ["Inversor 1.1"], ctl))
+        return {}
+    E._gravar(com_o_solto, cfg, BASE, banco)
+    r = E.juntar_soltos(cfg, BASE, banco)
+    vivos = [i for i in _livro(banco)["inv"] if not i.get("excluido")]
+    assert r["juntados"] == 1 and len(vivos) == 1
+    assert (vivos[0]["nome"], vivos[0]["strings_esperadas_qtd"], vivos[0]["potencia_kwp"]) == ("Inversor 1.1", 20, 353.8)
+    assert vivos[0]["supervisorio_id"] is not None
+    assert E.juntar_soltos(cfg, BASE, banco)["juntados"] == 0

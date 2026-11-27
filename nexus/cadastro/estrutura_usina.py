@@ -1475,6 +1475,50 @@ def _chave_para_os_soltos(est, uid, pares, aba_chaves, controle, dono, agora, qu
     return n_ch, n_inv
 
 
+def _assume_o_da_aba(i: dict, sid: int, a: dict, cid_de: dict, agora: str, quem: str) -> None:
+    """O inversor do Nexus sem chave passa à chave `sid`, ganhando da aba (`a`, do `estrutura_da_aba`) só o que ele não
+    tem: o nome no supervisório, as strings, o kWp e a cabine."""
+    i.update(supervisorio_id=sid, alterado_em=agora, alterado_por_hmac=quem)
+    if not texto(i.get("equipamento_supervisorio")) and texto(a.get("equipamento_supervisorio")):
+        i["equipamento_supervisorio"] = texto(a["equipamento_supervisorio"])
+    if not _int(i.get("strings_esperadas_qtd")) and _int(a.get("strings_esperadas_qtd")):
+        i["strings_esperadas_qtd"] = _int(a["strings_esperadas_qtd"])
+    if not (_num(i.get("potencia_kwp")) or 0) > 0 and (_num(a.get("potencia_kwp")) or 0) > 0:
+        i["potencia_kwp"], i["potencia_regra"] = _num(a["potencia_kwp"]), ""
+    if not i.get("cabine_id") and a.get("cabine"):
+        i["cabine_id"] = cid_de.get(norm(a["cabine"]))
+
+
+def juntar_soltos(cfg, base, sessao, *, info: dict | None = None, quem_email: str = "") -> dict:
+    """O inversor SEM chave que tem um gêmeo de mesmo nome com chave na mesma usina (o nome com o " · <chave>" que o
+    Nexus põe para não repetir) passa à chave do gêmeo, ganhando dele o que não tem, e o gêmeo sai (excluído, nunca
+    apagado). Caso que criou: a migração de 27/11/2026 rodou no servidor antes da correção do passo (2) e criou na Rio
+    do Peixe I e II 20 inversores ao lado dos 20 sem chave que ela já tinha. O que fica é o de antes (pode ter o código
+    do Fracttal e o ativo ligados). -> {juntados, log}."""
+    def mudar(est, agora, quem):
+        n = 0
+        for uid in sorted({i["usina_id"] for i in est["inversores"] if not i["excluido"] and i.get("supervisorio_id") is None}):
+            vivos = [i for i in est["inversores"] if i["usina_id"] == uid and not i["excluido"]]
+            com_chave = {}
+            for i in vivos:
+                if i.get("supervisorio_id") is not None:
+                    com_chave.setdefault(norm(str(i["nome"]).split(" · ")[0]), []).append(i)
+            for solto in [i for i in vivos if i.get("supervisorio_id") is None]:
+                gemeos = com_chave.get(norm(solto["nome"])) or []
+                if len(gemeos) != 1 or gemeos[0].get("equipamento_id") or gemeos[0].get("codigo_fracttal"):
+                    continue
+                g = gemeos[0]
+                cab = {c["cabine_id"]: c["nome"] for c in est["cabines"] if c["usina_id"] == uid}
+                _assume_o_da_aba(solto, g["supervisorio_id"], {
+                    "equipamento_supervisorio": g.get("equipamento_supervisorio"),
+                    "strings_esperadas_qtd": g.get("strings_esperadas_qtd"), "potencia_kwp": g.get("potencia_kwp"),
+                    "cabine": cab.get(g.get("cabine_id"))}, {norm(v): k for k, v in cab.items()}, agora, quem)
+                g.update(excluido=True, alterado_em=agora, alterado_por_hmac=quem)
+                n += 1
+        return {"juntados": n, "log": f"juntou {n} inversor(es) sem chave ao gêmeo com chave"}
+    return _gravar(mudar, cfg, base, sessao, quem_email, info)
+
+
 def migrar_da_aba(cfg, base, sessao, *, aba_chaves: dict, info: dict | None = None, quem_email: str = "",
                   mapa: dict | None = None) -> dict:
     """Grava no Nexus, de uma vez, o que só a aba tem (ver MIGRACAO_ABA), sem tirar nem mudar nada que o Nexus já tenha:
@@ -1547,9 +1591,18 @@ def migrar_da_aba(cfg, base, sessao, *, aba_chaves: dict, info: dict | None = No
                 cid_de[norm(c["nome"])] = cid
                 muda()
             vivos = [i for i in est["inversores"] if i["usina_id"] == uid and not i["excluido"]]
+            soltos = {norm(i["nome"]): i for i in vivos if i.get("supervisorio_id") is None}
             usados = {norm(i["nome"]) for i in vivos}
             ordem = max((i["ordem"] for i in vivos), default=0)
             for i in e["inversores"]:
+                # o inversor que a usina já tem SEM chave, de mesmo nome, passa a esta chave (a Rio do Peixe I e II,
+                # 27/11/2026: os 20 no Nexus sem chave e a chave sem nenhum; criar os da aba os dobrava)
+                solto = soltos.pop(norm(i["nome"]), None)
+                if solto is not None:
+                    _assume_o_da_aba(solto, sid, i, cid_de, agora, quem)
+                    n_inv += 1
+                    muda()
+                    continue
                 final, k = i["nome"], 1
                 while norm(final) in usados:
                     k += 1
