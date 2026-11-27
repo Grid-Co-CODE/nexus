@@ -108,6 +108,14 @@ ABA_CORACAO = ([_l(Cliente="Thopen", Usina="Coração 2", Equipamento="UFV", **{
 ABA = _aba_itaja() + _aba_itaja_inv() + ABA_PHARMA + ABA_AQUIRAZ + ABA_CORACAO
 
 
+def _inv_so_na_aba(ch=CH1, n=1):
+    """O 5º inversor da chave, que só a aba tem: a diferença que ainda segura a chave na fonte única (27/11/2026), porque
+    marcada ele sumiria dos leitores com a geração dele (a CPP100 e a Rio do Peixe, com os inversores só na aba)."""
+    return _l(**{"Cliente": "Thopen", "Usina": "Itajá", "Usina Supervisório": ch, "Equipamento": f"Inversor {n}.5",
+                 "Equipamento Supervisório": "INVERSOR05", "Equipamento Parente": f"UG 0{n}", "Potência (kWp)": 324.52,
+                 "Strings Ativas": 19, "Full O&M": "Sim", "String Box": "Não"})
+
+
 @pytest.fixture(autouse=True)
 def _sem_copias():
     E._CACHE.clear()
@@ -611,18 +619,36 @@ def test_itaja_as_tres_chaves_valem_no_lugar_da_aba(cli, cfg, banco):
     assert (j2["mudancas"], j2["marcacao"], banco.syncs) == (0, [], antes)
 
 
+@pytest.mark.parametrize("aba", [
+    _aba_itaja(Cliente="Outro cliente") + _aba_itaja_inv(),
+    _aba_itaja(**{"Full O&M": "Não"}) + _aba_itaja_inv(),
+    _aba_itaja() + [dict(x, **{"Full O&M": "Não"}) if x["Usina Supervisório"] == CH1 else x for x in _aba_itaja_inv()],
+    _aba_itaja() + [dict(x, Equipamento="Inversor 1.1 A") if x["Equipamento"] == "Inversor 1.1" else x
+                    for x in _aba_itaja_inv()],
+])
+def test_a_diferenca_de_cadastro_ja_nao_segura_vale_o_nexus(cli, cfg, banco, aba):
+    """A fonte única (27/11/2026, Levi: "resolvo isso aí para não mostrar nenhuma aba antiga. As abas têm que se
+    conversar"): o cliente, o Full O&M e o nome do inversor diferentes na aba seguravam a usina inteira com a aba (até
+    21/10 eram "fora da regra"). Agora vale o que está no Nexus, e as três chaves passam juntas."""
+    _poe_aba(banco, aba + ABA_PHARMA)
+    _monta_itaja(cfg, banco)
+    j = _salvar(cli, [_item_itaja(cli), _item_itaja(cli, chave=CH2, n=2)]).get_json()
+    assert j["ok"], j
+    assert all(m["marcada"] and m["fora_da_regra"] == [] for m in j["marcacao"]), j["marcacao"]
+    assert _marca(banco) == {CH_USINA: 1, CH1: 1, CH2: 1}
+
+
 @pytest.mark.parametrize("aba, nao_marca, fora", [
-    # o que não é da regra: a chave da UFV com outro cliente ou outro Full O&M na aba não marca (as dos inversores sim)
-    (_aba_itaja(Cliente="Outro cliente") + _aba_itaja_inv(), CH_USINA,
-     ["Cliente: “Outro cliente” na aba, “Thopen” no Nexus."]),
-    (_aba_itaja(**{"Full O&M": "Não"}) + _aba_itaja_inv(), CH_USINA, ["Full O&M: Não na aba, Sim no Nexus."]),
-    # a chave do pedido também: Full O&M diferente na Itaja 1 (sairia de trackers e PR se marcasse)
-    (_aba_itaja() + [dict(x, **{"Full O&M": "Não"}) if x["Usina Supervisório"] == CH1 else x for x in _aba_itaja_inv()],
-     CH1, ["Full O&M: Não na aba, Sim no Nexus."]),
-    # o nome do inversor é a coluna do BD: diferente da aba, não marca
-    (_aba_itaja() + [dict(x, Equipamento="Inversor 1.1 A") if x["Equipamento"] == "Inversor 1.1" else x
-                     for x in _aba_itaja_inv()],
-     CH1, ["INVERSOR01: nome: “Inversor 1.1 A” na aba, “Inversor 1.1” no Nexus."]),
+    # o que ainda segura (só o que apaga ou desliga dado nos leitores): o nome no Fracttal da chave da UFV (a usina sairia
+    # do índice do Fracttal: a disponibilidade e as OS)
+    (_aba_itaja(**{"Usina Fractall": "Thopen - Outra - RN"}) + _aba_itaja_inv(), CH_USINA,
+     ["Nome no Fracttal: “Thopen - Outra - RN” na aba"]),
+    # o inversor que só a aba tem (sumiria dos leitores)
+    (_aba_itaja() + _aba_itaja_inv() + [_inv_so_na_aba(CH1)], CH1,
+     ["INVERSOR05 (Inversor 1.5) está na aba e não no Nexus."]),
+    # o nome de exibição (o USINA_GRUPO junta as plantas por ele: a Taguaí)
+    (_aba_itaja() + [dict(x, Usina="Itajá X") if x["Usina Supervisório"] == CH1 else x for x in _aba_itaja_inv()],
+     CH1, ["Nome de exibição: “Itajá X” na aba, “Itajá” no Nexus."]),
 ])
 def test_diferenca_fora_da_regra_nao_marca_grava_e_avisa(cli, cfg, banco, aba, nao_marca, fora):
     """A chave com diferença fora da regra não marca, e a usina vale por inteiro ou nada (2ª revisão final e 3ª revisão,
@@ -639,7 +665,9 @@ def test_diferenca_fora_da_regra_nao_marca_grava_e_avisa(cli, cfg, banco, aba, n
     assert j["ok"], j
     m = {x["usina_supervisorio"]: x for x in j["marcacao"]}
     assert set(m) == {CH1, CH2, CH_USINA}
-    assert (m[nao_marca]["marcada"], m[nao_marca]["fora_da_regra"]) == (False, fora)
+    f_ = m[nao_marca]["fora_da_regra"]
+    assert m[nao_marca]["marcada"] is False and len(f_) == len(fora) and all(a.startswith(b) for a, b in zip(f_, fora)), f_
+    fora = f_
     segura = [f"“{nao_marca}”, da mesma usina, não vale(m) no lugar da aba, e a usina vale por inteiro ou nada"]
     # as outras duas (a da UFV, e a do pedido igual à aba também) passam, mas ficam seguras pela que não vale
     assert all((m[k]["marcada"], m[k]["fora_da_regra"]) == (False, segura) for k in {CH1, CH2, CH_USINA} - {nao_marca})
@@ -660,9 +688,9 @@ def test_diferenca_fora_da_regra_nao_marca_grava_e_avisa(cli, cfg, banco, aba, n
     assert [x["marcada"] for x in j2["marcacao"] if x["usina_supervisorio"] == nao_marca] == [False]
 
 
-def test_inversor_que_so_o_nexus_tem_nao_marca(cli, cfg, banco):
+def test_inversor_que_so_o_nexus_tem_vale_o_nexus(cli, cfg, banco):
     """O pedido traz o INVERSOR05, que a aba não tem: ele nasce com o nome do código ("Inversor 1.5"; nem o pedido nem a
-    aba dão outro), mas a chave não vale no lugar da aba (inversor de um lado só não é da regra)."""
+    aba dão outro) e, na fonte única (27/11/2026), a chave vale com ele (até então o inversor de um lado só segurava)."""
     _monta_itaja(cfg, banco)
     item = _item_itaja(cli)
     item["inversores"].append({"equipamento_supervisorio": "INVERSOR05", "strings": 19, "codigo_fracttal": "ITA100-INVR1.5",
@@ -671,7 +699,7 @@ def test_inversor_que_so_o_nexus_tem_nao_marca(cli, cfg, banco):
     assert j["ok"], j
     assert "Inversor 1.5" in [i["nome"] for i in j["usinas"][0]["inversores"]]
     m = next(x for x in j["marcacao"] if x["usina_supervisorio"] == CH1)
-    assert (m["marcada"], m["fora_da_regra"]) == (False, ["INVERSOR05 (Inversor 1.5) está no Nexus e não na aba."])
+    assert (m["marcada"], m["fora_da_regra"]) == (True, [])
 
 
 def test_chave_ja_marcada_continua_marcada(cli, cfg, banco):
@@ -717,32 +745,44 @@ def test_cabine_com_codigo_do_fracttal_nunca_sai(cli, cfg, banco):
 
 
 def test_fora_da_regra_pelo_tipo_da_diferenca():
-    """Da regra: as strings, o kWp que a regra calculou (a linhagem), a cabine pela CABN (o código), a UG que só a aba
-    tem quando todas as UG vivas já são CABN, a UFV vinda do Registro mestre e o "N de Inversores" contado. O resto
-    nunca: Full O&M, nome, exibição, Fracttal, cliente, inversor de um lado só, a chave fora da aba."""
-    u = {"cabines": [{"cabine_id": 1, "nome": "UG 01", "codigo_fracttal": "X-CABN1", "potencia_regra": "real_por_string"},
-                     {"cabine_id": 2, "nome": "UG 02", "codigo_fracttal": "", "potencia_regra": "informada"}],
-         "inversores": [{"inversor_id": 7, "potencia_regra": "contratual_por_string"},
-                        {"inversor_id": 8, "potencia_regra": ""}]}
+    """A fonte única (27/11/2026): vale o Nexus em toda diferença de cadastro. Só segura o que apaga ou desliga dado nos
+    leitores: o inversor que só a aba tem, o nome no Fracttal, o nome de exibição e o kWp que o Nexus não tem (vazio ou
+    zero) no inversor, na cabine ou na usina."""
+    u = {"cabines": [{"cabine_id": 1, "nome": "UG 01", "codigo_fracttal": "X-CABN1", "potencia_kwp": 990.0},
+                     {"cabine_id": 2, "nome": "UG 02", "codigo_fracttal": "", "potencia_kwp": None}],
+         "inversores": [{"inversor_id": 7, "potencia_kwp": 140.256, "potencia_regra": "informada"},
+                        {"inversor_id": 8, "potencia_kwp": 0, "potencia_regra": ""}]}
     do_registro = {"kwp": 990.0, "kwp_de": "real"}
 
     def fora(*itens, info_u=do_registro):
         return E.fora_da_regra({"itens": [dict(i, texto=f"d{n}") for n, i in enumerate(itens)]}, u, info_u)
+    # vale o Nexus: o kWp que ele tem (o digitado também), a cabine sem CABN, o Full O&M, o cliente, o inversor que só ele tem
     assert fora({"tipo": "kwp_cabine", "cabine_id": 1}, {"tipo": "kwp_inversor", "inversor_id": 7},
-                {"tipo": "cabine_so_no_nexus", "cabine_id": 1}, {"tipo": "cabine_do_inversor", "cabine_id": 1},
-                {"tipo": "strings_inversor"}, {"tipo": "kwp_usina"}, {"tipo": "inversores_usina"}) == []
-    assert fora({"tipo": "kwp_cabine", "cabine_id": 2}, {"tipo": "kwp_inversor", "inversor_id": 8},
-                {"tipo": "cabine_so_no_nexus", "cabine_id": 2}, {"tipo": "cabine_so_na_aba"},
-                {"tipo": "full_om"}, {"tipo": "string_box"}, {"tipo": "nome_inversor"}, {"tipo": "exibicao"},
-                {"tipo": "fracttal"}, {"tipo": "cliente"}, {"tipo": "inversor_so_na_aba"},
-                {"tipo": "inversor_so_no_nexus"}, {"tipo": "fora_da_aba"}, {"tipo": "ufv_em_outra_chave"}) == [
-        f"d{n}" for n in range(14)]
-    # a potência da UFV só é da regra quando vem do Registro mestre (sem ele a visão soma as cabines)
+                {"tipo": "cabine_so_no_nexus", "cabine_id": 2}, {"tipo": "cabine_do_inversor", "cabine_id": 2},
+                {"tipo": "cabine_so_na_aba"}, {"tipo": "strings_inversor"}, {"tipo": "kwp_usina"},
+                {"tipo": "inversores_usina"}, {"tipo": "full_om"}, {"tipo": "string_box"}, {"tipo": "nome_inversor"},
+                {"tipo": "cliente"}, {"tipo": "inversor_so_no_nexus"}, {"tipo": "fora_da_aba"},
+                {"tipo": "ufv_em_outra_chave"}) == []
+    # segura: o que apaga ou desliga dado
+    assert fora({"tipo": "inversor_so_na_aba"}, {"tipo": "fracttal"}, {"tipo": "exibicao"},
+                {"tipo": "kwp_inversor", "inversor_id": 8}, {"tipo": "kwp_cabine", "cabine_id": 2}) == [
+        f"d{n}" for n in range(5)]
     assert fora({"tipo": "kwp_usina"}, info_u={"kwp": None, "kwp_de": ""}) == ["d0"]
-    u["cabines"].pop()                                       # só a CABN viva: a UG que só a aba tem é o nome da UG
-    assert fora({"tipo": "cabine_so_na_aba"}) == []
-    u["cabines"].append({"cabine_id": 3, "nome": "PEI", "codigo_fracttal": ""})       # fora do padrão: não conta
-    assert fora({"tipo": "cabine_so_na_aba"}) == []
+
+
+def test_a_trava_do_kwp_da_usina_soma_as_chaves_e_confere_os_inversores_sem_o_registro():
+    """`segura_a_usina` (27/11/2026): o kWp do Registro contra a SOMA das UFV das chaves na aba (era a 1ª, e a Ipixuna 1 e 2
+    segurava com 1.823,3 de uma chave contra 3.270,0 da usina inteira); sem o kWp do Registro, o dos inversores (a
+    Rodrigues II, com o Registro ilegível e +21% nos inversores)."""
+    est = {"supervisorios": [{"supervisorio_id": 1, "usina_id": 9, "usina_supervisorio": "A", "excluido": False},
+                             {"supervisorio_id": 2, "usina_id": 9, "usina_supervisorio": "B", "excluido": False}],
+           "inversores": [{"supervisorio_id": 1, "potencia_kwp": 1255.8}, {"supervisorio_id": 2, "potencia_kwp": 1823.3}]}
+    aba = {"A": {"ufv_kwp": 1255.8, "inversores": [{"kwp": 1255.8}]}, "B": {"ufv_kwp": 1823.3, "inversores": [{"kwp": 1823.3}]}}
+    assert E.segura_a_usina(est, 9, {"kwp": 3079.1}, aba) == []
+    assert E.segura_a_usina(est, 9, {"kwp": 3270.0}, aba)[0].startswith("o kWp da usina é 3.079,1 kWp na aba e 3.270 kWp no Registro mestre (+6%)")
+    aba["B"]["inversores"] = [{"kwp": 1000.0}]
+    assert E.segura_a_usina(est, 9, {"kwp": None}, aba)[0].startswith("o kWp dos inversores soma 2.255,8 kWp na aba e 3.079,1 kWp no Nexus (+36%)")
+    assert E.segura_a_usina(est, 9, {"kwp": 3079.1}, aba) == []          # com o Registro conferido, vale o da regra
 
 
 # ── as recusas: nada é gravado, e a culpada vai junto ────────────────────────────────────────────────────────────────
@@ -1006,16 +1046,19 @@ def test_salvar_so_a_skid_1_da_assis_confere_a_usina_inteira_e_os_leitores_fecha
 
 
 def test_uma_chave_que_nao_vale_segura_a_usina_inteira_assis(cfg, banco):
-    """Mesma Assis, com a Skid 3 de Full O&M "Não" na aba (o Nexus tem Sim): a Skid 3 não vale, e nenhuma outra marca (a
-    Skid 1 não é igual à aba: o kWp mudou). Os leitores seguem com a aba inteira, que fecha com ela mesma, e o aviso diz
-    quanto somariam com só as outras (o estado misto que a regra evita)."""
+    """Mesma Assis, com um 5º inversor da Skid 3 que só a aba tem (até 27/11/2026 era o Full O&M "Não", que na fonte única
+    já não segura): a Skid 3 não vale, e nenhuma outra marca. Os leitores seguem com a aba inteira, que fecha com ela
+    mesma, e o aviso diz quanto somariam com só as outras (o estado misto que a regra evita)."""
     _liga_pela_aba(cfg, banco, _aba_assis(), ASSIS, ["Assis"] + [E.texto(_chave_skid(n, p)) for n, p, _s in SKIDS])
-    aba = _aba_assis(full_om_skid3="Não")
+    aba = _aba_assis() + [_l(**{"Cliente": "Thopen", "Usina": "Assis", "String Box": "Não", "Full O&M": "Sim",
+                                "Usina Supervisório": _chave_skid(3, 81), "Equipamento": "Inversor 3.5",
+                                "Equipamento Supervisório": "INVERSOR05", "Equipamento Parente": "UG 03",
+                                "Potência (kWp)": 323.4, "Strings Ativas": 21})]
     r = E.salvar_depara([_skid1(cfg, banco)], cfg, BASE, banco, info=INFO_ASSIS, por_codigo=POR_CODIGO,
                         aba_chaves=E.agrupar_aba(aba))
     m = {x["usina_supervisorio"]: x for x in r["marcacao"]}
     assert len(m) == 6 and not any(x["marcada"] for x in m.values())
-    assert m["Assis Chateaubriand Skid 3 (81)"]["fora_da_regra"] == ["Full O&M: Não na aba, Sim no Nexus."]
+    assert m["Assis Chateaubriand Skid 3 (81)"]["fora_da_regra"] == ["INVERSOR05 (Inversor 3.5) está na aba e não no Nexus."]
     assert m[ASSIS_NEXUS]["fora_da_regra"] == [
         "“Assis Chateaubriand Skid 3 (81)”, da mesma usina, não vale(m) no lugar da aba, e a usina vale por inteiro ou nada"]
     t = next(a["texto"] for a in r["avisos"] if a["tipo"] == "nao_marcada" and not a["usina_supervisorio"])
@@ -1043,13 +1086,17 @@ def test_rodrigues_ii_a_principal_que_nunca_vale_segura_a_2_2_e_a_2_3(cfg, banco
     r = E.salvar_depara(itens, cfg, BASE, banco, info=info, por_codigo={}, aba_chaves=E.agrupar_aba(aba))
     m = {x["usina_supervisorio"]: x for x in r["marcacao"]}
     assert set(m) == set(chaves) and not any(x["marcada"] for x in m.values())
-    assert any("a linha da usina fica em outra chave" in f for f in m["Rodrigues 2.1 (233)"]["fora_da_regra"])
+    # na fonte única (27/11/2026) a UFV em outra chave não segura a chave; segura a usina, porque a outra chave (a da UFV
+    # e das UG na aba) o Nexus não tem, e os leitores ficariam com duas
+    assert all(any("que o Nexus não tem, e os leitores ficariam com a usina em dobro" in f for f in x["fora_da_regra"])
+               for x in m.values())
     assert _livro(banco)["visao"] == []
 
 
-def _aba_itaja_full_om_diferente():
-    return _aba_itaja() + [dict(x, **{"Full O&M": "Não"}) if x["Usina Supervisório"] == CH1 else x
-                           for x in _aba_itaja_inv()] + ABA_PHARMA
+def _aba_itaja_1_segura():
+    """A Itaja 1 que não vale no lugar da aba: até 27/11/2026 pelo Full O&M "Não" na aba; na fonte única o Full O&M já não
+    segura, e o que segura é o 5º inversor que só a aba tem (ele sumiria dos leitores)."""
+    return _aba_itaja() + _aba_itaja_inv() + [_inv_so_na_aba(CH1)] + ABA_PHARMA
 
 
 def test_a_principal_nao_marca_sem_a_chave_do_pedido_e_os_leitores_nao_ficam_com_cabine_orfa(cli, cfg, banco):
@@ -1057,7 +1104,7 @@ def test_a_principal_nao_marca_sem_a_chave_do_pedido_e_os_leitores_nao_ficam_com
     inversores para a CABN2 marcava a "Itajá" sozinha e excluía a UG 01: nos leitores sobrava só a UG 02, e os 4
     inversores da Itaja 1 (vindos da aba) seguiam apontando para a UG 01, que não existia mais. Agora a "Itajá" não marca
     (a Itaja 1 não vale, e a Itaja 2, fora do pedido, fica segura junto), e os leitores seguem com as duas UG da aba."""
-    aba = _aba_itaja_full_om_diferente()
+    aba = _aba_itaja_1_segura()
     _poe_aba(banco, aba)
     _monta_itaja(cfg, banco)
     j = _salvar(cli, [_item_itaja(cli, cabine_codigo_fracttal="ITA100-CABN2")]).get_json()
@@ -1095,7 +1142,7 @@ def test_com_a_chave_da_ufv_valendo_mover_de_cabine_a_que_segue_com_a_aba_recusa
     e só segurava a UG 01 no Nexus: nos leitores a UG 02 ia com 2.596 kWp (os 8 inversores do Nexus) e só os 1.298,08
     da Itaja 2, vindos da aba, apontavam para ela. Agora recusa a usina (409, com a culpada) e nada é gravado; com a
     Itaja 1 acertada na aba, o mesmo salvar passa, as três chaves valem e a UG 01 sai."""
-    _poe_aba(banco, _aba_itaja_full_om_diferente())
+    _poe_aba(banco, _aba_itaja_1_segura())
     _monta_itaja(cfg, banco)
     _pela_base(cfg, banco, marca=(CH_USINA,))
     assert _marca(banco) == {CH_USINA: 1, CH1: 0, CH2: 0}
@@ -1123,7 +1170,7 @@ def test_a_ug_vazia_sem_codigo_sai_quando_nenhuma_chave_que_segue_com_a_aba_apon
     na aba ("Sai quando essas chaves valerem", dizia o aviso), mas nada a tirava depois: a UG 01 da Itajá (a Itaja 1
     levada para a UG 02 na Base, a "Itajá" marcada) ficava no Nexus para sempre e ia aos leitores vazia, com o kWp antigo,
     ao lado da UG 02 com a usina toda, depois que a Itaja 1 passava a valer."""
-    _poe_aba(banco, _aba_itaja_full_om_diferente())
+    _poe_aba(banco, _aba_itaja_1_segura())
     _monta_itaja(cfg, banco)
     assert _salvar(cli, [_item_itaja(cli, chave=CH2, n=2)]).get_json()["ok"]  # a UG 02 com a CABN2; nada marca
     _pela_base(cfg, banco, marca=(CH_USINA,), cabine={f"Inversor 1.{m}": "UG 02" for m in range(1, 5)},
@@ -1156,7 +1203,7 @@ def test_a_ja_marcada_cuja_visao_muda_volta_para_a_aba_numa_usina_segura(cli, cf
     Salvar da Itaja 1 com 20 strings refaz o kWp da usina inteira: a Itaja 2 levava 316,18 por inversor aos leitores
     (2.596 ÷ 156 × 19) ao lado da UG 02 da aba, 1.298,08. Agora ela volta para a aba, com o aviso, e os leitores seguem
     com a aba na usina inteira; o salvar que NÃO muda a visão dela a deixa como está."""
-    aba = _aba_itaja_full_om_diferente()
+    aba = _aba_itaja_1_segura()
     _poe_aba(banco, aba)
     _monta_itaja(cfg, banco)
     assert _salvar(cli, [_item_itaja(cli)]).get_json()["ok"]                # a regra põe 324,5 em todos; nada marca
@@ -1445,14 +1492,13 @@ def test_o_salvar_da_base_passa_a_usina_pronta_a_valer_pelo_nexus_sozinho(cli, c
 
 
 def test_a_usina_com_diferenca_fora_da_regra_segue_com_a_aba_e_o_aviso_diz_por_que(cli, cfg, banco):
-    """O Full O&M da Itaja 1 diferente na aba (sairia de trackers e PR): a usina inteira segue com a aba (nenhuma das três
+    """Um inversor da Itaja 1 que só a aba tem (sumiria dos leitores): a usina inteira segue com a aba (nenhuma das três
     chaves marca), e o aviso do Salvar e o bloco do alto dizem o porquê."""
-    _poe_aba(banco, _aba_itaja() + [dict(x, **{"Full O&M": "Não"}) if x["Usina Supervisório"] == CH1 else x
-                                    for x in _aba_itaja_inv()] + ABA_PHARMA)
+    _poe_aba(banco, _aba_itaja_1_segura())
     _monta_itaja(cfg, banco)
     j = _salvar_base(cli, cfg, banco, ITAJA)
     assert j["ok"] and "ainda vale pela aba Equipamentos na Sala de controle" in j["aviso"], j
-    assert any("Full O&M" in m for m in j["pendentes"])
+    assert any("INVERSOR05 (Inversor 1.5) está na aba e não no Nexus" in m for m in j["pendentes"])
     assert _marca(banco) == {CH_USINA: 0, CH1: 0, CH2: 0}
 
 

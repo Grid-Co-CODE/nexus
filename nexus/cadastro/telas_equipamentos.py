@@ -19,6 +19,7 @@ moldura e da aba Pessoas e setores (Base → Acessos)); o Salvar da estrutura va
 sem recarregar (a lista de inversores de uma usina grande passa de 40 linhas: recarregar perdia a rolagem).
 """
 import difflib
+import json
 import logging
 import os
 import threading
@@ -100,6 +101,11 @@ def _virar_ao_subir(app) -> None:
                 if aba.get("erro"):
                     log.warning("Equipamentos: a virada ao subir ficou para a abertura da tela (aba: %s).", aba["erro"])
                     return
+                try:
+                    if _migrar_uma_vez(cfg, base, sessao, info, aba["chaves"]) is not None:
+                        aba = E.aba_equipamentos(base, sessao)
+                except Exception as ex:  # noqa: BLE001 — a virada segue; a migração tenta na próxima subida
+                    log.error("Equipamentos: a migração da aba falhou (%s: %s).", type(ex).__name__, ex)
                 with _VIRADA_TRAVA:
                     if _VIRADA["rodando"]:
                         return
@@ -110,6 +116,22 @@ def _virar_ao_subir(app) -> None:
     if os.environ.get("PYTEST_CURRENT_TEST") or not app.config.get("NEXUS_EQUIP_VIRADA", not app.config.get("TESTING")):
         return
     threading.Thread(target=rodar, daemon=True, name="nexus-equipamentos-virada-boot").start()
+
+
+def _migrar_uma_vez(cfg, base, sessao, info, aba_chaves) -> dict | None:
+    """A migração única da aba para o Nexus (`estrutura_usina.migrar_da_aba`, 27/11/2026), antes da virada da subida.
+    Roda uma vez por pasta de dados: a marca guarda o que ela fez (a prova), e com ela a migração não roda de novo (o
+    Nexus é a fonte; rodando a cada subida, devolveria o que alguém apagou nele)."""
+    marca = L.pasta_dados(cfg) / E.MIGRACAO_MARCA
+    if marca.exists():
+        return None
+    r = E.migrar_da_aba(dict(cfg), base, sessao, aba_chaves=aba_chaves, info=info)
+    marca.parent.mkdir(parents=True, exist_ok=True)
+    marca.write_text(json.dumps({"em": datetime.now(_BRT).isoformat(timespec="seconds"),
+                                 **{k: v for k, v in r.items() if k != "visao_linhas"}}, ensure_ascii=False, indent=1),
+                     encoding="utf-8")
+    log.info("Equipamentos: %s.", r.get("log"))
+    return r
 
 
 def _virar_em_fundo(cfg, base, sessao, info, aba_chaves, quem_email="") -> None:
@@ -146,11 +168,21 @@ def _usinas(srv) -> list[dict]:
 def _info_usinas(srv, cfg, usinas: list | None = None) -> dict:
     """{usina_id: {nome, codigo, cliente, kwp, kwp_de, fracttal}}: o que a visão no formato da aba e o de-para do tempo
     real levam de cada usina, do Registro mestre (o nome, o código, o cliente e a potência da conferência, com a origem
-    dela: o de-para grava a linhagem do kWp) e das Ligações (o 1º nome do Fracttal ligado)."""
+    dela: o de-para grava a linhagem do kWp) e das Ligações (o nome do Fracttal ligado: `_fracttal_da_usina`)."""
     _nomes, fr_da_usina, _dono, _lido = _fracttal(cfg)
     return {u["id"]: {"nome": u["nome"], "codigo": u["codigo"], "cliente": u["cliente"], "kwp": u["kwp"],
-                      "kwp_de": u["kwp_de"], "fracttal": (fr_da_usina.get(u["id"]) or [{}])[0].get("chave", "")}
+                      "kwp_de": u["kwp_de"], "fracttal": _fracttal_da_usina(fr_da_usina.get(u["id"]))}
             for u in (usinas if usinas is not None else _usinas(srv))}
+
+
+def _fracttal_da_usina(ligados) -> str:
+    """O nome do Fracttal que a visão leva: o 1º ligado que é uma Classificação 1 de verdade. O "(sem Classificação 1)
+    BWK100" é o que as Ligações escrevem para o ativo SEM Classificação 1 (o código no lugar do nome), e a Brodowski
+    (27/11/2026) tinha ele em 1º, com o "Thopen - Brodowski 1 - SP" em 3º: a visão levava o código à Sala, a usina
+    saía do índice do Fracttal, e a diferença com a aba a segurava (também a Indaiatuba, a Marabá 100 e a Nobres). Sem
+    nenhum de verdade, o 1º (como antes)."""
+    ligados = [x.get("chave", "") for x in ligados or [] if x.get("chave")]
+    return next((x for x in ligados if not x.startswith("(sem Classificação 1)")), ligados[0] if ligados else "")
 
 
 def _leituras(forcar: bool = False) -> tuple:

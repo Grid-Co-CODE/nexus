@@ -123,8 +123,9 @@ def test_a_aba_agrupa_por_chave_do_supervisorio():
     assert (b["ufv_kwp"], b["ufv_inversores"], b["fracttal"], b["full_om"]) == (1000.0, 4, "Thopen - Brodowski 1 - SP", True)
     assert [c["nome"] for c in b["cabines"]] == ["UG 01", "UG 02"] and b["inversores"] == []
     inv = g["Brodowski 2 (91)"]["inversores"]
+    # o nome de exibição da linha do inversor (27/11/2026: a migração leva a "Taguaí" dos inversores para o Nexus)
     assert inv[0] == {"nome": "Inversor 2.1", "equipamento_supervisorio": "INVERSOR01", "cabine": "UG 02", "kwp": None,
-                      "strings": 18}
+                      "strings": 18, "usina": "Brodowski"}
     assert inv[1]["strings"] is None and g["Pedra do Sal"]["full_om"] is False
 
 

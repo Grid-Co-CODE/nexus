@@ -73,6 +73,11 @@ log = logging.getLogger(__name__)
 
 LIVRO, NOME_LIVRO = "nexus_estrutura_usina", "Nexus · estrutura das usinas"
 ABA_SUP, ABA_CAB, ABA_INV, ABA_VISAO = "dim_supervisorio", "dim_cabine", "dim_inversor", "aba_equipamentos"
+# A VISÃO TOTAL (27/11/2026; Levi: "NÃO PODE EXISTIR ABA ANTIGA, TUDO TEM QUE SER NOVO E INTERLIGAR"): o MESMO formato da
+# visão, de TODAS as usinas com estrutura no Nexus, marcadas ou não, sem comparação com a aba. É o que o leitor que já
+# não lê a aba Equipamentos usa no lugar dela (a plataforma com `ESTRUTURA_FONTE=nexus`); a `aba_equipamentos` (só as
+# marcadas, por cima da aba) segue para quem ainda lê a aba. O kWp da usina nela: `_info_da_total`
+ABA_VISAO_TOTAL = "aba_equipamentos_total"
 _CONTROLE = ("criado_em", "alterado_em", "alterado_por_hmac", "excluido")
 CAB_SUP = ("supervisorio_id", "usina_id", "usina_supervisorio", "usina_exibicao", "principal", "full_om", "string_box",
            "substitui_aba") + _CONTROLE
@@ -225,7 +230,8 @@ def _ler_banco(base: str, sessao) -> dict:
     def le(aba, f):
         return [y for y in (f(x) for x in livros._linhas(base, sessao, a[aba])) if y] if aba in a else []
     return {"supervisorios": le(ABA_SUP, _sup), "cabines": le(ABA_CAB, _cab), "inversores": le(ABA_INV, _inv),
-            "visao": livros._linhas(base, sessao, a[ABA_VISAO]) if ABA_VISAO in a else []}
+            "visao": livros._linhas(base, sessao, a[ABA_VISAO]) if ABA_VISAO in a else [],
+            "visao_total": livros._linhas(base, sessao, a[ABA_VISAO_TOTAL]) if ABA_VISAO_TOTAL in a else []}
 
 
 def ler(base: str, sessao, forcar: bool = False) -> dict:
@@ -240,7 +246,8 @@ def ler(base: str, sessao, forcar: bool = False) -> dict:
         erro = f"{type(ex).__name__}: {str(ex)[:160]}"
         if c:
             return dict(c, erro=erro, velha=True)
-        return {"supervisorios": [], "cabines": [], "inversores": [], "visao": [], "lido_em": None, "erro": erro}
+        return {"supervisorios": [], "cabines": [], "inversores": [], "visao": [], "visao_total": [], "lido_em": None,
+                "erro": erro}
     c = dict(d, lido_em=time.time(), erro="")
     _CACHE["livro"] = c
     return c
@@ -410,6 +417,55 @@ def visao_aba(est: dict, info: dict | None) -> list[dict]:
     """A visão inteira: as usinas com alguma chave "no lugar da aba", na ordem do ID (o sha não muda de máquina)."""
     usinas = sorted({s["usina_id"] for s in est["supervisorios"] if not s["excluido"] and s["substitui_aba"]})
     return [x for uid in usinas for x in visao_da_usina(da_usina(est, uid), (info or {}).get(uid))]
+
+
+def _info_da_total(u: dict, info_u: dict | None) -> dict | None:
+    """O `info` da usina na visão total: o kWp da usina é o do Registro mestre, menos quando ele falta ou foge mais de
+    KWP_USINA_TOLERANCIA da soma dos inversores no Nexus; aí vale a soma (27/11/2026). Por quê: nessas usinas a soma é o
+    kWp que a Sala usa hoje (a aba e o Nexus têm a MESMA soma, medido em 11 usinas: Diamantino 3.284,4 no Registro e
+    6.629,6 nos inversores, Linhares 1 3.222,6 × 1.009, Cambé 3.105 × 3.670), e o corte da aba não pode mudar o PR de
+    ninguém calado. O Registro errado se corrige no Registro; corrigido, ele volta a valer."""
+    soma = round(sum(_num(i.get("potencia_kwp")) or 0 for i in u["inversores"]), 3)
+    kr = _num((info_u or {}).get("kwp"))
+    if soma > 0 and (not kr or abs(kr - soma) / soma > KWP_USINA_TOLERANCIA):
+        return dict(info_u or {}, kwp=soma, kwp_de="inversores")
+    return info_u
+
+
+def visao_total(est: dict, info: dict | None) -> list[dict]:
+    """A visão de TODAS as usinas com alguma chave viva no Nexus (`ABA_VISAO_TOTAL`), na ordem do ID. A usina que o
+    Registro junta e a Sala separa (chaves com nomes de exibição diferentes: a "Ipixuna 1 e 2", com a "Ipixuna 1" e a
+    "Ipixuna 2") sai com uma linha UFV POR PLANTA, com o kWp e o número dos inversores dela, como a aba tinha: com uma só,
+    a da usina inteira, a Ipixuna 2 passava de 1.823,3 a 3.079,1 kWp e a Ipixuna 1 ficava sem (27/11/2026)."""
+    usinas = sorted({s["usina_id"] for s in est["supervisorios"] if not s["excluido"]})
+    out = []
+    for uid in usinas:
+        u = da_usina(est, uid)
+        info_u = _info_da_total(u, (info or {}).get(uid))
+        linhas = visao_da_usina(u, info_u, todas=True)
+        plantas = {}
+        for s in u["supervisorios"]:
+            invs = [i for i in u["inversores"] if i["supervisorio_id"] == s["supervisorio_id"]]
+            if invs:
+                p = plantas.setdefault(norm(exibicao(s, info_u) or s["usina_supervisorio"]), {"s": s, "invs": []})
+                p["invs"] += invs
+        if len(plantas) > 1:
+            ufv = next((x for x in linhas if x["Equipamento"] == "UFV"), None)
+            linhas = [x for x in linhas if x["Equipamento"] != "UFV"]
+            for p in plantas.values():
+                s = p["s"]
+                kwp = round(sum(_num(i.get("potencia_kwp")) or 0 for i in p["invs"]), 3) or None
+                linhas.append(dict(ufv or {}, **{"Usina": exibicao(s, info_u) or s["usina_supervisorio"],
+                                                 "Usina Supervisório": s["usina_supervisorio"], "Equipamento": "UFV",
+                                                 "Equipamento Supervisório": None, "Equipamento Parente": None,
+                                                 "Chave": None, "Chave 2": f"{s['usina_supervisorio']}UFV",
+                                                 "Potência (kWp)": kwp, "N de Inversores": len(p["invs"]),
+                                                 "Full O&M": "Sim" if s["full_om"] else "Não",
+                                                 "String Box": "Sim" if s["string_box"] else "Não",
+                                                 "supervisorio_id": s["supervisorio_id"], "cabine_id": None,
+                                                 "inversor_id": None, "Código Fracttal": None}))
+        out += linhas
+    return out
 
 
 def _campo_da_chave(linha: dict) -> str:
@@ -648,7 +704,9 @@ def agrupar_aba(linhas) -> dict:
             g["inversores"].append({"nome": texto(d.get("Equipamento")),
                                     "equipamento_supervisorio": texto(d.get("Equipamento Supervisório")),
                                     "cabine": texto(d.get("Equipamento Parente")), "kwp": _num(d.get("Potência (kWp)")),
-                                    "strings": _int(d.get("Strings Ativas"))})
+                                    "strings": _int(d.get("Strings Ativas")),
+                                    # o nome de exibição da linha do inversor (a migração de 27/11/2026: a Taguaí)
+                                    "usina": texto(d.get("Usina"))})
     return out
 
 
@@ -717,7 +775,7 @@ def _quem(cfg, email: str) -> str:
     return codigo_da_pessoa(cfg.get("NEXUS_PESSOA_HMAC"), email) or ""
 
 
-def _linhas_do_livro(est: dict, visao: list[dict]) -> dict:
+def _linhas_do_livro(est: dict, visao: list[dict], total: list[dict] | None = None) -> dict:
     """As três abas ordenadas pelo ID (o sha do livro não muda de máquina para máquina) e a visão. Indicador como 1/0
     (regra 3); `excluido` como na casa: "sim" ou vazio."""
     def vazio(v):
@@ -735,7 +793,9 @@ def _linhas_do_livro(est: dict, visao: list[dict]) -> dict:
     return {ABA_SUP: tab(est["supervisorios"], CAB_SUP, "supervisorio_id"),
             ABA_CAB: tab(est["cabines"], CAB_CAB, "cabine_id"),
             ABA_INV: tab(est["inversores"], CAB_INV, "inversor_id"),
-            ABA_VISAO: (list(CAB_VISAO), [[vazio(x.get(c)) for c in CAB_VISAO] for x in visao])}
+            ABA_VISAO: (list(CAB_VISAO), [[vazio(x.get(c)) for c in CAB_VISAO] for x in visao]),
+            ABA_VISAO_TOTAL: (list(CAB_VISAO), [[vazio(x.get(c)) for c in CAB_VISAO]
+                                                for x in (est.get("visao_total") or [] if total is None else total)])}
 
 
 def _gravar(mudar, cfg, base, sessao, quem_email: str = "", info: dict | None = None) -> dict:
@@ -756,10 +816,15 @@ def _gravar(mudar, cfg, base, sessao, quem_email: str = "", info: dict | None = 
         resultado = mudar(est, _agora(), _quem(cfg, quem_email))
         visao = visao_aba(est, info) if info is not None else est["visao"]
         visao_mudou = info is not None and not _mesma_visao(visao, est["visao"])
-        if {k: est[k] for k in estado} != antes or visao_mudou:
-            livros.publicar(LIVRO, NOME_LIVRO, _linhas_do_livro(est, visao), base=base, token=token, sessao=sessao)
-            est["visao"] = visao
-        resultado.update(visao_linhas=len(est["visao"]), visao_mudou=visao_mudou)
+        # a visão total (27/11/2026) anda junto: refeita com o mesmo `info`; sem ele, a gravada segue como está
+        total = visao_total(est, info) if info is not None else est.get("visao_total") or []
+        total_mudou = info is not None and not _mesma_visao(total, est.get("visao_total") or [])
+        if {k: est[k] for k in estado} != antes or visao_mudou or total_mudou:
+            livros.publicar(LIVRO, NOME_LIVRO, _linhas_do_livro(est, visao, total), base=base, token=token,
+                            sessao=sessao)
+            est["visao"], est["visao_total"] = visao, total
+        resultado.update(visao_linhas=len(est["visao"]), visao_mudou=visao_mudou,
+                         visao_total_linhas=len(est.get("visao_total") or []), visao_total_mudou=total_mudou)
         _CACHE["livro"] = dict(est, lido_em=time.time(), erro="")
     log.info("Estrutura das usinas: %s, por %s.", resultado.get("log", "sem mudança"),
              quem_email or "senha de administrador")
@@ -1023,17 +1088,14 @@ def valer_prontas(cfg, base, sessao, *, info: dict, aba_chaves: dict | None, usi
         alvo = sorted({s["usina_id"] for s in est["supervisorios"] if not s["excluido"] and not s["substitui_aba"]
                        and s["usina_id"] in info and (usinas is None or s["usina_id"] in usinas)})
         pendentes = defaultdict(list)
-        # a usina cujo kWp no Registro mestre foge do da aba segura para conferir (a regra levaria o do Registro à Sala, e o
-        # PR e a geração específica mudariam junto): na simulação de 24/11/2026, Diamantino 6.629,6 → 3.284,4 (metade),
-        # Linhares 1 1.009 → 3.222,6, Cambé −15% e as duas Araçoiaba da Serra trocadas entre si
+        # a usina cujo kWp mudaria demais nos leitores segura para conferir (`segura_a_usina`): o PR e a geração específica
+        # mudariam junto
         for uid in list(alvo):
-            kr, ka = (info.get(uid) or {}).get("kwp"), _kwp_ufv_na_aba(est, uid, aba_chaves)
-            if kr and ka and abs(kr - ka) / ka > KWP_USINA_TOLERANCIA:
+            seg = segura_a_usina(est, uid, info.get(uid), aba_chaves)
+            if seg:
                 alvo.remove(uid)
-                pendentes[uid].append(
-                    f"A usina não vale pelo Nexus porque: o kWp da usina é {_kw(ka)} na aba e {_kw(kr)} no Registro mestre "
-                    f"({(kr - ka) / ka * 100:+.0f}%), e a Sala passaria a usar o do Registro: confira o Registro mestre. "
-                    "A estrutura ficou gravada no Nexus")
+                pendentes[uid].append("A usina não vale pelo Nexus porque: " + "; ".join(seg)
+                                      + ". A estrutura ficou gravada no Nexus")
         visao_antes = {uid: visao_da_usina(da_usina(est, uid), info.get(uid), todas=True) for uid in alvo}
         avisos = []
         marcacao = _marcar(est, alvo, {}, {}, info, aba_chaves, muda, avisos, visao_antes)
@@ -1050,13 +1112,73 @@ KWP_USINA_TOLERANCIA = 0.05
 
 
 def _kwp_ufv_na_aba(est: dict, uid: int, aba_chaves: dict | None):
-    """O kWp da linha UFV da usina na aba (a da chave que a tem), ou None."""
+    """O kWp da usina na aba: a SOMA das linhas UFV das chaves dela, ou None sem nenhuma. Até 27/11/2026 era a da 1ª chave
+    com UFV, e a usina de duas chaves com UFV cada segurava por uma diferença que não existe (a Ipixuna 1 e 2: 1.823,3 na
+    chave da Ipixuna 2 contra os 3.270,0 da usina inteira no Registro mestre)."""
+    t = 0.0
     for s in est["supervisorios"]:
         if s["usina_id"] == uid and not s["excluido"]:
-            v = ((aba_chaves or {}).get(s["usina_supervisorio"]) or {}).get("ufv_kwp")
-            if v:
-                return v
-    return None
+            t += _num(((aba_chaves or {}).get(s["usina_supervisorio"]) or {}).get("ufv_kwp")) or 0
+    return t or None
+
+
+def _kwp_inversores(est: dict, uid: int, aba_chaves: dict | None) -> tuple:
+    """(kWp dos inversores da usina na aba, no Nexus): o que o PR e a perda de cada inversor dividem."""
+    na_aba = no_nexus = 0.0
+    for s in est["supervisorios"]:
+        if s["usina_id"] != uid or s["excluido"]:
+            continue
+        g = (aba_chaves or {}).get(s["usina_supervisorio"]) or {}
+        na_aba += sum(_num(i.get("kwp")) or 0 for i in g.get("inversores") or [])
+        no_nexus += sum(_num(i.get("potencia_kwp")) or 0 for i in est["inversores"]
+                        if i["supervisorio_id"] == s["supervisorio_id"] and not i.get("excluido"))
+    return na_aba, no_nexus
+
+
+def segura_a_usina(est: dict, uid: int, info_u: dict | None, aba_chaves: dict | None) -> list[str]:
+    """O que segura a usina INTEIRA com a aba, olhando só o kWp que os leitores passariam a usar (a fonte única, 27/11/2026):
+    - o da usina, quando o do Registro mestre (a Sala passa a usá-lo) foge mais de KWP_USINA_TOLERANCIA da soma das UFV da
+      aba: na simulação de 24/11/2026, Diamantino 6.629,6 → 3.284,4 (metade), Linhares 1 1.009 → 3.222,6, Cambé −15% e as
+      duas Araçoiaba da Serra trocadas entre si;
+    - o dos inversores, quando o Registro não tem o kWp (a trava de cima fica calada) e a soma no Nexus foge da soma na aba:
+      a Rodrigues II, 27/11/2026, com a potência do Registro ilegível ("0,,643"): 2.116,8 na aba, 2.570,0 no Nexus, +21%.
+      Com o kWp do Registro conferido, o que a regra calculou a partir dele vale;
+    - a usina que a aba tem numa chave que o Nexus não conhece, com o mesmo nome de exibição: os leitores trocam só as
+      linhas das chaves marcadas, e ficariam com as dessa chave da aba E com as do Nexus, a usina em dobro. A Rodrigues II
+      (a UFV e as três UG na "Rodrigues 2", que o Nexus não tem) e a União 1 e 2 (a aba inteira na "União"; o Nexus tem
+      "UNI" e "União 1 e 2", que a aba não tem). Só a chave que dobra: com inversores, ou com a UFV ou as UG quando o
+      Nexus também as escreve (a "Coração 2" da aba, só com a UFV, não dobra). A UFV que só muda de chave DENTRO da
+      usina não segura: as chaves marcam juntas (a Aparecida do Taboado, a Boa Esperança do Sul, a Santarém). A usina já marcada fica de fora: a chave solta
+      já convive com ela, e segurar a devolveria à aba sem tirar o dobro.
+    Vazio = o kWp não muda nos leitores além da tolerância, e a usina não fica em dobro."""
+    out = []
+    kr, ka = (info_u or {}).get("kwp"), _kwp_ufv_na_aba(est, uid, aba_chaves)
+    sups = [s for s in est["supervisorios"] if s["usina_id"] == uid and not s["excluido"]]
+    if aba_chaves and sups and not any(s.get("substitui_aba") for s in sups):
+        conhecidas = {s["usina_supervisorio"] for s in est["supervisorios"] if not s["excluido"]}
+        candidatas = {k: g for k, g in aba_chaves.items() if k not in conhecidas}
+        linhas = visao_da_usina(da_usina(est, uid), info_u, todas=True) if candidatas else []
+        nomes = {norm(x.get("Usina")) for x in linhas} - {""}
+        com_ufv = any(x.get("Equipamento") == "UFV" for x in linhas)
+        # só a chave solta que DOBRA: a com a linha da usina (UFV ou UG) quando o Nexus também a escreve, ou com inversores.
+        # A "Coração 2" da aba (só a UFV) ao lado da "Coração 2 (112)" (os inversores, a chave do Nexus, que não é a
+        # principal): o Nexus não escreve UFV, e a da aba segue sozinha
+        soltas = sorted(str(k or "(sem chave)") for k, g in candidatas.items()
+                        if nomes & {norm(n) for n in (g.get("usinas") or [g.get("usina")])}
+                        and (g.get("inversores") or (com_ufv and (g.get("ufv_kwp") is not None or g.get("cabines")))))
+        if soltas:
+            out.append("a aba Equipamentos tem a usina também na(s) chave(s) " + ", ".join(f"“{k}”" for k in soltas)
+                       + ", que o Nexus não tem, e os leitores ficariam com a usina em dobro (a da aba e a do Nexus): "
+                       "cadastre essa chave na usina, na Base > Equipamentos das usinas")
+    if kr and ka and abs(kr - ka) / ka > KWP_USINA_TOLERANCIA:
+        out.append(f"o kWp da usina é {_kw(ka)} na aba e {_kw(kr)} no Registro mestre ({(kr - ka) / ka * 100:+.0f}%), e a "
+                   "Sala passaria a usar o do Registro: confira o Registro mestre")
+    # sem o kWp do Registro (vazio ou ilegível) não há com o que conferir o que a regra calculou: vale o dos inversores
+    ia, inx = _kwp_inversores(est, uid, aba_chaves)
+    if not kr and ia and inx and abs(inx - ia) / ia > KWP_USINA_TOLERANCIA:
+        out.append(f"o kWp dos inversores soma {_kw(ia)} na aba e {_kw(inx)} no Nexus ({(inx - ia) / ia * 100:+.0f}%), e o "
+                   "PR e a perda de cada inversor mudariam junto: confira o kWp na Base > Equipamentos das usinas")
+    return out
 
 
 def vale_pelo_nexus(est: dict, aba_chaves: dict | None) -> dict:
@@ -1263,6 +1385,232 @@ def ligar_pela_aba(proposta: dict, aba_chaves: dict, cfg, base, sessao, quem_ema
     return _gravar(mudar, cfg, base, sessao, quem_email, info)
 
 
+# ── A MIGRAÇÃO ÚNICA DA ABA PARA O NEXUS (27/11/2026) ──────────────────────────────────────────────────────────────────
+# Levi, 27/11/2026: "NÃO PODE EXISTIR ABA ANTIGA, TUDO TEM QUE SER NOVO E INTERLIGAR" e "Resolva". Antes de os leitores
+# deixarem de ler a aba Equipamentos, entra no Nexus, UMA vez, o que só ela tem. Medido no banco real nesse dia: sem isto
+# o corte tirava da Sala 279 inversores de 42 chaves que o Nexus não tinha, os 34 da CPP100 e da Rio do Peixe (a chave
+# no Nexus sem inversor nenhum) e o kWp dos 18 da Pharma 2, 3 e 4. Depois dela, o Nexus é a fonte e a migração não roda
+# de novo (a marca `MIGRACAO_MARCA` na pasta de dados): rodando a cada subida, ela devolveria o que alguém apagou no Nexus.
+#
+# {usina_id do Registro mestre: [(chave na aba, chave no Nexus)]}: as usinas do Registro SEM estrutura nenhuma no Nexus
+# e as chaves delas na aba, achadas pelo nome e pelo Fracttal (o "Ligar pela aba" de 13/10 não as ligou: o nome do
+# Fracttal da aba não casava com o das Ligações, ou a aba tinha o nome curto: "Lyon" para a "Lyon I (Sol Maior I)",
+# "Areia Branca" para a "Pacaembu - Areia Branca"). A chave vai com o nome que a API PV manda quando a aba tinha outro,
+# provado pelo valor (as mesmas partes, os mesmos 8 ou 10 inversores INVERSOR01 em diante): a "Segredo 1.2 (643)" a
+# "1.5 (643)" da aba são as plantas "Segredo 1.2 (889)" a "1.5 (892)" (a 1.1 é "(643)" nas duas), e a "Aruanã (56)" é a
+# "Aruanã". Ficam de fora, por serem cópias do que o Nexus já tem: a "União" (o Nexus tem "UNI" e "União 1 e 2"), a
+# "Rodrigues 2" (a UFV da Rodrigues II, que sai na "Rodrigues 2.1 (233)") e a "AP. do Taboado" (uma UFV solta da
+# Aparecida do Taboado).
+MIGRACAO_ABA = {
+    28: [("Aruanã (56)", "Aruanã")],
+    31: [("PTOBELO1", "")],
+    47: [("Colider 1", ""), ("UFV Colider 1", "")],
+    48: [("Colider 2", ""), ("UFV Colider 2", "")],
+    49: [("Nobres", ""), ("UFV Nobres", "")],
+    77: [("Coração 1 (111)", ""), ("Coração 2", ""), ("Coração 2 (112)", "")],
+    126: [("Santo Inácio XII", ""), ("(327) Santo Inácio XII", "")],
+    128: [("Segredo", ""), ("Segredo 1.1 (643)", ""), ("Segredo 1.2 (643)", "Segredo 1.2 (889)"),
+          ("Segredo 1.3 (643)", "Segredo 1.3 (890)"), ("Segredo 1.4 (643)", "Segredo 1.4 (891)"),
+          ("Segredo 1.5 (643)", "Segredo 1.5 (892)")],
+    148: [("Gravatá II", "")],
+    149: [("Iramaia II", "")],
+    150: [("Ibipeba", "")],
+    259: [("Areia Branca", ""), ("Pacaembu - Sítio Areia Branca 1.1 (169)", ""),
+          ("Pacaembu - Sítio Areia Branca 1.2 (170)", "")],
+    260: [("Nova Iguaçu", ""), ("Nova Iguaçu 2.1 (180)", ""), ("Nova Iguaçu 2.2 (180)", "")],
+    261: [("Rondonópolis", ""), ("Rondonópolis (5)", "")],
+    262: [("Monte Aprazível", ""), ("Monte Aprazivel (9)", "")],
+    264: [("Lyon", "")] + [(f"Sol Maior GD {r} ({n})", "") for r, n in
+                           (("I", 184), ("II", 185), ("III", 186), ("IV", 187), ("V", 188))],
+}
+MIGRACAO_MARCA = "migracao_aba_27_11.json"
+
+
+def _inv_da_aba(a: dict):
+    """A chave de um inversor da aba para casar com o do Nexus: o nome no supervisório e, sem ele, o nome."""
+    return ("s", norm(a.get("equipamento_supervisorio"))) if texto(a.get("equipamento_supervisorio")) \
+        else ("n", norm(a.get("nome")))
+
+
+def _inv_do_nexus(i: dict):
+    return ("s", norm(i.get("equipamento_supervisorio"))) if texto(i.get("equipamento_supervisorio")) \
+        else ("n", norm(i.get("nome")))
+
+
+def _chave_para_os_soltos(est, uid, pares, aba_chaves, controle, dono, agora, quem) -> tuple[int, int]:
+    """(chaves, inversores novos) da usina com inversores e SEM chave: cada chave da aba de `pares` nasce no Nexus (a com
+    a UFV ou as UG é a da usina), e o inversor sem chave do Nexus de mesmo nome que um da aba passa a ela, ganhando o nome
+    no supervisório e as strings da aba quando não tem. O kWp do Nexus fica (330 kWp na Gravatá II; a aba tinha 339,6)."""
+    soltos = {norm(i["nome"]): i for i in est["inversores"]
+              if i["usina_id"] == uid and not i["excluido"] and i.get("supervisorio_id") is None}
+    tem_principal = False
+    n_ch = n_inv = 0
+    for chave_aba, como in pares:
+        g, alvo = aba_chaves.get(chave_aba), como or chave_aba
+        if not g or alvo in dono:
+            continue
+        e = estrutura_da_aba([chave_aba], aba_chaves)["supervisorios"][0]
+        principal = not tem_principal and (g.get("ufv_kwp") is not None or bool(g.get("cabines")))
+        tem_principal = tem_principal or principal
+        sid = _proximo(est["supervisorios"], "supervisorio_id")
+        est["supervisorios"].append({"supervisorio_id": sid, "usina_id": uid, "usina_supervisorio": alvo,
+                                     "usina_exibicao": e["exibicao"], "principal": principal, "full_om": e["full_om"],
+                                     "string_box": e["string_box"], "substitui_aba": False, **controle})
+        dono.add(alvo)
+        n_ch += 1
+        for a in g.get("inversores") or []:
+            i = soltos.pop(norm(a.get("nome")), None)
+            if i is None:
+                continue
+            i.update(supervisorio_id=sid, alterado_em=agora, alterado_por_hmac=quem)
+            if not texto(i.get("equipamento_supervisorio")) and texto(a.get("equipamento_supervisorio")):
+                i["equipamento_supervisorio"] = texto(a["equipamento_supervisorio"])
+            if not _int(i.get("strings_esperadas_qtd")) and _int(a.get("strings")):
+                i["strings_esperadas_qtd"] = _int(a["strings"])
+            n_inv += 1
+    if not any(s["usina_id"] == uid and s["principal"] and not s["excluido"] for s in est["supervisorios"]):
+        s = next((s for s in est["supervisorios"] if s["usina_id"] == uid and not s["excluido"]), None)
+        if s:
+            s["principal"] = True
+    return n_ch, n_inv
+
+
+def migrar_da_aba(cfg, base, sessao, *, aba_chaves: dict, info: dict | None = None, quem_email: str = "",
+                  mapa: dict | None = None) -> dict:
+    """Grava no Nexus, de uma vez, o que só a aba tem (ver MIGRACAO_ABA), sem tirar nem mudar nada que o Nexus já tenha:
+    (1) as chaves de `mapa` da usina SEM estrutura nenhuma, semeadas pela aba (`_semear_pela_aba`: cabines, inversores
+    com o nome, as strings e o kWp da aba; a chave com a UFV primeiro, que vira a da usina); (2) os inversores da aba na
+    chave do Nexus que não tem NENHUM (a CPP100 e a Rio do Peixe I e II: a chave e as cabines ligadas, nenhum inversor),
+    com as cabines que faltarem; (3) o kWp que o Nexus não tem (vazio ou zero) no inversor e na cabine onde a aba tem
+    (a Pharma 2, 3 e 4), sem linhagem, como o "Ligar pela aba". Tudo nasce fora do lugar da aba: quem marca é a virada.
+    -> {usinas, chaves, inversores, kwp, puladas: [textos], log}."""
+    mapa = MIGRACAO_ABA if mapa is None else mapa
+
+    def mudar(est, agora, quem):
+        conta = {"n": 0}
+
+        def muda(_x=None, **_c):
+            conta["n"] += 1
+        controle = {"criado_em": agora, "alterado_em": agora, "alterado_por_hmac": quem, "excluido": False}
+        n_us, n_ch, n_inv, n_kwp, puladas = 0, 0, 0, 0, []
+        dono = {s["usina_supervisorio"] for s in est["supervisorios"] if not s["excluido"]}
+        # (1) a usina sem estrutura nenhuma
+        for uid, pares in sorted(mapa.items()):
+            u = da_usina(est, uid)
+            if not u["supervisorios"] and u["inversores"]:
+                # (1b) a usina com inversores e sem chave nenhuma (a Gravatá II e a Iramaia II, 27/11/2026: os 10
+                # inversores e a UG 01 no Nexus, nenhuma chave; nenhum leitor os achava): a chave nasce da aba e os
+                # inversores que o Nexus já tem passam a ela pelo nome, com o nome no supervisório e as strings da aba
+                # onde o Nexus não tem; o que só a aba tem entra
+                n_ch_b, n_inv_b = _chave_para_os_soltos(est, uid, pares, aba_chaves, controle, dono, agora, quem)
+                if n_ch_b:
+                    n_us, n_ch, n_inv = n_us + 1, n_ch + n_ch_b, n_inv + n_inv_b
+                continue
+            if u["supervisorios"] or u["cabines"] or u["inversores"]:
+                puladas.append(f"usina {uid}: já tem estrutura no Nexus (vale o que está lá)")
+                continue
+            pares = [(a, c) for a, c in pares if a in aba_chaves]
+            pares.sort(key=lambda p: (aba_chaves[p[0]].get("ufv_kwp") is None and not aba_chaves[p[0]].get("cabines"),
+                                      natural(p[0])))
+            feitas = 0
+            for chave_aba, como in pares:
+                alvo = como or chave_aba
+                if alvo in dono:
+                    puladas.append(f"usina {uid}: a chave “{alvo}” já é de outra usina no Nexus")
+                    continue
+                _semear_pela_aba(est, uid, chave_aba, aba_chaves, controle, muda, como=como)
+                dono.add(alvo)
+                feitas += 1
+                n_inv += len(aba_chaves[chave_aba].get("inversores") or [])
+            if feitas:
+                n_us, n_ch = n_us + 1, n_ch + feitas
+        # (2) a chave do Nexus sem nenhum inversor, com inversores na aba
+        for s in [x for x in est["supervisorios"] if not x["excluido"]]:
+            g = aba_chaves.get(s["usina_supervisorio"])
+            if not g or not g.get("inversores"):
+                continue
+            uid, sid = s["usina_id"], s["supervisorio_id"]
+            if any(i["supervisorio_id"] == sid and not i["excluido"] for i in est["inversores"]):
+                continue
+            e = estrutura_da_aba([s["usina_supervisorio"]], aba_chaves)
+            vivas = [c for c in est["cabines"] if c["usina_id"] == uid and not c["excluido"]]
+            cid_de = {norm(c["nome"]): c["cabine_id"] for c in vivas}
+            ordem = max((c["ordem"] for c in vivas), default=0)
+            for c in e["cabines"]:
+                if norm(c["nome"]) in cid_de:
+                    continue
+                ordem += 1
+                cid = _proximo(est["cabines"], "cabine_id")
+                est["cabines"].append({"cabine_id": cid, "usina_id": uid, "nome": c["nome"],
+                                       "potencia_kwp": c["potencia_kwp"], "equipamento_id": None,
+                                       "codigo_fracttal": "", "ordem": ordem, **controle, "potencia_regra": ""})
+                cid_de[norm(c["nome"])] = cid
+                muda()
+            vivos = [i for i in est["inversores"] if i["usina_id"] == uid and not i["excluido"]]
+            usados = {norm(i["nome"]) for i in vivos}
+            ordem = max((i["ordem"] for i in vivos), default=0)
+            for i in e["inversores"]:
+                final, k = i["nome"], 1
+                while norm(final) in usados:
+                    k += 1
+                    final = f"{i['nome']} · {s['usina_supervisorio']}" if k == 2 else \
+                        f"{i['nome']} · {s['usina_supervisorio']} ({k - 1})"
+                usados.add(norm(final))
+                ordem += 1
+                est["inversores"].append({"inversor_id": _proximo(est["inversores"], "inversor_id"), "usina_id": uid,
+                                          "supervisorio_id": sid,
+                                          "cabine_id": cid_de.get(norm(i["cabine"])) if i["cabine"] else None,
+                                          "nome": final, "equipamento_supervisorio": i["equipamento_supervisorio"],
+                                          "potencia_kwp": i["potencia_kwp"],
+                                          "strings_esperadas_qtd": i["strings_esperadas_qtd"], "equipamento_id": None,
+                                          "codigo_fracttal": "", "ordem": ordem, **controle, "potencia_regra": "",
+                                          "fracttal_ligado_por": "", "conferido_em": ""})
+                n_inv += 1
+                muda()
+        # (3) o kWp que o Nexus não tem e a aba tem
+        for s in [x for x in est["supervisorios"] if not x["excluido"]]:
+            g = aba_chaves.get(s["usina_supervisorio"])
+            if not g:
+                continue
+            da_aba = {_inv_da_aba(a): a for a in g.get("inversores") or []}
+            for i in est["inversores"]:
+                if i["supervisorio_id"] != s["supervisorio_id"] or i["excluido"] or (_num(i.get("potencia_kwp")) or 0) > 0:
+                    continue
+                k = (_num((da_aba.get(_inv_do_nexus(i)) or {}).get("kwp")) or 0)
+                if k > 0:
+                    i.update(potencia_kwp=k, potencia_regra="", alterado_em=agora, alterado_por_hmac=quem)
+                    n_kwp += 1
+            cab_aba = {norm(c.get("nome")): c for c in g.get("cabines") or []}
+            for c in est["cabines"]:
+                if c["usina_id"] != s["usina_id"] or c["excluido"] or (_num(c.get("potencia_kwp")) or 0) > 0:
+                    continue
+                k = (_num((cab_aba.get(norm(c["nome"])) or {}).get("kwp")) or 0)
+                if k > 0:
+                    c.update(potencia_kwp=k, potencia_regra="", alterado_em=agora, alterado_por_hmac=quem)
+                    n_kwp += 1
+        # (4) o Full O&M "Sim" da aba onde o Nexus diz "Não" (a CPP100 e a chave da Guatambu, 27/11/2026: o "Não" veio do
+        # cadastro inicial, e com ele a usina saía de trackers e do PR no corte); e (5) o nome de exibição que TODOS os
+        # inversores da chave têm na aba, quando o do Nexus é outro (a Taguaí 1 (173) e a 2 (174): "Taguaí" nos
+        # inversores da aba, e a Sala junta as duas plantas por ele; no Nexus, o de uma UFV solta da aba)
+        full_om, exib = [], []
+        for s in [x for x in est["supervisorios"] if not x["excluido"]]:
+            g = aba_chaves.get(s["usina_supervisorio"])
+            if not g:
+                continue
+            if g.get("full_om") and not s["full_om"]:
+                s.update(full_om=True, alterado_em=agora, alterado_por_hmac=quem)
+                full_om.append(s["usina_supervisorio"])
+            nomes = {texto(a.get("usina")) for a in g.get("inversores") or [] if texto(a.get("usina"))}
+            if len(nomes) == 1 and g.get("inversores") and norm(next(iter(nomes))) != norm(s["usina_exibicao"]):
+                s.update(usina_exibicao=next(iter(nomes)), alterado_em=agora, alterado_por_hmac=quem)
+                exib.append(s["usina_supervisorio"])
+        return {"usinas": n_us, "chaves": n_ch, "inversores": n_inv, "kwp": n_kwp, "puladas": puladas,
+                "full_om": full_om, "exibicao": exib,
+                "log": f"migração da aba: {n_ch} chave(s) em {n_us} usina(s), {n_inv} inversor(es), {n_kwp} kWp, "
+                       f"Full O&M em {len(full_om)}, exibição em {len(exib)}"}
+    return _gravar(mudar, cfg, base, sessao, quem_email, info)
+
+
 # ── O de-para do tempo real (20/10/2026) ──────────────────────────────────────────────────────────────────────────────
 # Levi, 20/10/2026, com o protótipo do "Modo de-para": "Boa, é isso mesmo. Implementa no tempo real e adapta na base o
 # de-para". A plataforma (o tempo real e a Base · De-para de equipamentos) lê o estado pela rota `/depara/estado` e grava
@@ -1322,49 +1670,41 @@ def _numero_da_ug(nome):
     return int(m.group(1)) if m else None
 
 
+# A FONTE ÚNICA (27/11/2026). Levi, com a Ipixuna 2 salva na Base e a Sala de controle ainda na aba (o 2.13 sem strings
+# nem kWp): "resolvo isso aí para não mostrar nenhuma aba antiga. As abas têm que se conversar". A diferença com a aba
+# deixa de segurar a chave: vale o que está no Nexus (o kWp digitado, as cabines sem CABN, o Full O&M, o String Box, o
+# cliente, o nome do inversor, o inversor que só o Nexus tem). Só segura o que APAGARIA ou DESLIGARIA dado nos leitores:
+SEGURA_SEMPRE = {
+    "inversor_so_na_aba",     # o inversor sumiria dos leitores, com a geração e as strings dele (CPP100, Rio do Peixe)
+    "fracttal",               # a usina sairia do índice do Fracttal: a disponibilidade e as OS (a Belo Jardim, 20/10)
+    "exibicao",               # o USINA_GRUPO junta as plantas pelo nome de exibição (a Taguaí, 21/10)
+}
+
+
 def fora_da_regra(cmp: dict, u: dict, info_u: dict | None = None) -> list[str]:
-    """As diferenças de `comparar_chave` que o de-para NÃO explica (textos; vazio = a chave só difere da aba pela regra,
-    e só então o salvar a marca no lugar da aba). Da regra (20/10/2026, as decisões do Levi):
-    - as strings corretas ("Strings Ativas"): é o que o de-para grava;
-    - o kWp de inversor e de cabine que a regra do kWp calculou (a linhagem é `real_por_string` ou
-      `contratual_por_string`: o 1.298,08 da aba vira 1.298,0 na Itajá); kWp com outra linhagem não é do de-para;
-    - a cabine pela CABN (decisão 2): a cabine que só o Nexus tem e a do inversor que mudou de UG têm o código da CABN;
-      a que só a aba tem vale quando TODAS as cabines vivas da usina já são CABN (a UG 01 da Pharma II deu lugar à
-      UG 02);
-    - a potência da UFV quando vem do Registro mestre (real, senão contratual: `info_u`) e o "N de Inversores" da UFV,
-      que o Nexus CONTA (na Itajá real a UFV da aba é 2.596,16 kWp, a soma das UG, e sem "N de Inversores": até esta
-      regra a "Itajá" nunca marcava, e os leitores ficavam com a UG 1.298,08 sem a CABN);
-    - o "Código Fracttal" (a comparação nem olha).
-    Tudo o mais é fora: Full O&M, String Box, nome do inversor (a coluna do BD), nome de exibição, nome no Fracttal,
-    cliente, inversor de um lado só (o parado que não veio no pedido some dos leitores se a chave marcar), a chave fora da
-    aba e a UFV em outra chave."""
-    regras = set(REGRA_DO_REGISTRO.values())
+    """As diferenças de `comparar_chave` que ainda seguram a chave com a aba (textos; vazio = vale o Nexus). Desde
+    27/11/2026 (a fonte única, ver SEGURA_SEMPRE): os tipos de SEGURA_SEMPRE e o kWp que o Nexus não tem (vazio ou zero)
+    onde a aba tem, no inversor, na cabine ou na usina (o PR e a perda dividem por ele: a Pharma 2, 3 e 4, 27/11/2026). O
+    kWp que muda demais na usina inteira segura em `segura_a_usina`, não aqui."""
     cab = {c["cabine_id"]: c for c in u["cabines"]}
     inv = {i["inversor_id"]: i for i in u["inversores"]}
     info_u = info_u or {}
-    do_registro = info_u.get("kwp") is not None and info_u.get("kwp_de") in REGRA_DO_REGISTRO
 
-    def com_cabn(cid):
-        return bool((cab.get(cid) or {}).get("codigo_fracttal"))
+    def tem(v):
+        return (_num(v) or 0) > 0
     fora = []
     for it in cmp.get("itens") or ():
         t = it["tipo"]
-        if t == "kwp_cabine":
-            ok = (cab.get(it.get("cabine_id")) or {}).get("potencia_regra") in regras
-        elif t == "kwp_inversor":
-            ok = (inv.get(it.get("inversor_id")) or {}).get("potencia_regra") in regras
-        elif t in ("cabine_so_no_nexus", "cabine_do_inversor"):
-            ok = com_cabn(it.get("cabine_id"))
-        elif t == "cabine_so_na_aba":
-            # só as UG contam: a "UFV" e a "PEI" fora do padrão nem saem na visão (ver `visao_da_usina`)
-            ugs = [c for c in cab.values() if _numero_da_ug(c.get("nome")) is not None]
-            ok = bool(ugs) and all(c["codigo_fracttal"] for c in ugs)
-        elif t in ("strings_inversor", "inversores_usina"):
-            ok = True
-        elif t == "kwp_usina":
-            ok = do_registro
-        else:
+        if t in SEGURA_SEMPRE:
             ok = False
+        elif t == "kwp_inversor":
+            ok = tem((inv.get(it.get("inversor_id")) or {}).get("potencia_kwp"))
+        elif t == "kwp_cabine":
+            ok = tem((cab.get(it.get("cabine_id")) or {}).get("potencia_kwp"))
+        elif t == "kwp_usina":
+            ok = tem(info_u.get("kwp"))
+        else:
+            ok = True
         if not ok:
             fora.append(it["texto"])
     return fora
@@ -1546,7 +1886,7 @@ def _cabine_da_cabn(est, uid, cod, eid, controle, muda, chave: str = "") -> int:
     return cid
 
 
-def _semear_pela_aba(est, uid, chave, aba_chaves, controle, muda) -> tuple[dict, dict | None]:
+def _semear_pela_aba(est, uid, chave, aba_chaves, controle, muda, como: str = "") -> tuple[dict, dict | None]:
     """(a chave nova no livro, o aviso). A chave do pedido que o livro ainda não tem nasce SEMEADA PELA ABA antes do
     remendo, com o mesmo `estrutura_da_aba` do "Ligar pela aba": Full O&M, String Box, o nome de exibição, as cabines UG e
     TODOS os inversores da aba com o nome e as strings (e o kWp) da aba. Caso que criou (2ª revisão, 20/10/2026): a
@@ -1564,7 +1904,9 @@ def _semear_pela_aba(est, uid, chave, aba_chaves, controle, muda) -> tuple[dict,
       só): na Pharma 2 (usina 108), o Salvar da "PHARMA 2 API" criava "Inversor 2.1" a "2.6" com os THPN-PHS100-INVR2.x,
       e o da "Pharma 2" (a chave da aba) com os mesmos códigos levava 409 para sempre (o de-para não solta código). A
       chave nova é ligada na Base > Equipamentos das usinas, à vista.
-    - Sem a aba lida não há de onde semear: recusa (503), para não nascer pela metade."""
+    - Sem a aba lida não há de onde semear: recusa (503), para não nascer pela metade.
+    - `como` (a migração de 27/11/2026): o nome da chave no Nexus quando não é o da aba (a aba lida por `chave`)."""
+    alvo = como or chave
     tem_principal = any(x["usina_id"] == uid and x["principal"] and not x["excluido"] for x in est["supervisorios"])
     sid = _proximo(est["supervisorios"], "supervisorio_id")
     if aba_chaves is None:
@@ -1580,7 +1922,7 @@ def _semear_pela_aba(est, uid, chave, aba_chaves, controle, muda) -> tuple[dict,
     e = estrutura_da_aba([chave], aba_chaves)
     s0 = e["supervisorios"][0]
     na_aba_e_da_usina = g.get("ufv_kwp") is not None or bool(g.get("cabines"))
-    s = {"supervisorio_id": sid, "usina_id": uid, "usina_supervisorio": chave, "usina_exibicao": s0["exibicao"],
+    s = {"supervisorio_id": sid, "usina_id": uid, "usina_supervisorio": alvo, "usina_exibicao": s0["exibicao"],
          "principal": na_aba_e_da_usina and not tem_principal, "full_om": s0["full_om"],
          "string_box": s0["string_box"], "substitui_aba": False, **controle}
     est["supervisorios"].append(s)
@@ -1606,7 +1948,7 @@ def _semear_pela_aba(est, uid, chave, aba_chaves, controle, muda) -> tuple[dict,
         final, k = i["nome"], 1
         while norm(final) in usados:
             k += 1
-            final = f"{i['nome']} · {chave}" if k == 2 else f"{i['nome']} · {chave} ({k - 1})"
+            final = f"{i['nome']} · {alvo}" if k == 2 else f"{i['nome']} · {alvo} ({k - 1})"
         usados.add(norm(final))
         ordem += 1
         est["inversores"].append({"inversor_id": _proximo(est["inversores"], "inversor_id"), "usina_id": uid,
@@ -1683,6 +2025,12 @@ def _marcar(est, usinas, sid_de, ja_marcada, info, aba_chaves, muda, avisos, vis
                 cmp[sid] = comparar_chave(aba_chaves.get(s["usina_supervisorio"]),
                                           [x for x in linhas_u if x["supervisorio_id"] == sid])
                 fora[sid] = fora_da_regra(cmp[sid], u, info_u)
+        # o kWp que mudaria demais na usina inteira segura todas as chaves dela (`segura_a_usina`, 27/11/2026): no Salvar
+        # também, não só na virada, porque a regra da chave já não segura nenhuma diferença de kWp que o Nexus tenha
+        seg = segura_a_usina(est, uid, info_u, aba_chaves) if aba_chaves is not None else []
+        if seg:
+            for s in alvo:
+                fora[s["supervisorio_id"]] = list(fora[s["supervisorio_id"]]) + seg
         presas = [s for s in alvo if fora[s["supervisorio_id"]]]
         quem = ", ".join(f"“{p['usina_supervisorio']}”" for p in presas[:4]) + (
             f" e mais {len(presas) - 4}" if len(presas) > 4 else "")

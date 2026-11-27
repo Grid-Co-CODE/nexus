@@ -533,9 +533,9 @@ Essa é a regra."
 - **As usinas de fora, à vista do time**: o bloco "Vale pelo Nexus na Sala" (aberto quando há pendência) diz "N de M
   usinas · X ainda pela aba Equipamentos: o que falta em cada uma", com até três motivos por usina e o link que abre a
   usina. Em 25/11/2026: 82 de 125 pelo Nexus, 43 pela aba.
-- **A regra do de-para na Sala**: o Salvar da usina grava a estrutura e, com a usina pronta (só diferença que o de-para
-  corrige, kWp da UFV a menos de 5% da aba, todas as chaves da aba no Nexus), marca a usina inteira "no lugar da aba"
-  (`valer_prontas`); a plataforma relê a visão em ~60 s e a Sala de controle passa a mostrar o que se salvou aqui. A usina
+- **A regra do de-para na Sala**: o Salvar da usina grava a estrutura e, com a usina pronta (desde 27/11/2026 vale o
+  Nexus em toda diferença de cadastro; só segura o que apagaria, desligaria ou dobraria dado nos leitores, ver "A fonte
+  única de verdade" abaixo), marca a usina inteira "no lugar da aba" (`valer_prontas`); a plataforma relê a visão em ~60 s e a Sala de controle passa a mostrar o que se salvou aqui. A usina
   que não fica pronta segue com a aba, e o aviso do Salvar diz o que falta (é a lista do bloco de cima).
 - Prova: `tests/test_base_metas_e_equipamentos_25_11.py` (o item do menu, as abas, o setor Performance abrindo e o Salvar
   dele valendo na Sala, outro setor e o portão desligado de fora).
@@ -767,6 +767,54 @@ de entender para você, quando eu for fazer não vou entender nada".
   `tests/test_base_equipamentos_depara.py` (o Salvar que vira, o que segue com a aba e por quê, a tela velha que não
   desmarca, a conferência de todas sem regravar, o kWp longe do Registro). O passo seguinte é acertar as 43 e as chaves
   que faltam até a aba não ser mais lida.
+- **A fonte única de verdade: o Nexus vence a diferença de cadastro (27/11/2026; Levi, com a Ipixuna 2 salva na Base e
+  a Sala ainda na aba, o 2.13 sem strings nem kWp: "resolvo isso aí para não mostrar nenhuma aba antiga. As abas têm que
+  se conversar").** A regra da chave (`fora_da_regra`) deixa de exigir "só diferença da regra": vale o que está no
+  Nexus (o kWp digitado, a cabine sem CABN, o Full O&M, o String Box, o cliente, o nome do inversor, o inversor que só o
+  Nexus tem, a chave fora da aba, a UFV que muda de chave dentro da usina). Só segura a chave o que APAGARIA ou
+  DESLIGARIA dado nos leitores (`SEGURA_SEMPRE`): o inversor que só a aba tem (sumiria com a geração: a CPP100, a Rio
+  do Peixe), o nome no Fracttal (a usina sairia do índice do Fracttal: a Belo Jardim) e o nome de exibição (o
+  USINA_GRUPO junta as plantas por ele: a Taguaí); e o kWp que o Nexus não tem (vazio ou zero) onde a aba tem, no
+  inversor, na cabine ou na usina (a Pharma 2, 3 e 4). A usina inteira segura em `segura_a_usina`, no `valer_prontas` e
+  também no Salvar (`_marcar`), por três motivos: (1) o kWp do Registro mestre a mais de 5% da **soma** das UFV das chaves
+  na aba (era a da 1ª chave, e a Ipixuna 1 e 2 segurava por 1.823,3 × 3.270,0, uma diferença que não existe); (2) sem o
+  kWp no Registro, a soma dos inversores no Nexus a mais de 5% da da aba (a Rodrigues II, com o Registro "0,,643"); (3) a
+  aba com a usina também numa chave que o Nexus não conhece, com o mesmo nome de exibição, e que DOBRARIA (com
+  inversores, ou com a UFV ou as UG quando o Nexus também as escreve): os leitores trocam só as chaves marcadas e
+  ficariam com a usina duas vezes (a União 1 e 2: a aba inteira na "União", o Nexus com "UNI" e "União 1 e 2"; a
+  Rodrigues II: a UFV e as três UG na "Rodrigues 2"; a "Coração 2" da aba, só com a UFV, não dobra e não segura). A usina
+  já marcada fica de fora do (3). Medida a seco no banco real (`r148_simula_codigo_novo.py`, o `valer_prontas` de verdade
+  com a gravação trocada por uma cópia em memória): das 43 que seguiam com a aba, **19 viram** e 24 seguem, cada uma com
+  o motivo; nas 11 do kWp do Registro, a aba e o Nexus têm a MESMA soma de inversores e só o Registro difere (é o
+  Registro que se confere, não a trava que se afrouxa).
+- **A aba deixa de ser lida: a migração única e a visão TOTAL (27/11/2026; Levi: "NÃO PODE EXISTIR ABA ANTIGA, TUDO TEM
+  QUE SER NOVO E INTERLIGAR, VOCÊ ESTÁ LENDO ALGO ANTIGO E COMPARANDO COM ALGO NOVO?" e "Resolva").** Duas peças:
+  (1) **A migração única** (`estrutura_usina.migrar_da_aba`, na subida, antes da virada, pelo `_migrar_uma_vez` da
+  tela): entra no Nexus o que só a aba tinha, sem tirar nem mudar nada que ele já tenha. As chaves de `MIGRACAO_ABA`
+  das 16 usinas do Registro SEM estrutura (Lyon I, Nobres 1, Colíder 1 e 2, Coração 1 e 2, Segredo, Santo Inácio 1 e 2,
+  Pacaembu - Areia Branca, Nova Iguaçu, Monte Aprazível, Rondonópolis, Ponto Belo 1, Ibipeba, Aruanã, e a Gravatá II e
+  a Iramaia II, que tinham os inversores sem chave nenhuma: a chave nasce e eles passam a ela pelo nome), com o nome que
+  a API PV manda quando a aba tinha outro (Segredo 1.2 a 1.5 (643) → (889) a (892), Aruanã (56) → Aruanã, provados
+  pelos mesmos inversores); os inversores da chave do Nexus sem nenhum (CPP100, Rio do Peixe I e II); o kWp que o Nexus
+  não tinha (Pharma 2, 3 e 4); o Full O&M "Sim" da aba onde o Nexus dizia "Não" (CPP100, Guatambu, Rio do Peixe: o "Não"
+  veio do cadastro inicial e tirava a usina de trackers e do PR); e o nome de exibição que todos os inversores da chave
+  têm na aba (Taguaí 1 (173) e 2 (174) → "Taguaí", como a Sala junta as duas). Ficam de fora as cópias do que o Nexus
+  já tem ("União", "Rodrigues 2", "AP. do Taboado"). Roda UMA vez por pasta de dados (`migracao_aba_27_11.json`
+  guarda o que ela fez): rodando a cada subida, devolveria o que alguém apagou no Nexus. Medida a seco no banco real:
+  38 chaves em 16 usinas, 301 inversores, 21 kWp, Full O&M em 3, exibição em 2.
+  (2) **A visão TOTAL** (`ABA_VISAO_TOTAL` = `aba_equipamentos_total`, `visao_total`): o mesmo formato da visão, de
+  TODAS as usinas com estrutura no Nexus, marcadas ou não, sem comparação, refeita em toda gravação com `info`. É o que a
+  plataforma e o gêmeo leem no lugar da aba (`ESTRUTURA_FONTE=nexus`, o padrão; ver `plataforma/CLAUDE.md`). Nela, o
+  kWp da usina é o do Registro mestre, menos quando ele falta ou foge mais de 5% da soma dos inversores no Nexus (vale a
+  soma, `_info_da_total`: é o que a Sala usa hoje, e o corte não muda o PR de ninguém calado; corrigido o Registro, ele
+  volta a valer); e a usina que o Registro junta e a Sala separa (chaves com nomes de exibição diferentes: Ipixuna 1 e
+  2, Santarém 1 e 2, Boa Esperança 1 e 2, Aparecida do Taboado, Coração) sai com uma UFV POR PLANTA, com o kWp dos
+  inversores dela, como a aba tinha. O nome do Fracttal da visão é o 1º ligado que é uma Classificação 1 de verdade
+  (`telas_equipamentos._fracttal_da_usina`: o "(sem Classificação 1) BWK100" vinha antes do "Thopen - Brodowski 1 - SP"
+  e tirava a Brodowski do índice do Fracttal). A `aba_equipamentos` (só as marcadas) segue para quem ainda lê a aba (o
+  coletor, as Ligações). **Prova, valor a valor** (o cadastro da plataforma carregado pelos dois caminhos, com o banco
+  real e a migração em memória): nenhuma chave com inversor some (só as que trocam de nome); mudam só os valores que o
+  Nexus tem diferentes da aba (a Ipixuna 2 com 177 strings, o 2.13 com 13). Prova: `tests/test_migracao_aba_27_11.py`.
 - **Os leitores trocam as linhas das chaves da visão** (tiram da aba as de UFV, UG e inversor dessas chaves, pela chave
   efetiva "Usina Supervisório" ou, sem ela, "Usina", e põem as da visão; o resto segue da aba): a **plataforma**
   (`plataforma/estrutura_nexus.py`: o cadastro, o mapa do "Usina Fractall" e a disponibilidade; relê sozinha quando a
@@ -887,9 +935,11 @@ de entender para você, quando eu for fazer não vou entender nada".
     `contratual_por_string`); a cabine pela CABN (a cabine que só o Nexus tem e a do inversor que mudou de UG têm o
     código; a UG que só a aba tem vale quando todas as UG vivas já são CABN); a potência da UFV quando vem do Registro
     mestre e o "N de Inversores" da UFV, que o Nexus conta (com a aba real a "Itajá" tem 2.596,16 × 2.596,0 e "—" × 8:
-    só marca por isto); e o "Código Fracttal" (que a comparação nem olha). Qualquer outra (Full O&M, String Box, nome do
-    inversor, exibição, nome no Fracttal, cliente, inversor de um lado só, a chave fora da aba, a UFV em outra chave)
-    GRAVA a estrutura, NÃO marca e vai nos avisos (`nao_marcada`: "não vale no lugar da aba porque: ..."). A chave já
+    só marca por isto); e o "Código Fracttal" (que a comparação nem olha). **Desde 27/11/2026 (a fonte única, acima) a
+    regra é a inversa:** toda diferença de cadastro vale pelo Nexus, e só a de `SEGURA_SEMPRE` (o inversor que só a aba
+    tem, o nome no Fracttal, o nome de exibição) e o kWp que o Nexus não tem GRAVAM a estrutura, NÃO marcam e vão nos
+    avisos (`nao_marcada`: "não vale no lugar da aba porque: ..."). Até 27/11 o Full O&M, o String Box, o nome do
+    inversor, o cliente, o inversor só do Nexus, a chave fora da aba e a UFV em outra chave também seguravam. A chave já
     marcada não é mais conferida (fica marcada, menos no caso da usina segura abaixo). A aba que não se leu (a rota manda
     `None`) não marca nada.
     **A usina vale por INTEIRO ou nada (2ª revisão final e 3ª revisão, 21/10/2026; `_marcar`):** todas as chaves da usina
@@ -977,7 +1027,11 @@ de entender para você, quando eu for fazer não vou entender nada".
     cabine "UFV" fora da conta e da visão, o remendo, o Conferido, a Coração 2 semeada pela aba com os 4 inversores e o
     nome da aba, a aba não lida, o nome do inversor novo pelo pedido e pela aba, o casar pelo nome sem o nome no
     supervisório, o inversor de outra chave, as três chaves da Itajá marcadas, a diferença fora da regra que grava e não
-    marca — cliente, Full O&M da UFV e da chave, nome —, o inversor só do Nexus, a já marcada que fica, a CABN vazia que
+    marca — desde 27/11/2026 o nome no Fracttal, o inversor só da aba e a exibição; o cliente, o Full O&M e o nome do
+    inversor, que agora marcam, em `test_a_diferenca_de_cadastro_ja_nao_segura_vale_o_nexus` —, o inversor só do Nexus
+    (que agora vale), a trava da usina pela soma das chaves e pelos inversores
+    (`test_a_trava_do_kwp_da_usina_soma_as_chaves_e_confere_os_inversores_sem_o_registro`), a Rodrigues II segura pela
+    "Rodrigues 2" que dobraria, a já marcada que fica, a CABN vazia que
     fica, o `fora_da_regra` pelo tipo, as recusas com a culpada, o código num inversor só, a comparação que ignora a
     coluna, o `sobrepor` que herda a grafia na Assis Skid 1 com os mapas da plataforma pela chave da API, a linhagem da
     tela, colunas no fim, só admin e mesma origem) e 17 mutações da 2ª rodada (cada regra nova quebrada de propósito
