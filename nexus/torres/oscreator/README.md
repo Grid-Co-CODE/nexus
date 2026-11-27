@@ -3259,7 +3259,15 @@ chamado, se tiver só um ativo"; no quiz, o fim na finalização, também os abe
 - **O Finalizar** (`api_finalizar`, `_encerrar_atividade`) encerra a atividade antes de concluir a OS (a pausada é retomada
   antes). O chamado sem atividade nenhuma, mas com comentário (os abertos de antes da regra), ganha o registro inteiro:
   início no 1º comentário, fim na finalização; se o Fracttal gravar outro início, o registro encerrado é corrigido
-  (`editar_execucao`). Sem comentário, conclui sem registro, como sempre.
+  (`editar_execucao`). Sem comentário, conclui sem registro, como sempre. A tarefa que pede as validações de segurança
+  do Fracttal para ligar o cronômetro (`MUST_COMPLETE_SECURITY_VALIDATIONS`, as OS de chamado de setembro; a OS 13987
+  travava assim em 27/11/2026) também conclui sem registro, e a tela diz por quê; recusa de outro motivo segue parando.
+- **O chamado em verificação** (27/11/2026, a OS 17320: "precisa ser encerrado, porém não tem o botão para concluir, e
+  continua aparecendo no relatório que enviamos ao cliente"): o Finalizar aparece também na OS Em Verificação (o Raio X,
+  `em_verificacao` do `acomp_raiox`, e a tela do chamado) e só aprova, sem mexer na atividade. O Concluir que cai em
+  verificação (a conta configurada assim no Fracttal) vai mais uma vez, que é a aprovação: o chamado é administrativo e a
+  verificação não tem o que conferir. A conta que não aprova vê a OS seguir em verificação, dito na tela, sem o "chamado
+  finalizado" (`tests/test_oscreator_garantias_finalizar_27_11.py`).
 - **O comentário apagado** (Levi, no mesmo dia: "pense também na possibilidade de quando o comentário for apagado"):
   mexer na atividade rodando é o perigo da tarefa órfã que o App de Campo conhece, então: apagou o 1º e ficaram outros, a
   atividade segue e, na finalização, o início passa para o 1º comentário em vigor (`_inicio_pelo_comentario`, no registro

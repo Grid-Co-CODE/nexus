@@ -84,7 +84,10 @@ def blocos(folio, o: dict, ticket: str | None = None, obs=None, erro_obs: str = 
     except Exception:                                   # noqa: BLE001 — sem o banco, o histórico sai como veio na nota
         ajustes = {}
     aberto = c["col"] in ("chegou", "ticket")
-    return {"c": c, "n": n, "aberto": aberto, "tl": aw.linha_do_tempo(c, obs, n["historico"], ajustes),
+    # em verificação no Fracttal (27/11/2026, OS 17320): o chamado sai das filas de trabalho, mas só encerra com a
+    # aprovação; o Finalizar fica para quem aprova
+    em_verificacao = not aberto and str(c.get("status_id") or "") == "2"
+    return {"c": c, "n": n, "aberto": aberto, "em_verificacao": em_verificacao, "tl": aw.linha_do_tempo(c, obs, n["historico"], ajustes),
             "outros": aw.outros(c, todos) if todos else {"ativo": [], "campo": []}, "canal": cs.CANAL.get(c["marca"], ""),
             "menos7": aw.menos_7d(n["data_falha"], hoje), "copiar": aw.copiar_tudo(n["campos"]),
             "erro_obs": erro_obs, "pode_gravar": ga.pode_gravar(), "opcoes_status": aw.STATUS_CHAMADO,

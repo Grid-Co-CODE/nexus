@@ -505,7 +505,8 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
     prioridade" da Engenharia; à esquerda também o **Ticket no fornecedor** e o **Como abrir**;
   - à direita, antes da Tarefa: **Para abrir o ticket** (os campos da nota, com Copiar e Copiar tudo), as **Observações**
     do chamado (no lugar dos Comentários da Engenharia: uma linha do tempo só) e os **Outros chamados**; o **Finalizar
-    chamado** fica no alto, ao lado do Solicitar OS. A cadeia é a do Raio X;
+    chamado** fica no alto, ao lado do Solicitar OS, também na OS em verificação (aprova e conclui; 27/11/2026, a OS
+    17320 sem botão e ainda no relatório do cliente). A cadeia é a do Raio X;
   - quem monta é `_chamado_no_raiox` com `os_web/acomp_raiox.py` do OS Creator (a OS que o Raio X já leu no REST, o
     ticket pela subtarefa no REST, as observações e o status no banco da Gridco, os outros chamados da cópia do quadro de
     Garantias). As escritas (`static/engenharia-chamado.js`) vão às mesmas rotas da tela do chamado

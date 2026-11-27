@@ -1390,11 +1390,20 @@ def _encerrar_atividade(folio, tid) -> dict:
         return {}                                       # sem comentário, como sempre: conclui sem registro
     agora = _dt.datetime.now(_dt.timezone.utc)
     ini = min(ini, agora)
-    for passo in (lambda: api.iniciar_execucao(tid, ini), lambda: api.finalizar_execucao(tid)):
+    for n, passo in enumerate((lambda: api.iniciar_execucao(tid, ini), lambda: api.finalizar_execucao(tid))):
         r = passo()
         if not (isinstance(r, dict) and r.get("ok")):
+            erro = str((r or {}).get("erro") or "sem resposta")
+            # 27/11/2026 (a analista de chamados, OS 13987: "Mais um que não permite finalizar o chamado"): a tarefa das
+            # OS de chamado antigas (de setembro) pede as validações de segurança do Fracttal para ligar o cronômetro, e
+            # o Finalizar parava aí, sem concluir nunca. Recusado no 1º passo, nada foi iniciado: conclui sem o registro
+            # da atividade, como o chamado sem comentário, e diz isso. Recusa no 2º passo segue erro (o cronômetro ficou
+            # ligado e só quem o ligou o encerra).
+            if n == 0 and "SECURITY_VALIDATIONS" in erro.upper().replace(" ", "_"):
+                return {"aviso": "O Fracttal pede as validações de segurança para registrar a atividade desta OS (tarefa "
+                                 "antiga): o chamado foi concluído sem o registro da atividade."}
             return {"erro": "O Fracttal não registrou a atividade do chamado: %s"
-                            % str((r or {}).get("erro") or "sem resposta").replace("_", " ")[:160]}
+                            % erro.replace("_", " ")[:160]}
     regs = [e for e in (api.historico_execucao(tid) or []) if isinstance(e, dict) and e.get("id")]
     if regs:
         e = max(regs, key=lambda x: str(x.get("initial_date") or ""))
@@ -1402,6 +1411,13 @@ def _encerrar_atividade(folio, tid) -> dict:
         if lido is None or abs((lido - ini).total_seconds()) > 60:   # o Fracttal pôs agora no lugar do pedido
             api.editar_execucao(e["id"], ini, agora)
     return {"mensagem": "A atividade foi registrada de %s (o 1º comentário) até agora." % _hora(ini)}
+
+
+def _status_int(v):
+    try:
+        return int(v) or None
+    except (TypeError, ValueError):
+        return None
 
 
 def _status_depois_de_concluir(wid):
@@ -1418,8 +1434,12 @@ def api_finalizar(folio):
     wid, det = _os_conferida(folio, _corpo().get("wid"))
     if not wid:
         return _erro("Não achei a OS %s no Fracttal." % folio, 404)
+    antes = _status_int(det.get("status_id"))
+    if antes in (3, 4):
+        return _erro("A OS %s já está %s no Fracttal." % (folio, api.WO_STATUS.get(antes, "fechada").lower()))
     tid = _tarefa_unica(det)                                     # a atividade do chamado (15/11/2026): só um ativo
-    ativ = _encerrar_atividade(folio, tid) if tid is not None else {}
+    # em verificação, a atividade já foi feita e encerrada: o Finalizar só aprova (o Concluir do card)
+    ativ = _encerrar_atividade(folio, tid) if tid is not None and antes != 2 else {}
     if ativ.get("erro"):
         return _erro(ativ["erro"])
     res = api.concluir_os_checado(wid)                           # o Concluir do card (os_detalhe.py:896)
@@ -1431,6 +1451,23 @@ def api_finalizar(folio):
     # que falhou ou passou do prazo), 1 pedido, aqui, e não a lista inteira na volta ao quadro. Sem status nenhum, o quadro não
     # chuta e sai da memória, como até 20/10/2026
     st = reg.status_id if reg is not None else _status_depois_de_concluir(wid)
+    # 27/11/2026 (a analista de chamados, OS 17320: "está com o status em verificação 17/11, e precisa ser encerrado, porém
+    # não tem o botão para concluir, e continua aparecendo no relatório que enviamos ao cliente"): a OS de chamado é
+    # administrativa e ninguém a executa em campo; a verificação do Fracttal não tem o que conferir. O Concluir que caiu em
+    # verificação vai mais uma vez (o Concluir de uma OS em verificação é a aprovação); a conta que não aprova deixa a OS
+    # em verificação, e a tela diz isso em vez de anunciar o chamado encerrado.
+    if st == 2 and antes != 2:
+        try:
+            api.concluir_os(wid)
+        except api.SessionExpired:
+            raise
+        except api.FracttalError:                       # a conta que não aprova: a OS fica em verificação (abaixo)
+            log.info("Garantias: a OS %s ficou em verificação; a conta não aprovou", folio)
+        reg = lista_central.mudou(wid)
+        st = reg.status_id if reg is not None else _status_depois_de_concluir(wid)
+    if st == 2 and antes == 2:
+        return _erro("O Fracttal manteve a OS %s em verificação: a sua conta não aprova a verificação no Fracttal. Peça a "
+                     "quem aprova (o administrador do Fracttal) para finalizar o chamado." % folio)
     if st in (2, 3):
         _ajustar(wid, {"status_id": st, "status": api.WO_STATUS.get(st, "")})
     else:
@@ -1441,7 +1478,13 @@ def api_finalizar(folio):
     chk = (res or {}).get("data_fim") if isinstance(res, dict) else None
     sem_fim = bool((chk or {}).get("sem_fim")) if isinstance(chk, dict) else False
     nota = _anotar(folio, "Chamado finalizado", "finalizado", det)
-    return jsonify({"ok": True, "mensagem": "Chamado finalizado: a OS %s foi concluída no Fracttal.%s" % (
-                        folio, (" " + ativ["mensagem"]) if ativ.get("mensagem") else ""),
-                    "aviso": ("Sem registro de execução, o Fracttal deixa a data de fim vazia; o quadro usa a data "
-                              "desta finalização." if sem_fim and not ativ.get("mensagem") else ""), "aviso_obs": nota})
+    if st == 2:
+        concluida = "a OS %s foi para a verificação no Fracttal, e a sua conta não a aprova: peça a quem aprova (o " \
+                    "administrador do Fracttal) para concluí-la" % folio
+    else:
+        concluida = "a OS %s foi concluída no Fracttal" % folio
+    avisos = [ativ.get("aviso") or "", "Sem registro de execução, o Fracttal deixa a data de fim vazia; o quadro usa a data "
+              "desta finalização." if sem_fim and not ativ.get("mensagem") and not ativ.get("aviso") else ""]
+    return jsonify({"ok": True, "mensagem": "Chamado finalizado: %s.%s" % (
+                        concluida, (" " + ativ["mensagem"]) if ativ.get("mensagem") else ""),
+                    "aviso": " ".join(a for a in avisos if a), "aviso_obs": nota})

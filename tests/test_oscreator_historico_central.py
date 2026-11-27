@@ -923,9 +923,16 @@ def test_finalizar_e_executar_sem_pedido_a_toa(fr, ao_vivo, monkeypatch):
     monkeypatch.setattr(api, "get_os_detalhes", lambda wid: {"folio": POR_ID[wid]["folio"], "subtarefas": [], "notas": ""})
     monkeypatch.setattr(api, "concluir_os_checado", lambda wid: {"ok": True, "data_fim": {}})
     monkeypatch.setattr(obs_store, "adicionar", lambda *a, **k: {})
-    os_[51]["status"] = 2
+    os_[51]["status"] = 3
     j = a.post("/os/api/acomp/10051/finalizar", json={"wid": 51}).get_json()
-    assert j["ok"] and cabecalhos == [51] and OC.atual().por_id[51].status_id == 2
+    assert j["ok"] and cabecalhos == [51] and OC.atual().por_id[51].status_id == 3
+    # o Concluir que cai em verificação aprova na hora (27/11/2026, a OS 17320): 1 aprovação e 1 releitura a mais, só aí
+    os_[51]["status"] = 2
+    aprovou = []
+    monkeypatch.setattr(api, "concluir_os", lambda wid: aprovou.append(wid) or os_[51].update(status=3) or {"ok": True})
+    cabecalhos.clear()
+    j = a.post("/os/api/acomp/10051/finalizar", json={"wid": 51}).get_json()
+    assert j["ok"] and aprovou == [51] and cabecalhos == [51, 51] and OC.atual().por_id[51].status_id == 3
     monkeypatch.setattr(api, "subtarefas_da_tarefa", lambda tid: [])
     monkeypatch.setattr(api, "registrar_execucao", lambda *a, **k: {"ok": True, "confirmado": False})
     lidas.clear()

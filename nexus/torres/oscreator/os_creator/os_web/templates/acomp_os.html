@@ -43,7 +43,8 @@
     </div>
     <div class="ac-acoes">
       {% if not blocos %}{{ link_os(c.folio, wid, 'btn btn-o', 'Abrir a OS') }}{% endif %}
-      {% if c.col in ('chegou', 'ticket') %}<button type="button" class="btn btn-i" id="b_finalizar">Finalizar chamado</button>{% endif %}
+      {#- em verificação no Fracttal (27/11/2026): o Finalizar aprova e conclui #}
+      {% if c.col in ('chegou', 'ticket') or c.status_id|string == '2' %}<button type="button" class="btn btn-i" id="b_finalizar">Finalizar chamado</button>{% endif %}
     </div>
   </div>
   <div class="conf oculto" id="conf_fim">
