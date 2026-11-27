@@ -358,6 +358,10 @@ def visao(base: dict, st: dict, hoje: date, pessoas: list[dict], meu_hmac: str |
         k["regras"].append(rr)
     nomes = [c["cliente"] for c in clientes]
     fichas = {c: f for c, f in fichas.items() if c in nomes}
+    # o cliente retirado leva junto o que é dele (as obrigações, os adicionais, os comentários...)
+    vivos = {t: (itens if t in ("cliente", "parametros") else {i: x for i, x in itens.items()
+                                                                if not x.get("_cliente") or x.get("_cliente") in nomes})
+             for t, itens in vivos.items()}
     obrig = [{**{a: b for a, b in o.items() if a != "_cliente"}, "cliente": o["_cliente"], "_id": i} for i, o in vivos["obrigacao"].items()]
     adic = [{**{a: b for a, b in a.items() if a != "_cliente"}, "cliente": a["_cliente"], "_id": i} for i, a in vivos["adicional"].items()]
     par = vivos["parametros"].get("p0") or {}
@@ -601,7 +605,11 @@ def gravar(base: dict, item_tipo: str, item_ids, evento: str, cliente: str, valo
                     raise Recusada("Só o gestor deste contrato ou um administrador edita")
                 if planos and cli != planos[0][1]:
                     raise Recusada("Uma mudança é de um cliente só")
-            if evento == "retirada" and item_tipo in ("cliente", "parametros", "contrato"):
+            # o cliente sai dos contratos só pelo administrador, com o motivo e a prova (Levi, 27/11/2026: "TIRA SAL
+            # ENERGIA DOS CONTRATOS!"); ele, os contratos, as regras e as obrigações saem da tela e ficam no histórico
+            if evento == "retirada" and item_tipo == "cliente" and not admin:
+                raise Recusada("Só o administrador tira um cliente dos contratos")
+            if evento == "retirada" and item_tipo in ("parametros", "contrato"):
                 raise Recusada("Isso não se retira: altere o campo")
             spec = {x[0]: x for x in CAMPOS[item_tipo]}
             kids = tuple(k for k, x in st["contrato"].items() if x.get("_cliente") == cli and not x.get("_retirado"))

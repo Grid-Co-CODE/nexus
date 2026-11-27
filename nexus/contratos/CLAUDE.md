@@ -37,6 +37,11 @@ OBRIGATÓRIO (arquivo ou o texto colado), o administrador liga o gestor a uma pe
   e `contratos/fichas_contratos.json` na pasta de dados) é a **carga inicial**, e não muda mais; daí em diante tudo muda
   na própria tela. Cada coisa editável é um ITEM com id fixo tirado da carga: `cliente` (os dados do contrato da
   planilha), `contrato` (cada PDF lido), `regra`, `obrigacao`, `adicional` e `parametros` (as metas da Cadastros).
+- **Tirar um cliente dos contratos** (27/11/2026, Levi: "TIRA SAL ENERGIA DOS CONTRATOS!"): só o administrador, em
+  Editar dados › "Tirar o cliente dos contratos", com o motivo e a prova (`edicao.gravar`, `retirada` do item `cliente`;
+  o contrato e os parâmetros seguem sem retirada). O cliente e tudo dele (os contratos, as regras, as obrigações, os
+  adicionais, os comentários) saem da tela, da Visão gerencial, dos Indicadores e do Quem cuida de quê (`edicao.visao`
+  filtra pelo cliente vivo); a retirada fica no histórico. Voltar o cliente ainda não tem botão.
 - **O registro.** Livro `nexus_contratos_edicoes` · `fato_edicao_contrato` (no catálogo antes da 1ª gravação; só
   acrescenta). 1 linha = 1 mudança de 1 item (incluir, alterar, retirar). O estado de agora = a carga + as mudanças na
   ordem. Retirar esconde o item; a história fica. O conteúdo (o que era, o que ficou, o motivo, a prova, quem) vai só

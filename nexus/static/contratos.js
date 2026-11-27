@@ -1083,7 +1083,7 @@
         ids.map(function (i) { var k = null; Object.keys(R.fichas).forEach(function (x) { R.fichas[x].contratos.forEach(function (kk) { (kk.regras || []).forEach(function (r) { if (r._id === i) k = kk; }); }); });
           return '<option value="' + esc(i) + '">Só ' + esc(k ? rotuloK(k) : i) + "</option>"; }).join("") + "</select></div>";
     }
-    var retiravel = !novoItem && ["regra", "obrigacao", "adicional", "ponto", "resolucao"].indexOf(tipo) >= 0;
+    var retiravel = !novoItem && (["regra", "obrigacao", "adicional", "ponto", "resolucao"].indexOf(tipo) >= 0 || (tipo === "cliente" && R.admin));
     var titulo = tipo === "resolucao" ? (novoItem ? "Resolver o ponto" : "Ponto resolvido") : (novoItem ? "Incluir: " : "Editar: ") + (ROTULO[tipo] || tipo);
     dlg.innerHTML = '<form method="dialog" novalidate><h2 id="ctr-dlg-t">' + esc(titulo) + "</h2>" +
       (tipo === "resolucao" && item.ponto_texto ? '<p class="ctr-nota" style="margin:0 0 8px">' + esc(item.ponto_texto) + "</p>" : "") +
@@ -1095,7 +1095,7 @@
       '<input id="ctr-f-provas" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.eml,.msg,.doc,.docx,.xlsx"></div>' +
       '<div class="ctr-campo largo"><label for="ctr-f-prova-texto">ou cole aqui o texto do e-mail ou da mensagem</label><textarea id="ctr-f-prova-texto" rows="3"></textarea></div></div>' +
       '<p class="ctr-dlg-erro" role="alert" hidden></p><div class="ctr-dlg-botoes"><button type="submit" class="gc-btn gc-btn--ui gc-btn--primario" data-evento="' + (novoItem ? "inclusao" : "alteracao") + '">Salvar</button>' +
-      '<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-fechar>Cancelar</button>' + (retiravel ? '<button type="submit" class="gc-btn gc-btn--ui gc-btn--contorno ctr-retirar" data-evento="retirada">' + (tipo === "resolucao" ? "Reabrir o ponto" : "Retirar") + "</button>" : "") + "</div></form>";
+      '<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-fechar>Cancelar</button>' + (retiravel ? '<button type="submit" class="gc-btn gc-btn--ui gc-btn--contorno ctr-retirar" data-evento="retirada">' + (tipo === "resolucao" ? "Reabrir o ponto" : tipo === "cliente" ? "Tirar o cliente dos contratos" : "Retirar") + "</button>" : "") + "</div></form>";
     var form = dlg.querySelector("form");
     dlg.querySelector("[data-fechar]").onclick = function () { dlg.close(); };
     form.onsubmit = function (ev) {
@@ -1110,7 +1110,9 @@
       fd.append("motivo", form.querySelector("#ctr-f-motivo").value);
       fd.append("prova_texto", form.querySelector("#ctr-f-prova-texto").value);
       [].forEach.call(form.querySelector("#ctr-f-provas").files, function (f) { fd.append("provas", f, f.name); });
-      if (evento === "retirada" && !window.confirm(tipo === "resolucao" ? "Reabrir este ponto? A resolução sai e fica no histórico." : "Retirar este item? Ele sai da tela e fica no histórico.")) return;
+      if (evento === "retirada" && !window.confirm(tipo === "resolucao" ? "Reabrir este ponto? A resolução sai e fica no histórico." :
+        tipo === "cliente" ? "Tirar " + (cli || "este cliente") + " dos contratos? Ele, os contratos, as regras e as obrigações saem da tela e ficam no histórico." :
+        "Retirar este item? Ele sai da tela e fica no histórico.")) return;
       [].forEach.call(form.querySelectorAll("button"), function (x) { x.disabled = true; });
       erro.hidden = true;
       pedir(CAMINHO + "editar", {method: "POST", body: fd, headers: {"Accept": "application/json", "X-Nexus-Parte": "1"}}).then(function (r) {
