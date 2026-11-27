@@ -1406,6 +1406,93 @@ def _secao_canto_central(app=None) -> dict:
     return pecas
 
 
+# ── o disco do Nexus (27/11/2026) ──────────────────────────────────────────────────────────────────────────────────────
+# O caso: a geração da W49 esbarrou em "OSError: [Errno 122] Disk quota exceeded" (a cota do usuário do serviço no disco),
+# e a limpeza dos caches das rodadas antigas não bastou. O Levi não tem acesso ao servidor: o Raio-X diz o espaço e os
+# arquivos livres e as pastas do usuário do serviço que mais ocupam (em tamanho e em quantidade de arquivos: a cota pode
+# ser de arquivos). A medida anda numa thread, com teto de tempo e de arquivos, e fica guardada por 10 min.
+_DISCO = {"medida": None, "quando": 0.0, "medindo": False}
+_DISCO_TRAVA = threading.Lock()
+DISCO_VALE_S = 600
+DISCO_MAX_S = 90
+DISCO_MAX_ARQ = 3_000_000
+
+
+def _medir_disco() -> dict:
+    t0 = time.monotonic()
+    raiz = Path(__file__).resolve().parents[2]
+    out = {"livre_gb": None, "total_gb": None, "arquivos_livres": None, "arquivos_total": None, "pastas": [],
+           "contados": 0, "cortado": False, "raizes": []}
+    try:
+        v = os.statvfs(str(raiz))
+        out.update(livre_gb=round(v.f_bavail * v.f_frsize / 2**30, 1), total_gb=round(v.f_blocks * v.f_frsize / 2**30, 1),
+                   arquivos_livres=v.f_favail, arquivos_total=v.f_files)
+    except (AttributeError, OSError):
+        pass
+    uid = os.getuid() if hasattr(os, "getuid") else None
+    raizes = []
+    for r in (raiz, Path.home(), Path("/tmp")):
+        r = r.resolve()
+        if r.is_dir() and not any(r == x or x in r.parents for x in raizes):
+            raizes.append(r)
+    out["raizes"] = [str(r) for r in raizes]
+    soma: dict = {}
+
+    def chave(p: Path, base: Path) -> str:
+        rel = p.relative_to(base).parts
+        return str(base.joinpath(*rel[:2])) if rel else str(base)
+    for base in raizes:
+        pilha = [base]
+        while pilha:
+            if time.monotonic() - t0 > DISCO_MAX_S or out["contados"] > DISCO_MAX_ARQ:
+                out["cortado"] = True
+                break
+            d = pilha.pop()
+            try:
+                with os.scandir(d) as it:
+                    for e in it:
+                        try:
+                            st = e.stat(follow_symlinks=False)
+                        except OSError:
+                            continue
+                        if e.is_dir(follow_symlinks=False):
+                            pilha.append(Path(e.path))
+                            continue
+                        if uid is not None and st.st_uid != uid:
+                            continue
+                        k = chave(Path(e.path).parent, base)
+                        s_, n_ = soma.get(k, (0, 0))
+                        soma[k] = (s_ + st.st_size, n_ + 1)
+                        out["contados"] += 1
+            except OSError:
+                continue
+    linhas = [{"pasta": k, "mb": round(v[0] / 2**20, 1), "arquivos": v[1]} for k, v in soma.items()]
+    out["por_tamanho"] = sorted(linhas, key=lambda x: -x["mb"])[:15]
+    out["por_arquivos"] = sorted(linhas, key=lambda x: -x["arquivos"])[:10]
+    out["total_mb"] = round(sum(x["mb"] for x in linhas), 1)
+    out["levou_s"] = round(time.monotonic() - t0, 1)
+    return out
+
+
+def _disco() -> dict | None:
+    """A última medida do disco (ou None na 1ª vez); mede de novo por trás quando passou de 10 min."""
+    with _DISCO_TRAVA:
+        velha = time.monotonic() - _DISCO["quando"] > DISCO_VALE_S
+        if velha and not _DISCO["medindo"]:
+            _DISCO["medindo"] = True
+
+            def medir():
+                try:
+                    m = _medir_disco()
+                except Exception as ex:      # noqa: BLE001 — a medida nunca derruba o Raio-X
+                    m = {"erro": f"{type(ex).__name__}: {str(ex)[:200]}"}
+                with _DISCO_TRAVA:
+                    _DISCO.update(medida=dict(m, hora=time.strftime("%d/%m %H:%M")), quando=time.monotonic(),
+                                  medindo=False)
+            threading.Thread(target=medir, name="nexus-raio-x-disco", daemon=True).start()
+        return _DISCO["medida"]
+
+
 ABAS = (("agora", "Agora"), ("memoria", "Memória"), ("pedidos", "Pedidos e tarefas"), ("uso", "Uso do OS Creator"),
         ("canto", "Canto central"))
 
@@ -1461,6 +1548,9 @@ def registrar_raio_x(bp) -> None:
                                threads_quando=lista.get("anterior_quando") if threads_atrasado else None,
                                travamentos=travamentos, abas=ABAS, aba=aba, subida=_fila_de_subida(),
                                como_atualiza=_diagnostico_do_deploy(),
+                               # nos testes a medida não dispara (a thread dela, andando pelo disco, entrava na conta do
+                               # processador por thread dos outros testes)
+                               disco=_DISCO["medida"] if app.config.get("TESTING") else _disco(),
                                parecer=parecer(pedidos, threads, teto, cpu.get("maquina"), travamentos,
                                                (("Nexus", nexus), ("worker", worker), ("web", web))),
                                quando=time.strftime("%d/%m/%Y %H:%M:%S"))

@@ -167,6 +167,26 @@
 {% if worker %}{{ dentro(worker, "Dentro do worker da plataforma", "worker", "Estimado por amostra pelo próprio worker a cada 10 min (o faxineiro dele, no PerformancePainel).", prazo_memoria) }}{% endif %}
 {% if web %}{{ dentro(web, "Dentro do web da plataforma", "web", "Estimado por amostra pelo próprio web a cada 10 min (no PerformancePainel); o web não descarta cache nenhum, só devolve a memória livre.", prazo_memoria) }}{% endif %}
 {% if not quem and not nexus and not worker and not web and not (m and m.usada_gb is defined) %}<p class="cad-vazio">Sem leitura de memória aqui: ela vem do /proc do Linux e dos relatórios do servidor.</p>{% endif %}
+
+{# o disco do Nexus (27/11/2026): a cota de disco estourada (Errno 122) travou a geração da W49 #}
+<section class="cad-secao" id="disco">
+  <h2>Disco do Nexus</h2>
+  {% if not disco %}<p class="gc-ajuda">Medindo o disco: leia de novo em um minuto.</p>
+  {% elif disco.erro %}<p class="gc-ajuda">A medida do disco falhou: {{ disco.erro }}</p>
+  {% else %}
+  <p class="gc-ajuda">Medido em {{ disco.hora }} ({{ disco.levou_s }} s{% if disco.cortado %}, cortado no teto: a soma é parcial{% endif %}).
+    Livres no disco: {{ disco.livre_gb }} de {{ disco.total_gb }} GB e {{ disco.arquivos_livres }} de {{ disco.arquivos_total }} arquivos.
+    Do usuário do serviço, em {{ disco.raizes|join(', ') }}: {{ disco.total_mb }} MB em {{ disco.contados }} arquivos.</p>
+  <div class="cad-rolagem"><table class="cad-tabela">
+    <thead><tr><th>Pasta (as que mais ocupam)</th><th class="num">MB</th><th class="num">Arquivos</th></tr></thead>
+    <tbody>{% for x in disco.por_tamanho %}<tr><td>{{ x.pasta }}</td><td class="num gc-num">{{ x.mb }}</td><td class="num gc-num">{{ x.arquivos }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <div class="cad-rolagem"><table class="cad-tabela">
+    <thead><tr><th>Pasta (as com mais arquivos)</th><th class="num">Arquivos</th><th class="num">MB</th></tr></thead>
+    <tbody>{% for x in disco.por_arquivos %}<tr><td>{{ x.pasta }}</td><td class="num gc-num">{{ x.arquivos }}</td><td class="num gc-num">{{ x.mb }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% endif %}
+</section>
 </div>
 
 {# ── Pedidos e tarefas ─────────────────────────────────────────────────────────────────────────────────────────── #}
