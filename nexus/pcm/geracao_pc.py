@@ -162,6 +162,7 @@ def abrir_rodada(config, semana: str, comp: dict) -> dict:
     if not conf["pronto"]:              # o mesmo portão do servidor (a credencial também: o PC a recebe do Nexus)
         raise G.NaoPronto("falta: " + ", ".join(i["nome"] for i in conf["itens"] if not i["ok"]))
     trabalho = G.pasta_trabalho(config)
+    limpeza = G.limpar_rodadas(config)     # os caches das rodadas antigas (a cota de disco do servidor, 27/11/2026)
     rid = datetime.now(G._BRT).strftime("%Y%m%d-%H%M%S") + "-" + semana
     pasta = trabalho / "geracoes" / rid
     (pasta / "saida").mkdir(parents=True, exist_ok=False)
@@ -174,7 +175,7 @@ def abrir_rodada(config, semana: str, comp: dict) -> dict:
         raise
     fama = G._fama(config, ler_o_fracttal=True)
     st = {"id": rid, "semana": semana, "estado": NO_PC, "inicio": _agora(), "credencial": "no PC",
-          "insumos": insumos, "motor": "no PC",
+          "insumos": insumos, "motor": "no PC", "limpeza": limpeza,
           "pc": {"computador": comp["id"], "nome": comp.get("nome") or "", "etapa": "preparando", "atualizado": _agora()}}
     if fama is not None and "fora" in fama:
         st["fama"] = {"fora": fama["fora"]}

@@ -281,3 +281,34 @@ def test_a_preparacao_que_quebra_diz_o_motivo(cliente, pc, monkeypatch):
     monkeypatch.setattr(P, "abrir_rodada", quebra)
     r = cliente.post("/t/pcm/pc/rodada", json={"semana": "2026-W49"}, headers=pc)
     assert r.status_code == 500 and "KeyError" in r.get_json()["erro"] and "usina_id" in r.get_json()["erro"]
+
+
+# ── a limpeza das rodadas antigas (a cota de disco do servidor, 27/11/2026) ─────────────────────────────────────────────
+def test_a_limpeza_tira_so_os_caches_das_rodadas_antigas(config):
+    base = G.pasta_trabalho(config) / "geracoes"
+    nomes = ["20261101-080000-2026-W45", "20261108-080000-2026-W46", "20261115-080000-2026-W47", "20261122-080000-2026-W48"]
+    for n in nomes:
+        p = base / n
+        (p / "saida").mkdir(parents=True)
+        (p / "status.json").write_text(json.dumps({"id": n, "estado": "ok"}), encoding="utf-8")
+        (p / "saida" / "sombra.xlsx").write_bytes(b"PK" + b"x" * (3 * 2**20))      # a planilha grande fica
+        (p / ".cache_semanal_api.pkl").write_bytes(b"x" * 1000)
+        (p / "BD_gerado.xlsx").write_bytes(b"x" * (3 * 2**20))
+        (p / "Observacoes_Semana.txt").write_text("pequeno", encoding="utf-8")
+    r = G.limpar_rodadas(config)
+    assert r["rodadas"] == 2 and r["arquivos"] == 4 and r["mb"] > 5
+    for n in nomes[:2]:                                     # as antigas: só os caches saíram
+        p = base / n
+        assert not (p / ".cache_semanal_api.pkl").exists() and not (p / "BD_gerado.xlsx").exists()
+        assert (p / "saida" / "sombra.xlsx").exists() and (p / "status.json").exists() and (p / "Observacoes_Semana.txt").exists()
+    for n in nomes[2:]:                                     # as duas mais novas ficam inteiras
+        assert (base / n / ".cache_semanal_api.pkl").exists()
+    assert G.limpar_rodadas(config)["arquivos"] == 0
+
+
+def test_cota_de_disco_cheia_avisa_no_aplicativo(cliente, pc, monkeypatch):
+    def cheio(*a, **k):
+        raise OSError(122, "Disk quota exceeded")
+    monkeypatch.setattr(P, "abrir_rodada", cheio)
+    r = cliente.post("/t/pcm/pc/rodada", json={"semana": "2026-W49"}, headers=pc).get_json()
+    assert "disco do servidor está cheio" in r["erro"]

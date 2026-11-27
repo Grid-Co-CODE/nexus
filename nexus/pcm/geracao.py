@@ -346,6 +346,45 @@ def _fama(config, ler_o_fracttal: bool) -> dict | None:
         return {"fora": str(ex)[:300]}
 
 
+# ── a limpeza das rodadas antigas (27/11/2026) ─────────────────────────────────────────────────────────────────────────
+# O caso: a rodada da W49 pelo PC esbarrou em "OSError: [Errno 122] Disk quota exceeded" no servidor. Cada rodada do servidor
+# guarda na pasta dela os caches que o motor grava ao ler o Fracttal (as 48 mil OS, em .pkl e .xlsx de dezenas de MB) e
+# nada os apagava: rodada atrás de rodada, desde outubro. Das rodadas antigas sai só o que é cache (o .pkl e o arquivo grande);
+# ficam a planilha (`saida/sombra.xlsx`, a do Publicar no App e do "Baixar a planilha"), o status, o log e a oficial.
+GUARDAR_INTEIRAS = 2                # as N rodadas mais novas ficam inteiras (a de agora e a anterior, para comparar)
+GRANDE_MB = 2.0
+NUNCA_APAGAR = {"status.json", "log_motor.txt", "oficial.xlsx", "sombra.xlsx", "fama.json"}
+
+
+def limpar_rodadas(config) -> dict:
+    """Apaga os caches das rodadas antigas (fora as `GUARDAR_INTEIRAS` mais novas e as que ainda rodam). → o que saiu."""
+    base = pasta_trabalho(config) / "geracoes"
+    out = {"rodadas": 0, "arquivos": 0, "mb": 0.0}
+    if not base.is_dir():
+        return out
+    rodadas = sorted((p for p in base.iterdir() if p.is_dir() and RODADA_RE.match(p.name)), reverse=True)
+    for p in rodadas[GUARDAR_INTEIRAS:]:
+        st = ler_status(config, p.name) or {}
+        if st.get("estado") in ("rodando", "no_pc") and ativa(config, p.name):
+            continue
+        mexeu = False
+        for f in p.rglob("*"):
+            try:
+                if not f.is_file() or f.name in NUNCA_APAGAR:
+                    continue
+                tam = f.stat().st_size
+                if f.suffix == ".pkl" or tam > GRANDE_MB * 2**20:
+                    f.unlink()
+                    out["arquivos"] += 1
+                    out["mb"] += tam / 2**20
+                    mexeu = True
+            except OSError:
+                continue
+        out["rodadas"] += int(mexeu)
+    out["mb"] = round(out["mb"], 1)
+    return out
+
+
 def iniciar(config, semana: str) -> dict:
     if not SEMANA_RE.match(semana or ""):
         raise ValueError("semana inválida")
@@ -354,6 +393,7 @@ def iniciar(config, semana: str) -> dict:
         raise NaoPronto("falta: " + ", ".join(i["nome"] for i in conf["itens"] if not i["ok"]))
     trabalho = pasta_trabalho(config)
     chave = str(trabalho.resolve())
+    limpeza = limpar_rodadas(config)
     with _trava:
         ativo = _rodando.get(chave)
         if ativo and ativo[1].is_alive():
@@ -370,7 +410,7 @@ def iniciar(config, semana: str) -> dict:
             raise
         cred = credencial(config)
         st = {"id": rid, "semana": semana, "estado": "rodando", "inicio": datetime.now(_BRT).isoformat(timespec="seconds"),
-              "credencial": cred.onde, "insumos": insumos, "motor": str(caminho_motor(config))}
+              "credencial": cred.onde, "insumos": insumos, "motor": str(caminho_motor(config)), "limpeza": limpeza}
         _gravar(pasta, st)
         saida = pasta / "saida" / "sombra.xlsx"
         t = threading.Thread(target=_executar, name=f"pcm-{rid}", daemon=True,
