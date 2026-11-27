@@ -124,8 +124,18 @@ def test_o_video_wall_em_tres_colunas(cliente, pontos, setor, com_mapa_base, mon
     # à esquerda, a usina com problema e o técnico que está nela (a Naira, a 0,8 km da Alfa, primeira posição do dia)
     assert "Queda total" in cos and "Naira Teste na usina desde" in cos and 'data-tv-uid="7"' in cos
     # no meio, o tipo do mapa (gira a cada 20 s), o Brasil inteiro e o Sair sempre à vista, e a contagem
-    for tipo in ("alarmes", "chuva", "equipes"):
+    # 27/11/2026 (Levi: "Eu quero que abra focado nas usinas [...] ênfase em usinas"): o 1º tipo é Usinas, e abre nele
+    for tipo in ("usinas", "chuva", "equipes"):
         assert f'data-tv-tipo="{tipo}"' in mapa
+    assert 'data-tv-tipo="alarmes"' not in mapa and 'data-tv-tipo="usinas" aria-pressed="true"' in mapa
+    assert "Usinas, alarmes e equipes" in mapa
+    # a legenda acima do mapa ("explicasse, ó, crítico engloba isso, a atenção engloba isso..."), pela régua do Comando
+    leg = html.split('class="eqtv-legenda"', 1)[1].split("</dl>", 1)[0]
+    for termo in ("Crítico", "Atenção", "Sem comunicação", "Normal", "Sem leitura", "religamento em campo", "Inversor",
+                  "Falha de comunicação", "Nenhuma ocorrência aberta"):
+        assert termo in leg, termo
+    # a linha do tempo não rola sozinha (Levi: "não precisa ficar rolando automático não"): rola na mão
+    assert "data-eqtv-rola-tl" not in html
     assert "data-tv-brasil" in mapa and "data-tv-gira" in mapa and "Sair" in mapa
     assert "críticas" in mapa and "normais" in mapa and "Equipes em deslocamento" in mapa
     # à direita, os eventos de hoje das ocorrências: a Naira chegando na Alfa (a usina com ocorrência)

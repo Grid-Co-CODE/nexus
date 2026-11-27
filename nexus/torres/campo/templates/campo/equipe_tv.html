@@ -90,11 +90,18 @@
        Chuva, Equipes; Levi: "a cada 20 segundos vai mudar"); o clique numa usina, num cartão ou num evento dá o zoom, e o
        Brasil inteiro volta pelo botão ou sozinho ("é importante ter um botão para voltar pro mapa") #}
     <section class="eqtv-mapa" aria-label="O mapa" data-tv-giro-s="{{ giro_s }}">
+      {# o que cada cor engloba (27/11/2026, Levi: "crítico engloba isso, a atenção engloba isso [...] normais isso"), pela
+         régua de Comando > Usinas; a usina com mais de uma ocorrência fica na cor da mais grave #}
+      <dl class="eqtv-legenda">
+        {% for id, nome, texto in legenda %}<div class="eqtv-legenda-i eqtv-legenda-i--{{ id }}"><dt>{{ nome }}</dt><dd>{{ texto }}</dd></div>{% endfor %}
+      </dl>
       <header class="eqtv-mapa-cab">
-        <h2>Alarmes e equipes</h2>
+        {# abre com o foco nas usinas (27/11/2026, Levi: "Eu quero que abra focado nas usinas [...] ênfase em usinas"): a
+           usina vira a bolinha na cor do estado, e o técnico fica menor #}
+        <h2>Usinas, alarmes e equipes</h2>
         <span class="eqtv-conta">{% for k in contagem %}<span class="eqtv-conta-i eqtv-conta-i--{{ k.id }}"><b>{{ k.n }}</b>{{ k.rotulo }}</span>{% endfor %}</span>
         <div class="cn-seg eqtv-tipo" role="group" aria-label="O que o mapa mostra">
-          <button type="button" data-tv-tipo="alarmes" aria-pressed="true"><i class="ph ph-warning" aria-hidden="true"></i>Alarmes</button>
+          <button type="button" data-tv-tipo="usinas" aria-pressed="true"><i class="ph ph-solar-panel" aria-hidden="true"></i>Usinas</button>
           <button type="button" data-tv-tipo="chuva" aria-pressed="false"><i class="ph ph-cloud-rain" aria-hidden="true"></i>Chuva</button>
           <button type="button" data-tv-tipo="equipes" aria-pressed="false"><i class="ph ph-users-three" aria-hidden="true"></i>Equipes</button>
         </div>
@@ -115,7 +122,9 @@
     <section class="eqtv-tl" aria-label="Eventos de hoje nas ocorrências">
       <header class="eqtv-cos-cab"><div><p class="gc-eyebrow">COS · Linha do tempo</p><h2>Eventos de hoje nas ocorrências</h2></div></header>
       <p class="eqtv-agora"><span>Agora · {{ hora }}</span></p>
-      <div class="eqtv-lista" data-eqtv-rola-tl>
+      {# não rola sozinha (27/11/2026, Levi: "não precisa ficar rolando automático não [...] pode até scrollar com um scroll
+         invisível"): o mais novo fica em cima, e o resto rola na mão #}
+      <div class="eqtv-lista eqtv-lista--mao">
         <ol class="eqtv-tl-lista">
           {% for e in linha_tempo %}
           <li class="eqtv-tl-item" data-tv-uid="{{ e.uid }}" tabindex="0"><time>{{ e.hora }}</time>

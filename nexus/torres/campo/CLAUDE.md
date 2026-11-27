@@ -1977,7 +1977,7 @@ equipes"; "pode até clicar e dar um zoom automático. Mas é importante ter um 
     prevista da última saída;
   - **meio:** o mapa com o **Brasil inteiro fixo** (sem arrastar nem zoom de mão; reenquadra quando a tela muda), a
     contagem pelo Agora de Comando > Usinas (`contagem`: críticas, em atenção, sem comunicação, normais), o tipo que **gira
-    a cada 20 s** (`GIRO_TV_S`: Alarmes, as usinas na cor do Agora; Chuva, o radar animado e os avisos do INMET, por isso o
+    a cada 20 s** (`GIRO_TV_S`: **Usinas**, onde abre, com a usina em bolinha na cor do Agora e o técnico menor; Chuva, o radar animado e os avisos do INMET, por isso o
     vídeo wall lê o clima sempre, sem levar o `clima=1` aos links; Equipes, o foco no técnico), a barrinha do giro, as
     **Equipes em deslocamento** (`deslocamentos`) com a rota tracejada até a usina de destino; o **clique** numa usina, num
     cartão ou num evento dá o zoom com o resumo (o estado, o motivo e o técnico na usina ou a caminho), para o giro, e o
@@ -1986,7 +1986,15 @@ equipes"; "pode até clicar e dar um zoom automático. Mas é importante ter um 
   - **direita:** os **eventos de hoje das ocorrências** (`linha_do_tempo`), do mais novo ao mais velho: do COS, a abertura
     de hoje ("Nova · OS N", o grupo e a falha) e a última nota de hoje ("Atualizada"), com a hora do COS; do Nexus Field, só
     o técnico das usinas com ocorrência aberta (chegou, saiu, a caminho com a chegada prevista). O "Normalizada" e o
-    "Fechada" da referência não vêm: a fotografia do COS só traz as abertas. Rola sozinha, como a lista da esquerda.
+    "Fechada" da referência não vêm: a fotografia do COS só traz as abertas. **Não rola sozinha** (27/11/2026, Levi: "não
+    precisa ficar rolando automático não [...] pode até scrollar com um scroll invisível"): o mais novo fica em cima e o
+    resto rola na mão, com a barra escondida.
+  - **27/11/2026, os ajustes do Levi:** abre com o foco nas usinas ("Eu quero que abra focado nas usinas [...] as usinas
+    poderiam ficar com bolinha redonda, né? E as equipes um pouquinho menores"): o tipo Alarmes virou **Usinas**, a usina
+    é a bolinha (`usinas-bola`, maior quanto mais grave; o losango fica para a tela) e o título é "Usinas, alarmes e
+    equipes"; acima do mapa, **a legenda do que cada cor engloba** (`parede.LEGENDA`: "crítico engloba isso, a atenção
+    engloba isso [...]"), a régua de `comando.usinas.classificar` em palavras (mudou a régua, muda o texto); e o mapa
+    acompanha o tamanho da caixa (`ResizeObserver`), porque na bancada o desenho ficava com metade dela.
   - Prova: `tests/test_equipe_videowall_26_11.py`.
 
 **A 2ª parte (a seguir):** na tela, o painel da usina na visão de Usinas (as ocorrências, os técnicos mais perto, a chuva

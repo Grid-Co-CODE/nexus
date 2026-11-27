@@ -272,7 +272,7 @@
       var cor = corDaUsina(u), corT = corNoFoco(cor, "tecnico");
       var selo = !!(u.nivel && u.agora && (u.agora.tom === "critico" || u.agora.tom === "alerta"));
       // `icone` = a cor de sempre (o foco usina e o Usinas); `icone_t` = a do foco técnico
-      return ponto(u.c, { id: u.id, nome: u.nome, icone: "u-" + cor + (selo ? "-!" : ""),
+      return ponto(u.c, { id: u.id, nome: u.nome, tom: u.agora ? u.agora.tom : "", icone: "u-" + cor + (selo ? "-!" : ""),
                           icone_t: "u-" + corT + (selo && corT !== "cinza" ? "-!" : ""), ordem: ORD[cor] || 0 });
     }));
   }
@@ -411,6 +411,14 @@
       // pulsava em volta da crítica saiu (Levi, 12/11/2026: "TIRE ESSA BORDA ENORME DAS UFVs em vermelho!")
       { id: "usinas", type: "symbol", source: "usinas", layout: { "icon-image": ["get", "icone"], "icon-size": tamanhoUsina(1),
         "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "ordem"] } },
+      // no vídeo wall a usina é a bolinha na cor do estado (27/11/2026, Levi: "as usinas poderiam ficar com bolinha
+      // redonda, né? E as equipes um pouquinho menores"), maior quanto mais grave
+      { id: "usinas-bola", type: "circle", source: "usinas", layout: { visibility: D.tv ? "visible" : "none", "circle-sort-key": ["get", "ordem"] },
+        paint: { "circle-color": ["match", ["get", "tom"], "critico", P.t["--critico"], "alerta", P.t["--alerta-cheio"], "semcom", P.t["--semcom-cheio"],
+                                  "ok", P.t["--ok-cheio"], mistura(P.terra, P.t["--mudo"], 0.6)],
+                 "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, ["match", ["get", "tom"], "critico", 7.5, "semcom", 6.5, "alerta", 6.5, "ok", 5, 3.5],
+                                   10, ["match", ["get", "tom"], "critico", 13, "semcom", 12, "alerta", 12, "ok", 10, 7]],
+                 "circle-stroke-color": P.t["--fundo"], "circle-stroke-width": 1.6 } },
       { id: "usinas-nome", type: "symbol", source: "usinas", minzoom: 8.5, layout: { "text-field": ["get", "nome"], "text-font": FONTE_M, "text-size": ["interpolate", ["linear"], ["zoom"], 8.5, 10.5, 13, 12.5],
         "text-variable-anchor": ["left", "right", "top", "bottom"], "text-radial-offset": 1.1, "text-optional": true }, paint: { "text-color": P.forte, "text-halo-color": P.halo, "text-halo-width": 1.6 } },
       { id: "perc-marcos", type: "symbol", source: "perc-marcos", layout: { "text-field": ["get", "texto"], "text-font": FONTE_M, "text-size": 11.5, "text-max-width": 16,
@@ -430,6 +438,7 @@
         paint: { "text-color": ["case", ["get", "velho"], P.fraco, P.t["--fundo"]] } }
     ];
     L.forEach(function (l) { if (!mapa.getLayer(l.id)) mapa.addLayer(l); });
+    if (D.tv) mapa.setLayoutProperty("usinas", "visibility", "none");      // no vídeo wall, a bolinha no lugar do losango
     aplicarFoco();
     aplicarBase();
     radarCamadas();          // a troca de tema refaz o estilo: as camadas do radar voltam junto
@@ -618,14 +627,16 @@
     mostrar([t.nome, t.equipe || "sem equipe", t.rotulo + (t.velho ? " · última posição " + t.hora : ""),
              "Clique para ver o percurso do dia"], e.point.x, e.point.y);
   });
-  mapa.on("mousemove", "usinas", function (e) {
+  function dicaUsina(e) {
     var u = porUsina[e.features[0].properties.id];
     if (!u) return;
     mapa.getCanvas().style.cursor = "pointer";
     var cos = u.agora ? "Agora (COS): " + u.agora.rotulo + (u.agora.motivo ? " · " + u.agora.motivo : "") : "";
     mostrar([u.nome, u.onde, cos, u.rotulo ? "Clima: " + u.rotulo + (u.motivo ? ": " + u.motivo : "") : ""], e.point.x, e.point.y);
-  });
-  ["tecnicos", "usinas"].forEach(function (id) {
+  }
+  mapa.on("mousemove", "usinas", dicaUsina);
+  mapa.on("mousemove", "usinas-bola", dicaUsina);
+  ["tecnicos", "usinas", "usinas-bola"].forEach(function (id) {
     mapa.on("mouseleave", id, function () { mapa.getCanvas().style.cursor = ""; esconder(); });
   });
   mapa.on("dragstart", esconder);
@@ -634,6 +645,7 @@
     if (D.tv) { if (t) tvZoom(t.c, "<b>" + esc(t.nome) + "</b><small>" + esc(t.rotulo + (t.hora ? " · " + t.hora : "")) + "</small>"); return; }
     if (t && t.url) location.href = t.url;
   });
+  mapa.on("click", "usinas-bola", function (e) { if (D.tv) tvZoomUsina(e.features[0].properties.id); });
   mapa.on("click", "usinas", function (e) {
     if (D.tv) { tvZoomUsina(e.features[0].properties.id); return; }
     var c = e.features[0].geometry.coordinates;
@@ -763,6 +775,12 @@
     });
     foco = t === "equipes" ? "tecnico" : "usina";
     aplicarFoco();
+    // o técnico um pouco menor que no mapa da tela (27/11/2026, Levi: "as equipes um pouquinho menores")
+    if (t === "equipes" && mapa.getLayer("tecnicos")) {
+      mapa.setPaintProperty("tecnicos", "circle-radius", ["interpolate", ["linear"], ["zoom"], 3, 8, 10, 11]);
+      mapa.setLayoutProperty("tecnicos-ini", "text-size", 10);
+    }
+    if (mapa.getLayer("usinas-bola")) mapa.setPaintProperty("usinas-bola", "circle-opacity", t === "equipes" ? 0.55 : 1);
   }
   function tvGirar() {
     clearInterval(TV.giro); tvMarcar(false);
@@ -792,7 +810,7 @@
   }
   function tvComecar() {
     var sec = document.querySelector(".eqtv-mapa");
-    TV = { raiz: document.querySelector("[data-eq-tv]"), TIPOS: ["alarmes", "chuva", "equipes"], tipo: "alarmes", giro: null,
+    TV = { raiz: document.querySelector("[data-eq-tv]"), TIPOS: ["usinas", "chuva", "equipes"], tipo: "usinas", giro: null,
            zoom: false, volta: null, barra: document.querySelector("[data-tv-gira]"), brasil: document.querySelector("[data-tv-brasil]"),
            ms: (parseInt(sec && sec.getAttribute("data-tv-giro-s"), 10) || 20) * 1000,
            pop: new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 14, className: "eq-tvpop" }) };
@@ -800,9 +818,14 @@
     // o Brasil fixo: nada de arrastar, girar ou dar zoom com a mão (o clique ainda dá o zoom automático)
     ["scrollZoom", "boxZoom", "dragPan", "keyboard", "doubleClickZoom", "touchZoomRotate"].forEach(function (h) { mapa[h].disable(); });
     tvEnquadrar(0);
-    tvTipo("alarmes");
+    tvTipo("usinas");
     tvGirar();
-    window.addEventListener("resize", function () { if (!TV.zoom) setTimeout(function () { tvEnquadrar(0); }, 80); });
+    // a caixa do mapa muda de tamanho quando a página assenta (a legenda, as fontes) ou a TV muda de resolução: o mapa
+    // acompanha e reenquadra o Brasil (27/11/2026: na bancada o desenho ficou com metade da caixa)
+    var reenquadrar = function () { mapa.resize(); if (!TV.zoom) tvEnquadrar(0); };
+    window.addEventListener("resize", function () { setTimeout(reenquadrar, 80); });
+    if (window.ResizeObserver) new ResizeObserver(function () { reenquadrar(); }).observe(caixaMapa);
+    setTimeout(reenquadrar, 600);
     document.addEventListener("click", function (e) {
       var tb = e.target.closest("[data-tv-tipo]");
       if (tb) { tvTipo(tb.getAttribute("data-tv-tipo")); if (!TV.zoom) tvGirar(); return; }

@@ -73,9 +73,9 @@
     };
     requestAnimationFrame(passo);
   }
-  var c1 = raiz.querySelector("[data-eqtv-rola]"), c2 = raiz.querySelector("[data-eqtv-rola-tl]");
+  // a linha do tempo da direita não rola sozinha (27/11/2026, Levi: "não precisa ficar rolando automático não"): rola na mão
+  var c1 = raiz.querySelector("[data-eqtv-rola]");
   rolar(c1, c1 && c1.querySelector(".eqtv-trilho"));
-  rolar(c2, c2 && c2.querySelector(".eqtv-tl-lista"));
 
   // ── os controles só ao mexer ───────────────────────────────────────────────────────────────────────────────────
   var esconder = 0;

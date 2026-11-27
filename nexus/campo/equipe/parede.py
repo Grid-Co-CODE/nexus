@@ -139,6 +139,17 @@ def montar(cos: dict | None, uids, nome_de, ficha_de, agora: datetime) -> dict:
 # do COS; a do técnico, a do Nexus Field; sem a fotografia do COS, a linha do tempo fica vazia.
 _BRT = timezone(timedelta(hours=-3))
 NOME_DO_GRUPO = {g[0]: g[1] for g in GRUPOS}
+# o que cada cor engloba (27/11/2026, Levi: "acima desse alarmes e equipes explicasse, ó, crítico engloba isso, a atenção
+# engloba isso, comunicação engloba isso, normais isso"): a régua de Comando > Usinas (`comando.usinas.classificar`), em
+# palavras. Mudou a régua lá, muda o texto aqui. (id, nome, o que engloba)
+LEGENDA = (("critico", "Crítico", "Usina desligada: desligamento de usina, cabine, SKID ou QGBT desligado, proteção atuou, "
+            "falta de energia da rede e religamento em campo com OS"),
+           ("alerta", "Atenção", "Inversor desligado ou em falha, tracker parado, string sem corrente e as outras "
+            "ocorrências abertas (furto, corretiva)"),
+           ("semcom", "Sem comunicação", "Falha de comunicação: o COS não enxerga a usina (logger, inversor ou relé sem "
+            "resposta); ela pode estar gerando"),
+           ("ok", "Normal", "Nenhuma ocorrência aberta no COS"),
+           ("neutro", "Sem leitura", "A fotografia do COS não trouxe a usina agora"))
 # a contagem do mapa, nas palavras do Agora de Comando > Usinas (a mesma régua que pinta a usina)
 CONTAGEM = (("critico", "críticas"), ("alerta", "em atenção"), ("semcom", "sem comunicação"), ("ok", "normais"))
 
