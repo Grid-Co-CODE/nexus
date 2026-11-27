@@ -1997,8 +1997,11 @@ equipes"; "pode até clicar e dar um zoom automático. Mas é importante ter um 
     Field por situação (na usina, em deslocamento, parado fora, sem sinal, sem permissão, sem posição), com onde está
     (a usina e desde quando, o destino e a chegada prevista, a cidade) e a ocorrência aberta da usina dele (o grupo do
     cartão); o clique dá o zoom na usina, ou na posição do técnico quando não há usina ligada.
-    O "agora" das Ocorrências é a hora pequena no rótulo de cima, sem o resumo embaixo (27/11/2026, Levi: "esse agora pode
-    ser mais discreto, ele está ocupando muito espaço. E tem um texto embaixo dele também, nada a ver").
+    O cabeçalho da coluna é só o título com a fonte ("Ocorrências mais recentes COS", "Técnicos agora Nexus Field") e os
+    dois botões: sem rótulo em cima, sem "da mais nova para a mais antiga", sem hora e sem resumo (27/11/2026, Levi: "não
+    precisa explicar da mais nova para a mais antiga [...] Bote só ocorrências mais recentes COS. E os botões, acabou"). O
+    seletor não encolhe nem quebra linha (`.eqtv-tipo` nowrap; quem cede é o título): com o título comprido o `.cn-seg`
+    empilhava "Ocorrências" sobre "Técnicos" ("dá essa bugada violenta").
   - **O nome da usina vai com "em"/"de", sem artigo** (27/11/2026, Levi: "na União, na Rio do Peixe, na Araputanga, não.
     Em Araputanga, em Matões, em Saturnino"): `situacao.com_prep` ("em Araputanga desde", "chegou em Matões", "saiu de
     Saturnino", "a 0,3 km de União"); só o nome que começa por UFV ou Usina leva "na"/"da". Vale para a visão dos

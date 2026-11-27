@@ -2392,6 +2392,8 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
   border:1px solid var(--linha);border-radius:var(--raio-md)}
 .eqtv-cos-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:1vw}
 .eqtv-cos-cab .gc-eyebrow{margin:0;font-size:.78em}
+.eqtv-cos-cab>div{min-width:0}
+.eqtv-cos-cab h2 .eqtv-fonte{color:var(--mudo);font:600 .55em var(--font-sans);margin-left:.3em;white-space:nowrap}
 .eqtv-cos-cab h2{margin:.15em 0 0;font:800 1.45em/1.15 var(--font-display)}
 .eqtv-leitura{color:var(--tinta-2);font:500 .85em var(--font-mono);white-space:nowrap}
 .eqtv-sem{margin:0;padding:1em;border:1px dashed var(--linha-forte);border-radius:var(--raio-controle);color:var(--tinta-2)}
@@ -2529,8 +2531,10 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eqtv-conta-i strong{font-weight:600;color:var(--tinta)}
 .eqtv-conta-i small{font-weight:400;font-size:.85em;color:var(--mudo)}
 .eqtv-mapa-cab .eqtv-conta{order:5;flex-basis:100%;gap:.5em 1.4em}
-.eqtv-tipo{border-radius:999px}
-.eqtv-tipo button{border:0;background:none;color:var(--tinta-2);font:600 .85em/1 var(--font-sans);padding:.7em 1em;border-radius:999px;cursor:pointer}
+/* o seletor do vídeo wall não encolhe nem quebra linha (27/11/2026, Levi: "quando tá em ocorrências dá essa bugada
+   violenta": o título comprido apertava e o .cn-seg empilhava os botões); quem cede é o título */
+.eqtv-tipo{flex:none;flex-wrap:nowrap;border-radius:999px}
+.eqtv-tipo button{white-space:nowrap;border:0;background:none;color:var(--tinta-2);font:600 .85em/1 var(--font-sans);padding:.7em 1em;border-radius:999px;cursor:pointer}
 .eqtv-tipo button .ph{margin-right:.35em}
 .eqtv-tipo button[aria-pressed="true"]{background:var(--verde);color:var(--sobre-verde)}
 .eqtv-brasil[hidden]{display:none}

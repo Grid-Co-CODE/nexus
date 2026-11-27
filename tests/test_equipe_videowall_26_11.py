@@ -146,6 +146,11 @@ def test_o_video_wall_em_tres_colunas(cliente, pontos, setor, com_mapa_base, mon
     # à direita, as ocorrências mais recentes do COS com o técnico de cada uma (27/11/2026): a Naira na Alfa
     assert "Ocorrências mais recentes" in tl and "Queda total" in tl and "Naira Teste na usina desde" in tl
     assert "Eventos de hoje" not in tl and "chegou na usina" not in tl
+    # o cabeçalho é só o título e os botões (27/11/2026, Levi: "não precisa explicar da mais nova para a mais antiga [...]
+    # Bote só ocorrências mais recentes COS. E os botões, acabou")
+    cab = tl.split('<header class="eqtv-cos-cab">', 1)[1].split("</header>", 1)[0]
+    assert "Ocorrências mais recentes <span" in cab and ">COS</span>" in cab
+    assert "mais nova" not in cab and "gc-eyebrow" not in cab and "Onde está cada técnico" not in cab
     # as duas visões da coluna (27/11/2026, "Visão técnico, visão ocorrências"): abre nas Ocorrências; a dos técnicos traz
     # a Naira na Usina Alfa, com a ocorrência aberta dela
     assert 'data-tv-visao-bt="ocorrencias" aria-pressed="true"' in tl and 'data-tv-visao-bt="tecnicos"' in tl
@@ -190,3 +195,14 @@ def test_a_preposicao_antes_do_nome_da_usina():
     assert SI.com_prep("em", "Rio do Peixe") == "em Rio do Peixe" and SI.com_prep("de", "União") == "de União"
     assert SI.com_prep("em", "UFV Altair") == "na UFV Altair" and SI.com_prep("de", "Usina Alfa") == "da Usina Alfa"
     assert SI.texto_perto(0.3, "Saturnino") == "a 0,3 km de Saturnino"
+
+
+def test_a_troca_ocorrencias_tecnicos_nao_quebra_linha():
+    """27/11/2026, Levi (print): "quando tá em ocorrências dá essa bugada violenta" - o título "Ocorrências mais recentes"
+    é mais comprido que "Técnicos agora", apertava o seletor e o `.cn-seg` (que quebra linha de propósito nas outras telas)
+    empilhava "Ocorrências" sobre "Técnicos". No vídeo wall o seletor não encolhe nem quebra; quem cede é o título."""
+    from pathlib import Path
+    css = (Path(__file__).resolve().parents[1] / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
+    assert ".eqtv-tipo{flex:none;flex-wrap:nowrap;" in css
+    assert ".eqtv-tipo button{white-space:nowrap;" in css
+    assert ".eqtv-cos-cab>div{min-width:0}" in css
