@@ -423,6 +423,16 @@ Regra de uso e do porquê: `nexus/torres/campo/CLAUDE.md`, "Mapa de equipe".
   outras ações e nas linhas de antes delas (a linha da fila gravada antes da coluna vai com elas vazias). Quem abriu só
   por `pessoa_hmac` (o e-mail nunca vai ao banco). Só acrescenta.
 
+## O PR e a disponibilidade de cada usina e mês (27/11/2026; `nexus/comando/kpi_mes.py`)
+
+O livro `nexus_kpi_usina_mes · fato_kpi_usina_mes` (registrado antes de existir, regra 10): 1 linha = 1 usina × 1 mês,
+com o PR e a disponibilidade sem e com o expurgo do contrato, a potência (o peso da média do contrato, atributo e não
+medida: kWp não é unidade da regra 3), a produção e a meta. Sai da conta da Visão gerencial (o mesmo `com_expurgo` do
+Comando), de hora em hora no :47, uma máquina por vez (50 min) e só quando o sha das linhas muda. O mês fechado congela
+no dia 11 do seguinte (o Thopen fecha no dia 10); a linha do banco que não veio na conta fica (`so_cresce`). A usina já
+vem ligada (`usina_ligada_por = visao gerencial`); sem texto do expurgo (regra 8). Quem lê: a aba Indicadores dos
+contratos. Medido em 27/11/2026 (ensaio, sem gravar): 266 linhas, 133 usinas, out e nov/26.
+
 ## Os textos reservados (19/11/2026; `textos_reservados.py`, `ferramentas/textos_reservados.py`)
 
 **Para que serve.** O repositório é público. Valor de contrato, citação de cliente e de fornecedor e o e-mail de um

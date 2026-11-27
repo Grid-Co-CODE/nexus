@@ -127,8 +127,9 @@ disponibilidade expurgada contra a meta, e o contrato inteiro no alto. O Levi, j
 DE ANIVERSÁRIO DE CONTRATO". Escolhas dele no mesmo dia: o ano conta do **início da vigência** (não da data-base);
 entram **todas as usinas do cliente no cadastro** (como a Visão gerencial); o mês sem dado no banco diz **"s/d"** (o
 histórico anterior a 10/2026 é a fase 2); o relatório de aniversário é **interno, para o gestor do contrato**; o aviso,
-**30 dias** antes; a régua de cor **da sugestão**: verde na meta, amarelo até 2 pontos abaixo, vermelho abaixo disso, azul
-com asterisco no mês que teve expurgo, sem cor sem meta.
+**30 dias** antes; a régua de cor **da sugestão**: verde na meta, amarelo até 2 pontos abaixo, vermelho abaixo disso,
+sem cor sem meta. **A visão é gerencial, para o CEO e os heads** (Levi, 27/11/2026: "Pense que a gente está fazendo uma
+visão gerencial para o CEO, para os heads darem uma olhada, vai ser muito importante").
 - **A janela padrão são os ÚLTIMOS 12 MESES até o mês de hoje** (`indicadores.ultimos_12_meses`; Levi, vendo o ano
   contratual no ar: "puxa pelos últimos 12 meses até atualmente [...] sempre vai se atualizando, do que tá projetando um
   futuro que não tem dado"): anda sozinha a cada mês e vale também para o contrato sem início da vigência. O ano
@@ -138,10 +139,21 @@ com asterisco no mês que teve expurgo, sem cor sem meta.
   `ano_contratual`; a linha de fatos mostra o aniversário, e a aba Pontos ganha a Atenção 30 dias antes
   (`pontos.ANIVERSARIO_DIAS`). Sem início da vigência, a aba diz que falta.
 - **De onde vem cada linha** (as fontes que as telas donas já usam, juntadas em `contratos_tela._fontes_da_ligacao`):
-  - PR e disponibilidade: a conta da Visão gerencial (`gerencial_tela.dados_gerencial_sem_esperar`, por `usina_id`), que
-    desde 26/11/2026 devolve também o mês COM o expurgo do contrato (`com_expurgo`, a mesma conta da nota). O banco tem
-    esses meses só desde 10/2026 (`diagnostico_mes.PRIMEIRO_MES`); antes, "s/d". Enquanto a Visão gerencial monta (o
-    Nexus acabou de subir), a rota volta `montando` e a página pede de novo a cada 3 s;
+  - **PR e disponibilidade, cada um em duas linhas, sem e com o expurgo do contrato** (Levi, 27/11/2026: "Eu tô sentindo
+    falta do PR ponderado, PR expurgado"; "Disponibilidade expurgada também, mesma lógica"): na usina, PR, PR expurgado,
+    Disponibilidade e Disponibilidade expurgada; no contrato, as quatro pela potência ("PR ponderado"). Cada linha contra
+    a meta; o "fora da meta" e os cartões do alto contam o EXPURGADO (o número do contrato), com o sem expurgo ao lado. O
+    expurgo é o `com_expurgo` da Visão gerencial (`comando/expurgos.py`: a queda da rede e a limitação imposta saem da
+    conta, `pr × (prod + E) ÷ prod`); a sujidade e a vegetação não entram (o chat da Performance, 26/11/2026);
+  - **de onde vem o PR e a disponibilidade: o livro `nexus_kpi_usina_mes`** (`comando/kpi_mes.py`; Levi: "Pode até
+    criar um book sobre isso para você não ficar carregando, calculando toda vez que abre"): a conta da Visão gerencial
+    já feita, por usina e mês, gravada de hora em hora (:47) pelo laço do app, só quando muda; o mês fechado congela no
+    dia 11 do seguinte. A aba junta pelo `_usinas_kpi`: o mês fechado vem do livro; o mês em curso, da conta de agora
+    quando ela está pronta; sem a conta (o Nexus acabou de subir), as usinas e os números saem só do livro e a aba abre
+    na hora, sem o "montando" (a conta fria levou 29 s no PC em 27/11). Sem o livro nem a conta, volta `montando` e a
+    página pede de novo a cada 3 s. O banco de performance só tem os meses desde 10/2026 (`diagnostico_mes.
+    PRIMEIRO_MES`); antes, "s/d". Medido em 27/11: 266 linhas (133 usinas × out e nov/26); o expurgo mudou o PR em 26 e
+    a disponibilidade em 193;
   - MPM, MPS e MPA: as tarefas do ano do PCM (`pcm.fonte.ler_gestao_sem_esperar` e `pcm.gestao.classificar`: a sigla no
     nome, o mês da Data Programada, feita = Finalizada), ligadas à usina pelo nome (`responsaveis.Nomes`);
   - supressão vegetal (roçagem e poda química) e lavagem (limpeza de módulos), de duas fontes juntas
@@ -155,18 +167,14 @@ com asterisco no mês que teve expurgo, sem cor sem meta.
     de um serviço do mesmo tipo já contado é o mesmo serviço (`indicadores.juntar_servicos`). Com as duas, a Thopen foi
     de 14 para 27 usina·mês com lavagem e de 65 para 108 com supressão. O mínimo do ano, o `zeladoria_contratual` do
     Radar por UFV (só o "fixo"); a linha do portfólio ("82 UFVs") vale para as usinas sem linha própria;
-  - **feita ou não, sobre o PR expurgado** (Levi, 26/11/2026: "supressão vegetal e lavagem de módulos tem que mostrar se
-    foi feita ou não sobre o PR expurgado"): o mês com o serviço mostra a data; o mês sem ele, "não", e fica em atenção
-    quando o PR expurgado ficou abaixo da meta e a ronda leu 4 ou 5 (a sujidade para a lavagem, a vegetação para a
-    supressão); a dica traz o PR, a meta e o nível. Antes do 1º mês do arquivo do PCM (`_zel_desde`, 01/2026 em 26/11) é
-    "s/d", porque sem as OS do Fracttal o "não" seria chute. A linha do contrato pinta o mês de atenção e a gaveta lista
-    as usinas. O chat da Performance confirmou (26/11): o expurgo do contrato só tira a queda da rede e a limitação, a
-    sujidade e a vegetação não entram, e a perda de PR por sujeira ou mato não é medida em lugar nenhum; por isso a
-    célula não mostra número de perda. "PR antes e depois da lavagem" (pelo PR diário) é conta nova e precisa de regra
-    aprovada;
-  - o PR é o **expurgado** (o `com_expurgo` da Visão gerencial, `comando/expurgos.py`: a queda da rede e a limitação
-    imposta saem da conta, `pr × (prod + E) ÷ prod`), com asterisco no mês em que o expurgo mudou o número; sem expurgo
-    no mês, o PR publicado. Até 26/11 a linha usava o PR sem expurgo;
+  - **a data feita, e a atrasada pelo prazo do contrato** (Levi, 27/11/2026: "tem que ser a data que foi feita [...] E
+    não feita, a depender do prazo do contrato"): o mês com o serviço mostra a data (a dica, a próxima pelo prazo); sem
+    ele, **"atrasada"** (vermelho) quando o prazo do contrato da zeladoria venceu desde a última (`passo_do_contrato`: o
+    mínimo do ano vira o intervalo, 2 por ano = uma a cada 6 meses, 4 = a cada 3; sem nenhuma registrada, conta do 1º
+    mês do arquivo do PCM); senão "—", com a última e o vencimento na dica. A usina sem prazo no contrato só mostra as
+    datas. Antes do 1º mês do arquivo do PCM (`_zel_desde`, 01/2026 em 26/11) é "s/d": sem as OS do Fracttal o atraso
+    seria chute. A linha do contrato diz "N atras." no mês e a gaveta lista as usinas. Até 27/11 o "não" vinha do PR
+    expurgado abaixo da meta com a ronda em 4 ou 5: saiu com a ronda;
   - a meta de PR (26/11/2026, Levi: "As metas de PR, você vai entrar na BD Performance"): por usina e mês, o "PR Previsto
     1° Ano" da aba Info Mensal da BD Performance e o "PR (2026)" da aba Dados Mensais 2026 da BD Thopen
     (`contratos_tela._metas_pr_bd`, ligados pelo nome); o PR do contrato no mês compara com a meta do mês pela potência. O
@@ -174,10 +182,8 @@ com asterisco no mês que teve expurgo, sem cor sem meta.
     um PR de 98%). Medido em 26/11: na Thopen, 72 das 84 usinas com meta; na Athon, 10 de 10;
   - a garantia de disponibilidade: a dos Dados do contrato (`meta_disp`), ou a lida do PDF, ou **99%** (Levi: "As que
     faltam, bota 99%"; `indicadores.DISP_PADRAO`);
-  - a vegetação e a sujidade (Levi: "Tem na parte de rondas. Do usinas 360°. Isso daí aparece bastante"): duas linhas ao
-    lado da supressão e da lavagem, o pior nível do mês que as rondas leram (de 1 a 5, a régua das Rondas: 5 crítico, 4
-    atenção), o acumulado é a última leitura, e no contrato, as usinas em 4 ou 5 (`_rondas_das_usinas`, pelo
-    `visao.historico_usina`; o livro das rondas guarda 90 dias). Na Thopen, 78 das 84 usinas com leitura.
+  - **a vegetação e a sujidade da ronda saíram em 27/11/2026** (Levi: "Sobre sujidade e vegetação na ronda, não importa
+    isso daí não"); tinham entrado em 26/11.
   A ligação pelo nome é medida: as tarefas do PCM e as usinas do Radar do cliente que não ligaram aparecem numa linha da
   aba, com quantas de quantas.
 - **A tela, no desenho do mockup** (a 1ª versão subiu enxuta, numa linha de fatos; o Levi, vendo no ar: "eu queria no
@@ -201,8 +207,9 @@ com asterisco no mês que teve expurgo, sem cor sem meta.
   janela). MPM, MPS e MPA: as OS do mês, uma vez cada, com as tarefas dentro (o PCM conta TAREFA a tarefa: uma OS de MPM
   traz a cabine, o inversor, a segurança…), quantas feitas, e a OS abre o card do Fracttal (`NexusOsCard.abrir`, pelo id;
   sem id, pelo número). Supressão e lavagem: os serviços com a data, a origem (rota da equipe, OS de contrato, OS do
-  Fracttal…) e a OS clicável. PR e disponibilidade: usina a usina, com a meta, o
-  número sem o expurgo e o texto do expurgo (o mesmo da nota da Visão gerencial). Toda gaveta diz de onde vem.
+  Fracttal…) e a OS clicável, e as usinas com o serviço atrasado (na usina, os meses sem ele, com a última). PR e
+  disponibilidade (as quatro linhas): usina a usina, com a meta, o número sem o expurgo na linha expurgada e o texto do
+  expurgo (o mesmo da nota da Visão gerencial). Toda gaveta diz de onde vem.
 - **A legenda** são amostras do mesmo tamanho, com o valor no meio, em colunas iguais.
 - **O PR acima de 100% é leitura errada** (`indicadores.PR_MAX`, a régua da Visão gerencial): na prévia de 26/11/2026,
   uma usina da Thopen com PR de mais de 1.000% fazia o PR do contrato dar 730,5%. A célula diz "s/d" com a dica.
@@ -215,7 +222,7 @@ com asterisco no mês que teve expurgo, sem cor sem meta.
 - **Falta (fase 2):** o relatório de aniversário em PDF, guardado congelado no ano que fechou; o histórico de PR e
   disponibilidade antes de 10/2026 (a Performance); MPM, MPS e MPA no banco (hoje o arquivo do PCM, por nome); o Radar
   ligado ao cadastro; o planejado do Radar (diarista), que não está nas tabelas copiadas; a ligação contrato × usina para o cliente com vários contratos.
-- Prova: `tests/test_contratos_indicadores_26_11.py`.
+- Prova: `tests/test_contratos_indicadores_26_11.py` e `tests/test_comando_kpi_mes_27_11.py` (o livro).
 
 ## Quem cuida de quê: a visão reduzida por setor (26/11/2026; `setores.py`)
 

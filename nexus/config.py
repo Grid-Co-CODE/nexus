@@ -58,6 +58,8 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # as normalizações da Ronda COS no banco (29/10/2026, nexus/cos/normalizacoes_banco.py): "0" desliga; onde
              # a fonte do Andamento não está ligada (o PC) cada volta só pula
              "NEXUS_NORMALIZACOES_PUBLICAR",
+             # o PR e a disponibilidade de cada usina e mês no banco (27/11/2026, nexus/comando/kpi_mes.py): "0" desliga
+             "NEXUS_KPI_PUBLICAR",
              # os relatos do App de Campo nas Sugestões do Início (21/11/2026, nexus/casca/relatos_app.py): a chave que o
              # Nexus manda ao servidor do App (a mesma do App Setting de lá; também pela tela Base → Chaves do Nexus, que
              # vence o .env) e, se mudar, o endereço da rota (só aqui). Sem a chave os relatos não aparecem

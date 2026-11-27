@@ -92,9 +92,11 @@ def test_a_matriz_do_ano_contratual():
     assert pr["2026-09"]["txt"] == "s/d"                                 # antes de 10/2026: sem dado, nunca 0
     assert pr["2026-10"]["tom"] == "critico" and pr["2026-11"]["tom"] == "ok"
     assert pr["2027-01"]["txt"] == ""                                    # o que ainda não chegou fica em branco
-    disp = _linha(z1, "disp")["cels"]
-    assert disp["2026-10"]["txt"] == "97,5*" and disp["2026-10"]["tom"] == "info" and "96,0" in disp["2026-10"]["dica"]
-    assert disp["2026-11"]["txt"] == "99,0" and disp["2026-11"]["tom"] == "ok"
+    # a disponibilidade em duas linhas (27/11/2026): sem o expurgo e com ele, cada uma contra a garantia
+    disp, dexp = _linha(z1, "disp")["cels"], _linha(z1, "disp_exp")["cels"]
+    assert (disp["2026-10"]["txt"], disp["2026-10"]["tom"]) == ("96,0", "alerta")             # 2 pontos abaixo dos 98
+    assert (dexp["2026-10"]["txt"], dexp["2026-10"]["tom"]) == ("97,5", "alerta") and "sem o expurgo 96,0%" in dexp["2026-10"]["dica"]
+    assert disp["2026-11"]["txt"] == dexp["2026-11"]["txt"] == "99,0" and dexp["2026-11"]["tom"] == "ok"
     roc = _linha(z1, "rocada")
     assert roc["cels"]["2026-10"]["txt"] == "03/10 +1" and roc["acum"]["txt"] == "3/4" and roc["acum"]["tom"] == "alerta"
     assert _linha(z1, "lavagem")["acum"]["txt"] == "0/2"
@@ -102,6 +104,7 @@ def test_a_matriz_do_ano_contratual():
     tot = {l["id"]: l for l in d["total"]}
     assert tot["MPM"]["cels"]["2026-10"]["txt"] == "1/2"
     assert tot["pr"]["cels"]["2026-10"]["txt"] == "76,8"                 # (75 × 3 + 82 × 1) / 4
+    assert tot["pr"]["nome"] == "PR ponderado" and tot["pr_exp"]["cels"]["2026-10"]["txt"] == "76,8"   # sem expurgo no mês
     assert d["resumo"]["prev"]["MPM"] == [2, 4] and d["resumo"]["fora_pr"] == 1
 
 
@@ -131,7 +134,6 @@ def test_a_rota_dos_indicadores(carga, cliente, relogio, monkeypatch):  # noqa: 
     monkeypatch.setattr(CT, "_fontes_da_ligacao", lambda cli, uids, ano: (
         {7: {"MPM": {"2026-10": [1, 1]}}}, {}, {7: {}}, {"pcm": {"ligadas": 1, "total": 2}}, []))
     monkeypatch.setattr(CT, "_metas_pr_bd", lambda uids, nomes: {7: {"2026-10": 82.0}})
-    monkeypatch.setattr(CT, "_rondas_das_usinas", lambda uids: {7: [{"data": "2026-10-03", "sujidade": 4, "vegetacao": 2, "os": "900", "tipo": "", "validada": False}]})
     from nexus.campo import visao as _v
     monkeypatch.setattr(_v, "_Base", lambda: None)
     cliente.application.extensions.pop("nexus_contratos_indicadores", None)
@@ -161,8 +163,9 @@ def test_a_tela_dos_indicadores(cliente):
     js = r.get_data(as_text=True)
     r.close()
     for t in ('["indicadores", "Indicadores"]', "function rIndicadores(c)", "indicadores.json?cliente=", "function fatoAniv(c)",
-              '"Só KPIs"', '"Só manutenções"', "data-ind-ano", "data-ind-usina", "sem dado no banco", "Últimos 12 meses", "ind-cinco", "data-cel", "function abrirGaveta(c, cel)", "data-os-abrir", "NexusOsCard", "As leituras das rondas", "nível 1 a 5"):
+              '"Só KPIs"', '"Só manutenções"', "data-ind-ano", "data-ind-usina", "sem dado no banco", "Últimos 12 meses", "ind-cinco", "data-cel", "function abrirGaveta(c, cel)", "data-os-abrir", "NexusOsCard", "pr_exp", "disp_exp", "atrasada"):
         assert t in js, t
+    assert "As leituras das rondas" not in js and "nível 1 a 5" not in js          # a ronda saiu (27/11/2026)
 
 
 def test_o_pr_acima_de_100_e_leitura_errada_e_os_cartoes_do_alto():
@@ -213,32 +216,30 @@ def test_a_gaveta_da_celula_explica_com_as_os(carga, cliente, relogio, monkeypat
     assert [o["os"] for o in d["os"]] == ["124", "123"]                        # a aberta primeiro; a da outra usina não entra
     assert d["os"][1]["id"] == 999 and d["os"][1]["final"] == "2026-10-11"
     assert {n["rot"]: n["val"] for n in d["numeros"]} == {"OS": "2", "Tarefas feitas": "1", "Tarefas planejadas": "2", "Tarefas abertas": "1"}
-    d = adm.get("/t/comando/contratos/indicadores/celula.json", query_string=dict(q, uid="t", linha="disp", mes="acum")).get_json()
+    d = adm.get("/t/comando/contratos/indicadores/celula.json", query_string=dict(q, uid="t", linha="disp_exp", mes="acum")).get_json()
     assert d["usinas"][0]["val"] == "98,5%" and "sem o expurgo 97,0%" in d["usinas"][0]["extra"]
+    d = adm.get("/t/comando/contratos/indicadores/celula.json", query_string=dict(q, uid="t", linha="disp", mes="acum")).get_json()
+    assert d["usinas"][0]["val"] == "97,0%" and "Sem o expurgo" in d["fonte"]
     assert any("Antes de 10/2026" in x for x in d["textos"])
     assert adm.get("/t/comando/contratos/indicadores/celula.json", query_string=dict(q, linha="nada")).status_code == 404
     assert adm.get("/t/comando/contratos/indicadores/celula.json", query_string=dict(q, uid="8")).status_code == 404
     assert adm.get("/t/comando/contratos/indicadores/celula.json", query_string=dict(q, mes="2020-01")).status_code == 404
 
 
-def test_a_meta_de_pr_da_bd_e_a_vegetacao_e_a_sujidade_da_ronda():
+def test_a_meta_de_pr_da_bd_e_as_linhas_da_tabela():
     """A meta de PR por usina e mês da BD Performance (Levi, 26/11/2026: "As metas de PR, você vai entrar na BD
-    Performance"); a vegetação e a sujidade das rondas do Usinas 360° ("Isso daí aparece bastante")."""
-    rondas = {1: [{"data": "2026-10-05", "sujidade": 2, "vegetacao": 5}, {"data": "2026-10-20", "sujidade": 4, "vegetacao": 3},
-                  {"data": "2026-11-02", "sujidade": 1, "vegetacao": None}]}
-    d = _montar(contrato={}, metas_pr={1: {"2026-10": 78.0, "2026-11": 78.0}, 2: {"2026-10": 80.0}}, rondas=rondas)
+    Performance"); as linhas desde 27/11/2026: o PR e a disponibilidade sem e com o expurgo, sem a ronda ("Sobre sujidade e
+    vegetação na ronda, não importa isso daí não")."""
+    d = _montar(contrato={}, metas_pr={1: {"2026-10": 78.0, "2026-11": 78.0}, 2: {"2026-10": 80.0}})
     z1 = next(u for u in d["usinas"] if u["uid"] == 1)
     pr = _linha(z1, "pr")["cels"]
     assert pr["2026-10"]["tom"] == "critico" and "meta 78,0%" in pr["2026-10"]["dica"] and pr["2026-11"]["tom"] == "ok"
     assert d["metas"]["pr"]["origem"].startswith("da BD Performance") and d["metas"]["disp"]["pct"] == 99.0
-    veg, suj = _linha(z1, "veg"), _linha(z1, "suj")
-    assert (veg["cels"]["2026-10"]["txt"], veg["cels"]["2026-10"]["tom"]) == ("5", "critico")
-    assert (suj["cels"]["2026-10"]["txt"], suj["cels"]["2026-10"]["tom"]) == ("4", "alerta")
-    assert veg["acum"]["txt"] == "3" and suj["acum"]["txt"] == "1"          # a última leitura
-    assert [l["id"] for l in z1["linhas"]] == ["MPM", "MPS", "MPA", "rocada", "veg", "lavagem", "suj", "pr", "disp"]
+    ordem = ["MPM", "MPS", "MPA", "rocada", "lavagem", "pr", "pr_exp", "disp", "disp_exp"]
+    assert [l["id"] for l in z1["linhas"]] == ordem and [l["id"] for l in d["total"]] == ordem
     tot = {l["id"]: l for l in d["total"]}
-    assert [l["id"] for l in d["total"]] == ["MPM", "MPS", "MPA", "rocada", "veg", "lavagem", "suj", "pr", "disp"]
-    assert tot["veg"]["cels"]["2026-10"]["txt"] == "1" and tot["suj"]["cels"]["2026-10"]["txt"] == "1"
+    assert [tot[k]["nome"] for k in ("pr", "pr_exp", "disp", "disp_exp")] == ["PR ponderado", "PR expurgado", "Disponibilidade",
+                                                                               "Disponibilidade expurgada"]
     # o PR do contrato no mês contra a meta do mês pela potência: (78 × 3 + 80 × 1) / 4 = 78,5; o PR 76,8 fica amarelo
     assert tot["pr"]["cels"]["2026-10"]["tom"] == "alerta" and "78,5" in tot["pr"]["cels"]["2026-10"]["dica"]
 
@@ -284,30 +285,41 @@ def test_a_lavagem_e_a_supressao_nas_os_do_fracttal():
         ("lavagem", "2026-09-10", "501"), ("rocada", "2026-09-12", "9004"), ("lavagem", "2026-11-02", "9002")]
 
 
-def test_a_lavagem_feita_ou_nao_sobre_o_pr_expurgado():
-    """Levi, 26/11/2026: "supressão vegetal e lavagem de módulos tem que mostrar se foi feita ou não sobre o PR expurgado".
-    O PR da tabela é o expurgado (o `com_expurgo` da Visão gerencial), com asterisco quando o expurgo mudou o número; o
-    mês sem lavagem diz "não", e fica em atenção quando o PR expurgado ficou abaixo da meta e a sujidade da ronda em 4 ou
-    5; antes do 1º mês do arquivo do PCM, "s/d"; o mês que não chegou, em branco."""
+def test_o_pr_expurgado_e_a_lavagem_pelo_prazo_do_contrato():
+    """Levi, 27/11/2026: "Eu tô sentindo falta do PR ponderado, PR expurgado"; "Disponibilidade expurgada também, mesma
+    lógica"; e da supressão e da lavagem: "tem que ser a data que foi feita [...] E não feita, a depender do prazo do
+    contrato". O mês com o serviço mostra a data; sem ele, "atrasada" quando o prazo do contrato (o mínimo do ano: 2 por ano
+    = a cada 6 meses) venceu desde a última; sem prazo no contrato, a dica diz a última; antes do arquivo do PCM, s/d."""
     usinas = [{"uid": 1, "usina": "Zeta 1", "mwp": 3.0,
                "meses": {"2026-10": {"pr": 74.0, "disp": 99.0}, "2026-11": {"pr": 76.0, "disp": 99.0}},
-               "com_expurgo": {"2026-10": {"disp": 99.0, "pr": 75.0}, "2026-11": {"disp": 99.0, "pr": 76.0}}}]
-    rondas = {1: [{"data": "2026-10-08", "sujidade": 4, "vegetacao": 2}, {"data": "2026-11-05", "sujidade": 5, "vegetacao": 4}]}
-    zel = {1: {"lavagem": ["2026-11-12"], "rocada": []}}
-    d = _montar(usinas=usinas, zel=zel, rondas=rondas, zel_desde="2026-10")
-    z1 = d["usinas"][0]
-    pr = _linha(z1, "pr")["cels"]
-    assert pr["2026-10"]["txt"] == "75,0*" and "sem o expurgo 74,0%" in pr["2026-10"]["dica"]
-    assert pr["2026-11"]["txt"] == "76,0"                                # o expurgo não mudou: sem asterisco
+               "com_expurgo": {"2026-10": {"disp": 99.0, "pr": 75.0}, "2026-11": {"disp": 99.0, "pr": 76.0}}},
+              {"uid": 2, "usina": "Zeta 2", "mwp": 1.0, "meses": {}, "com_expurgo": {}}]
+    zel = {1: {"lavagem": ["2026-03-10", "2026-11-12"], "rocada": []}, 2: {"lavagem": ["2026-10-05"]}}
+    d = _montar(usinas=usinas, zel=zel, zel_min={1: {"lavagem": 2, "rocada": 4}, 2: {}}, zel_desde="2026-09")
+    z1 = next(u for u in d["usinas"] if u["uid"] == 1)
+    pr, pe = _linha(z1, "pr")["cels"], _linha(z1, "pr_exp")["cels"]
+    assert pr["2026-10"]["txt"] == "74,0" and pe["2026-10"]["txt"] == "75,0" and "sem o expurgo 74,0%" in pe["2026-10"]["dica"]
+    assert pe["2026-11"]["txt"] == "76,0" and "sem o expurgo" not in pe["2026-11"]["dica"]   # o expurgo não mudou
     lav, roc = _linha(z1, "lavagem")["cels"], _linha(z1, "rocada")["cels"]
-    assert lav["2026-09"]["txt"] == "s/d"                                # antes do arquivo do PCM: sem dado
-    assert (lav["2026-10"]["txt"], lav["2026-10"]["tom"]) == ("não", "alerta")      # PR 75 < 78 e sujidade 4
-    assert "PR expurgado 75,0% (meta 78,0%)" in lav["2026-10"]["dica"] and "sujidade da ronda 4" in lav["2026-10"]["dica"]
-    assert (lav["2026-11"]["txt"], lav["2026-11"]["tom"]) == ("12/11", "ok")         # feita: a data
-    assert (roc["2026-10"]["txt"], roc["2026-10"]["tom"]) == ("não", "")             # vegetação 2: não, sem atenção
-    assert (roc["2026-11"]["txt"], roc["2026-11"]["tom"]) == ("não", "alerta")       # vegetação 4 e PR 76 < 78
-    assert lav["2026-12"]["txt"] == ""                                   # ainda não chegou
+    # a última em 10/03 e uma a cada 6 meses: venceu em 10/09
+    assert (lav["2026-09"]["txt"], lav["2026-09"]["tom"]) == ("atrasada", "critico") and "venceu em 10/09/26" in lav["2026-09"]["dica"]
+    assert lav["2026-10"]["txt"] == "atrasada" and (lav["2026-11"]["txt"], lav["2026-11"]["tom"]) == ("12/11", "ok")
+    assert "a próxima vence em 12/05/27" in lav["2026-11"]["dica"] and lav["2026-12"]["txt"] == ""
+    # nenhuma roçada desde o 1º mês do arquivo do PCM (set/26) e uma a cada 3 meses: ainda no prazo em nov/26
+    assert roc["2026-11"]["txt"] == "—" and "vence em 01/12/26" in roc["2026-11"]["dica"]
+    z2 = next(u for u in d["usinas"] if u["uid"] == 2)
+    l2 = _linha(z2, "lavagem")["cels"]
+    assert l2["2026-10"]["txt"] == "05/10" and l2["2026-11"]["txt"] == "—"
+    assert "a última em 05/10/26" in l2["2026-11"]["dica"] and "não traz o prazo" in l2["2026-11"]["dica"]
     tot = {l["id"]: l for l in d["total"]}
-    assert tot["lavagem"]["cels"]["2026-10"]["tom"] == "alerta" and "1 sem o serviço" in tot["lavagem"]["cels"]["2026-10"]["dica"]
+    assert (tot["lavagem"]["cels"]["2026-10"]["txt"], tot["lavagem"]["cels"]["2026-10"]["tom"]) == ("1 atras.", "critico")
     assert (tot["lavagem"]["cels"]["2026-11"]["txt"], tot["lavagem"]["cels"]["2026-11"]["tom"]) == ("1", "ok")
-    assert [l["nome"] for l in d["total"] if l["id"] == "pr"] == ["PR expurgado"]
+    r = d["resumo"]
+    assert r["pr"] == tot["pr_exp"]["acum"]["txt"] and r["pr_sem_expurgo"] == tot["pr"]["acum"]["txt"]
+    assert I.passo_do_contrato(2) == 6 and I.passo_do_contrato(4) == 3 and I.passo_do_contrato(None) is None
+    # o relógio começa no início da vigência: o contrato que começou em 20/10 não deve a lavagem vencida em setembro
+    d = _montar(contrato={"inicio": "2026-10-20"}, usinas=usinas, zel=zel, zel_min={1: {"lavagem": 2, "rocada": 4}, 2: {}},
+                zel_desde="2026-01")
+    lav = _linha(next(u for u in d["usinas"] if u["uid"] == 1), "lavagem")["cels"]
+    assert lav["2026-09"]["txt"] == "—" and "antes do início da vigência" in lav["2026-09"]["dica"]
+    assert lav["2026-10"]["txt"] == "—" and "vence em 20/04/27" in lav["2026-10"]["dica"]

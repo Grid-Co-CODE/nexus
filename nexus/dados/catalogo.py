@@ -1342,6 +1342,31 @@ FATOS = (
                     "meta_alta (a meta do mês fora de 2 a 8 kWh por kWp por dia) e geracao_impossivel (dia tirado da "
                     "conta pelo filtro de geração acima da potência × 12 h); vazia = normal; só sinaliza, o número não "
                     "muda (a Visão do responsável diz que o dado pode estar errado)"),
+    # o PR e a disponibilidade de cada usina em cada mês, com e sem o expurgo do contrato, já calculados (27/11/2026, Levi,
+    # na aba Indicadores dos contratos: "Pode até criar um book sobre isso para você não ficar carregando, calculando toda
+    # vez que abre"): derivado no Nexus da conta da Visão gerencial (nexus/comando/kpi_mes.py)
+    Fato("kpi_usina_mes", "PR e disponibilidade da usina no mês, com e sem o expurgo", "comando",
+         "derivado no Nexus da conta da Visão gerencial (nexus/comando/kpi_mes.py, gerencial.montar + expurgos.aplicar)",
+         "1 linha = 1 usina × 1 mês (o PR e a disponibilidade do mês, com e sem o expurgo do contrato)",
+         _d(data=("id", "data_id_mes (o dia 1º do mês, AAAAMM01)"),
+            usina=("id", "usina_id (a do cadastro, que a Visão gerencial já traz ligada)"),
+            cliente=("cod", "cliente (o nome do cliente na Visão gerencial)")),
+         tipo="snapshot_periodico", chave=("kpi_id",),
+         medidas=_m((("pr_pct", "%", "nao"), ("pr_exp_pct", "%", "nao"),
+                     ("disp_pct", "%", "nao"), ("disp_exp_pct", "%", "nao"), ("prod_kwh", "kWh", "aditiva"),
+                     ("meta_kwh", "kWh", "aditiva"), ("mes_fechado", "1/0", "nao"))),
+         fontes=("nexus_performance · fato_meta_usina_mes", "falhas_performance · disponibilidade_dia",
+                 "nexus_cos_normalizacoes · fato_normalizacao"),
+         janela_origem="desde 10/2026 (o banco de performance); o mês fechado fica como foi gravado",
+         estado="conformado", conformado_em="nexus_kpi_usina_mes · fato_kpi_usina_mes",
+         observacao="a mesma conta da Visão gerencial e do Comando (o com_expurgo: a queda da rede e a limitação imposta "
+                    "saem da conta; o PR expurgado = pr × (prod + E) ÷ prod). Sem expurgo no mês, o expurgado repete o "
+                    "bruto. O PR acima de 100% é leitura errada e fica vazio. O contrato pondera pela potencia_kwp (a "
+                    "potência da usina no mês, atributo da linha e peso da média, não medida; não "
+                    "somar PR nem disponibilidade entre usinas). O mês fechado congela no dia 11 do seguinte (o Thopen "
+                    "fecha no dia 10): depois disso a linha do banco não muda; antes, cada volta a troca. A linha do "
+                    "banco que não veio na conta fica (o livro não encolhe). O texto do expurgo fica na conta viva "
+                    "(regra 8). kpi_id = <usina_id>-<AAAAMM>"),
     # As janelas da Visão do responsável (12/10/2026, Levi: "PR ao clicar aparece um card (...) essa mesma visão do PAINEL
     # NOC > HISTÓRICO > PR > PR DIÁRIO EXPANDIDO"; a meta "com uma tabelinha de dia do mês, geração meta, geração real"):
     # o dia a dia do Gerencial (a geração que fecha no atingimento, 13/10/2026) com o POA e o PR do PR diário do Painel
@@ -1913,6 +1938,12 @@ LIVROS = (
           "plataforma/gerencial_publicar.py (worker do servidor, `_ger_publicar` no app.py)", True,
           "no banco desde 12/10/2026 19:55 (1ª volta do worker do servidor depois do deploy da plataforma, conferida "
           "por GET). A Visão do responsável do Nexus lê; sem o livro, ela diz que a meta ainda não chegou"),
+    Livro("nexus_kpi_usina_mes", ("fato_kpi_usina_mes", "atualizacao"), "de hora em hora (:47), uma máquina por vez, só "
+          "quando as linhas mudam",
+          "nexus/comando/kpi_mes.py (laço do app.py e do servir.py; NEXUS_KPI_PUBLICAR=0 desliga numa máquina)", False,
+          "registrado em 27/11/2026 antes de existir (regra 10): nasce na 1ª volta depois do deploy. A aba Indicadores dos "
+          "contratos lê dele; sem ele, faz a conta como antes",
+          so_cresce=("fato_kpi_usina_mes",)),
     Livro("nexus_chamados", ("fato_chamado",), "de hora em hora (:50), uma máquina por vez",
           "nexus/campo/chamados_acompanhamento.py (laço do Campo; NEXUS_CHAMADOS_PUBLICAR=0 desliga numa máquina)", True,
           "no banco desde 12/10/2026 (1ª gravação pelo Nexus do PC, conferida por GET: 18 linhas, 17 abertas e 1 em "

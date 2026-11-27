@@ -296,22 +296,56 @@ def _metas_pr_bd(uids: set, nomes) -> dict:
     return out
 
 
-def _rondas_das_usinas(uids: set) -> dict:
-    """{uid: [{data, sujidade, vegetacao, os, tipo, validada}]}: as leituras das rondas do Usinas 360° (o livro das rondas
-    guarda 90 dias; as respostas do checklist, as das OS que o Nexus leu), a mesma conta do histórico da usina."""
-    from ...campo import ronda_checklist, visao
-    lr = visao.rondas()
-    dr = lr.dados or {}
-    if lr.erro:
-        raise RuntimeError(lr.erro)
-    resp = ronda_checklist.respostas()
-    out = {}
-    for uid in uids:
-        hist = visao.historico_usina(dr.get("todas") or [], resp, uid, dr.get("validacoes") or [])
-        out[uid] = [{"data": str(h.get("data") or "")[:10], "sujidade": h.get("sujidade"), "vegetacao": h.get("vegetacao"),
-                     "os": h.get("os"), "tipo": h.get("tipo") or "", "validada": bool(h.get("validada"))}
-                    for h in hist if h.get("data") and (h.get("sujidade") is not None or h.get("vegetacao") is not None)]
-    return out
+def _uid(v):
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return v
+
+
+def _usinas_kpi(cliente: str):
+    """(as usinas do cliente [{uid, usina, mwp, meses, com_expurgo}], os meses com dado, os avisos da conta) ou None
+    enquanto nada está pronto. O PR e a disponibilidade, com e sem o expurgo, vêm do livro `nexus_kpi_usina_mes`
+    (`comando/kpi_mes.py`, 27/11/2026, Levi: "Pode até criar um book sobre isso para você não ficar carregando,
+    calculando toda vez que abre"): o mês fechado é o do livro (congelado); o mês em curso, o da conta da Visão gerencial
+    quando ela está pronta (o livro é de até uma hora atrás). Sem a conta (o Nexus acabou de subir), as usinas do
+    cliente e os números saem só do livro, e a aba abre sem esperar."""
+    from flask import current_app
+
+    from ...campo import visao
+    from ...comando import kpi_mes as KM
+    from ...comando.gerencial import chave_cliente
+    from .gerencial_tela import dados_gerencial_sem_esperar
+    g = dados_gerencial_sem_esperar()
+    kpi = KM.ler(current_app.config)
+    mes_hoje = visao._agora().date().isoformat()[:7]
+    if g is not None:
+        cg = next((x for x in g.get("clientes") or [] if chave_cliente(x.get("cliente")) == chave_cliente(cliente)), None)
+        usinas = [dict(u, uid=_uid(u.get("uid"))) for u in (cg or {}).get("usinas") or []]
+        com_dado = {m["id"] for m in g.get("meses") or []}
+        avisos = [x for x in g.get("avisos") or []      # só os avisos das fontes desta aba
+                  if any(p in x for p in ("histórico", "disponibilidade", "expurgo", "limitaç", "religamento"))]
+    elif kpi:
+        base = visao._Base()
+        usinas, com_dado, avisos = [], set(), []
+        for uid, meses in kpi.items():
+            if not any(chave_cliente(v.get("cliente")) == chave_cliente(cliente) for v in meses.values()):
+                continue
+            kwp = next((v.get("kwp") for v in meses.values() if v.get("kwp")), None)
+            usinas.append({"uid": uid, "usina": str((base.por_id.get(uid) or {}).get("nome") or uid),
+                           "mwp": round(kwp / 1000, 3) if kwp else None, "meses": {}, "com_expurgo": {}})
+    else:
+        return None
+    for u in usinas:
+        meses, exp = dict(u.get("meses") or {}), dict(u.get("com_expurgo") or {})
+        for mid, v in (kpi.get(u["uid"]) or {}).items():
+            com_dado.add(mid)
+            if g is not None and mid >= mes_hoje and (meses.get(mid) or {}).get("pr") is not None:
+                continue                         # o mês em curso: a conta de agora, mais nova que o livro
+            meses[mid] = {**(meses.get(mid) or {}), "pr": v["pr"], "disp": v["disp"]}
+            exp[mid] = {"pr": v["pr_exp"], "disp": v["disp_exp"]}
+        u["meses"], u["com_expurgo"] = meses, exp
+    return usinas, com_dado, avisos
 
 
 @bp.route("/contratos/indicadores.json")
@@ -324,10 +358,8 @@ def contratos_indicadores():
 
     from ...campo import visao
     from ...comando import diagnostico_mes as DM
-    from ...comando.gerencial import chave_cliente
     from ...contratos import controle as K
     from ...contratos import indicadores as I
-    from .gerencial_tela import dados_gerencial_sem_esperar
     _so_interno()
     cliente = request.args.get("cliente", "")
     n = request.args.get("ano", type=int)
@@ -350,13 +382,12 @@ def contratos_indicadores():
         if not ano:
             out = {"ok": True, "sem_inicio": True}
         else:
-            g = dados_gerencial_sem_esperar()
-            if g is None:
+            pronto = _usinas_kpi(cliente)
+            if pronto is None:
                 resp = jsonify(ok=True, montando=True)
                 resp.headers["Cache-Control"] = "no-store"
                 return resp
-            cg = next((x for x in g.get("clientes") or [] if chave_cliente(x.get("cliente")) == chave_cliente(cliente)), None)
-            usinas = (cg or {}).get("usinas") or []
+            usinas, com_dado, avisos_g = pronto
             uids = {u.get("uid") for u in usinas}
             pcm, zel, zel_min, ligacao, avisos = _fontes_da_ligacao(cliente, uids, ano)
             from ...campo import responsaveis as R
@@ -366,19 +397,10 @@ def contratos_indicadores():
                 _log.exception("Contratos · Indicadores: a meta de PR da BD Performance não abriu")
                 metas_pr = {}
                 avisos.append("a meta de PR da BD Performance")
-            try:
-                rondas = _rondas_das_usinas(uids)
-            except Exception:            # noqa: BLE001 — sem as rondas, a vegetação e a sujidade ficam "—" e a aba diz
-                _log.exception("Contratos · Indicadores: as rondas não abriram")
-                rondas = {}
-                avisos.append("as rondas do Usinas 360° (a vegetação e a sujidade)")
-            if not cg:
+            if not usinas:
                 avisos.append("o cliente não tem usina mobilizada no cadastro com este nome")
-            com_dado = {m for m in (x["id"] for x in g.get("meses") or [])}
             out = I.montar(c, (vis.get("fichas") or {}).get(cliente), ano, usinas, pcm, zel, zel_min, hoje, com_dado,
-                           ligacao, avisos + [x for x in g.get("avisos") or []      # só os avisos das fontes desta aba
-                                              if any(p in x for p in ("histórico", "disponibilidade", "expurgo", "limitaç", "religamento"))],
-                           metas_pr=metas_pr, rondas=rondas, zel_desde=_zel_desde(current_app.config))
+                           ligacao, avisos + avisos_g, metas_pr=metas_pr, zel_desde=_zel_desde(current_app.config))
             atual = K.ano_contratual(prim, hoje)
             out["anos"] = [{"n": i, "ini": K.ano_contratual(prim, hoje, i)["ini"], "fim": K.ano_contratual(prim, hoje, i)["fim"]}
                            for i in range(1, atual["n"] + 1)] if atual else []
@@ -396,7 +418,7 @@ def contratos_indicadores():
 # datas, os serviços de zeladoria com a data, o PR e a disponibilidade com a meta, o expurgo e a conta. Só lê: as fontes
 # são as mesmas da aba, nas cópias que já estão na memória.
 _ROT_LINHA = {"MPM": "MPM", "MPS": "MPS", "MPA": "MPA", "rocada": "Supressão vegetal", "lavagem": "Lavagem de módulos",
-              "veg": "Vegetação na ronda", "suj": "Sujidade na ronda", "pr": "PR expurgado", "disp": "Disponibilidade expurgada"}
+              "pr": "PR", "pr_exp": "PR expurgado", "disp": "Disponibilidade", "disp_exp": "Disponibilidade expurgada"}
 
 
 def _br(v, casas=1):
@@ -410,10 +432,8 @@ def contratos_indicadores_celula():
 
     from ...campo import responsaveis as R
     from ...campo import visao
-    from ...comando.gerencial import chave_cliente
     from ...contratos import controle as K
     from ...contratos import indicadores as I
-    from .gerencial_tela import dados_gerencial_sem_esperar
     _so_interno()
     cliente, linha, mes = request.args.get("cliente", ""), request.args.get("linha", ""), request.args.get("mes", "")
     n = request.args.get("ano", type=int)
@@ -434,9 +454,7 @@ def contratos_indicadores_celula():
     if any(i not in {m["id"] for m in meses} for i in ids):
         abort(404)
     rot_mes = "a janela toda (" + meses[0]["rot"] + " a " + meses[-1]["rot"] + ")" if mes == "acum" else next(m["rot"] for m in meses if m["id"] == mes)
-    g = dados_gerencial_sem_esperar() or {}
-    cg = next((x for x in g.get("clientes") or [] if chave_cliente(x.get("cliente")) == chave_cliente(cliente)), None) or {}
-    usinas = {u.get("uid"): u for u in cg.get("usinas") or []}
+    usinas = {u["uid"]: u for u in (_usinas_kpi(cliente) or ([], set(), []))[0]}
     if uid_txt == "t":
         alvo, nome_alvo = set(usinas), f"{cliente} (contrato inteiro)"
     else:
@@ -448,7 +466,7 @@ def contratos_indicadores_celula():
             abort(404)
         alvo, nome_alvo = {uid}, usinas[uid].get("usina")
     out = {"ok": True, "titulo": f"{_ROT_LINHA[linha]} · {nome_alvo} · {rot_mes}", "os": [], "servicos": [], "numeros": [],
-           "usinas": [], "rondas": [], "textos": [], "fonte": ""}
+           "usinas": [], "textos": [], "fonte": ""}
     nomes = R.Nomes(visao._Base())
     memo: dict = {}
 
@@ -480,26 +498,6 @@ def contratos_indicadores_celula():
                         "feita é a Finalizada. A OS abre o card do Fracttal.")
         if lei is None:
             out["textos"].append("As tarefas do PCM ainda estão chegando: abra de novo em instantes.")
-    elif linha in ("veg", "suj"):
-        campo = "vegetacao" if linha == "veg" else "sujidade"
-        try:
-            rds = _rondas_das_usinas(alvo)
-        except Exception:                # noqa: BLE001
-            rds = {}
-            out["textos"].append("As rondas do Usinas 360° não abriram agora.")
-        for u, lista in rds.items():
-            for r in lista:
-                if r["data"][:7] in ids and r.get(campo) is not None:
-                    out["rondas"].append({"data": r["data"], "nivel": r[campo], "tom": I.tom_nivel(r[campo]),
-                                          "os": str(r.get("os") or ""), "tipo": "validação por foto" if r["validada"] else (r["tipo"] or "ronda"),
-                                          "usina": (usinas.get(u) or {}).get("usina") or ""})
-        out["rondas"].sort(key=lambda r: (r["data"], r["usina"]), reverse=True)
-        altos = [r for r in out["rondas"] if r["nivel"] >= 4]
-        out["numeros"] = [{"rot": "Leituras", "val": str(len(out["rondas"]))}, {"rot": "Em 4 ou 5", "val": str(len(altos))},
-                          {"rot": "A pior", "val": str(max((r["nivel"] for r in out["rondas"]), default="—"))}]
-        out["fonte"] = ("As rondas do Usinas 360°: a " + ("vegetação" if linha == "veg" else "sujidade") + " que o técnico marca no "
-                        "checklist da ronda, de 1 (muito baixa) a 5 (muito alta); 4 pede atenção e 5, ação (a régua das Rondas). "
-                        "O livro das rondas guarda 90 dias. A OS abre o card do Fracttal.")
     elif linha in ("rocada", "lavagem"):
         from ...pcm import fonte as PF
         from ...zeladoria import leitura
@@ -512,8 +510,8 @@ def contratos_indicadores_celula():
                     out["servicos"].append({"data": sv["data"], "servico": sv["servico"][:1].upper() + sv["servico"][1:].lower() if sv["rotulo"] != "OS do Fracttal" else sv["servico"],
                                             "origem": sv["rotulo"], "os": sv["os"], "id": sv.get("id"), "usina": (usinas.get(uu) or {}).get("usina") or ""})
         out["servicos"].sort(key=lambda s: (s["data"], s["usina"]))
-        # feita ou não, sobre o PR expurgado: as usinas do mês sem o serviço, com o PR abaixo da meta e a ronda em 4 ou 5,
-        # lidas da conta da aba que já está na memória (a mesma célula, a mesma dica)
+        # as atrasadas pelo prazo do contrato da zeladoria, lidas da conta da aba que já está na memória (a mesma célula,
+        # a mesma dica); na usina, também os meses sem o serviço com a data da última
         copia = (current_app.extensions.get("nexus_contratos_indicadores") or {}).get((cliente, n))
         for u in ((copia or [0, {}])[1].get("usinas") or []):
             if u.get("uid") not in alvo:
@@ -521,53 +519,55 @@ def contratos_indicadores_celula():
             ln = next((x for x in u["linhas"] if x["id"] == linha), None) or {}
             for mid in ids:
                 cel = (ln.get("cels") or {}).get(mid) or {}
-                if cel.get("tom") == "alerta" or (uid_txt != "t" and cel.get("txt") == "não"):
+                if cel.get("txt") == "atrasada" or (uid_txt != "t" and cel.get("txt") == "—"):
                     out["usinas"].append({"usina": u.get("usina"), "mes": next(m["rot"] for m in meses if m["id"] == mid),
-                                          "val": "não", "tom": cel.get("tom") or "", "extra": cel.get("dica") or ""})
+                                          "val": cel.get("txt"), "tom": cel.get("tom") or "", "extra": cel.get("dica") or ""})
         nome_sv = "supressão" if linha == "rocada" else "lavagem"
-        out["usinas_titulo"] = (f"Sem {nome_sv}, com o PR expurgado abaixo da meta e a ronda em 4 ou 5" if uid_txt == "t"
-                                else f"Os meses sem {nome_sv}")
-        em_alerta = sum(1 for x in out["usinas"] if x["tom"] == "alerta")
-        out["numeros"] = [{"rot": "Feitas", "val": str(len(out["servicos"]))}, {"rot": "Não feitas em atenção", "val": str(em_alerta)}]
+        out["usinas_titulo"] = (f"Com a {nome_sv} atrasada pelo prazo do contrato" if uid_txt == "t" else f"Os meses sem {nome_sv}")
+        atrasadas = sum(1 for x in out["usinas"] if x["val"] == "atrasada")
+        out["numeros"] = [{"rot": "Feitas", "val": str(len(out["servicos"]))}, {"rot": "Atrasadas", "val": str(atrasadas)}]
         out["fonte"] = ("Os serviços feitos do Radar da Zeladoria, como o Histórico de Serviços os junta (o histórico de serviços, "
                         "a cotação com a execução terminada, a rota da equipe e a OS de contrato), e as OS finalizadas do Fracttal "
                         "(as tarefas de limpeza de módulos e de supressão vegetal do ano). A OS do Fracttal a até 10 dias de um "
-                        "serviço do Radar é o mesmo serviço. O mínimo do ano vem do contrato da zeladoria de cada UFV. "
-                        "Em atenção: o mês sem o serviço com o PR expurgado abaixo da meta e a " + ("vegetação" if linha == "rocada" else "sujidade")
-                        + " da ronda em 4 ou 5. A perda de PR por sujeira ou mato não é medida em lugar nenhum, então não há número dela.")
+                        "serviço do Radar é o mesmo serviço. O prazo é o do contrato da zeladoria de cada UFV: o mínimo do ano "
+                        "vira o intervalo (2 por ano, uma a cada 6 meses); passou do intervalo desde a última sem o serviço, "
+                        "atrasada. A UFV sem prazo no contrato só mostra as datas.")
     else:
+        e_pr, expurgado = linha.startswith("pr"), linha.endswith("_exp")
         mt = I.metas(c, (vis.get("fichas") or {}).get(cliente))
-        meta = (mt["pr"] if linha == "pr" else mt["disp"]) or {}
-        metas_bd = _metas_pr_bd(alvo, nomes) if linha == "pr" and not meta else {}
+        meta = (mt["pr"] if e_pr else mt["disp"]) or {}
+        metas_bd = _metas_pr_bd(alvo, nomes) if e_pr and not meta else {}
         for u in sorted((usinas[x] for x in alvo), key=lambda x: -(x.get("mwp") or 0)):
             for mid in ids:
                 mm = (u.get("meses") or {}).get(mid) or {}
                 ex = (u.get("com_expurgo") or {}).get(mid) or {}
-                if linha == "pr":
-                    v = ex.get("pr") if ex.get("pr") is not None else mm.get("pr")
+                if e_pr:
+                    v = ex.get("pr") if expurgado and ex.get("pr") is not None else mm.get("pr")
                     v = v if v is not None and 0 < v <= I.PR_MAX else None
-                    extra = ((f"sem o expurgo {_br(mm.get('pr'))}% · " if ex.get("pr") is not None and mm.get("pr") is not None
+                    extra = ((f"sem o expurgo {_br(mm.get('pr'))}% · " if expurgado and ex.get("pr") is not None and mm.get("pr") is not None
                               and round(ex["pr"], 2) != round(mm["pr"], 2) else "")
-                             + f"geração {_br(mm.get('prod_kwh'), 0)} kWh de {_br(mm.get('meta_kwh'), 0)} kWh previstos") if mm else ""
+                             + (f"geração {_br(mm.get('prod_kwh'), 0)} kWh de {_br(mm.get('meta_kwh'), 0)} kWh previstos"
+                                if mm.get("prod_kwh") is not None else "")) if mm else ""
                 else:
-                    v = ex.get("disp") if ex.get("disp") is not None else mm.get("disp")
-                    extra = f"sem o expurgo {_br(mm.get('disp'))}%" if mm.get("disp") is not None else ""
+                    v = ex.get("disp") if expurgado and ex.get("disp") is not None else mm.get("disp")
+                    extra = f"sem o expurgo {_br(mm.get('disp'))}%" if expurgado and mm.get("disp") is not None else ""
                     item = next((i for i in ((u.get("score") or {}).get(mid) or {}).get("itens") or [] if i.get("nome") == "Disponibilidade"), None)
                     if item and item.get("expurgo") and uid_txt != "t":
                         out["textos"].append(f"{next(m['rot'] for m in meses if m['id'] == mid)}: {item['expurgo']}")
                 if v is None and not mm:
                     continue
                 mu = meta.get("pct") if meta else (metas_bd.get(u.get("uid")) or {}).get(mid)
-                if linha == "pr" and not meta:
+                if e_pr and not meta:
                     extra = (f"meta {_br(mu)}% (BD Performance)" if mu is not None else "sem meta na BD") + (" · " + extra if extra else "")
                 out["usinas"].append({"usina": u.get("usina"), "mes": next(m["rot"] for m in meses if m["id"] == mid),
                                       "val": _br(v) + "%" if v is not None else "s/d", "tom": I.tom_kpi(v, mu), "extra": extra})
         out["numeros"] = [{"rot": "Meta do contrato" if meta else "Meta", "val": (_br(meta["pct"]) + "%") if meta.get("pct") is not None
-                           else ("por usina, da BD Performance" if linha == "pr" else "sem meta")}]
-        out["fonte"] = ("A Visão gerencial: o PR do mês que a Performance publica (desde 10/2026) e a disponibilidade do "
-                        "Fracttal e do COS, os dois com o expurgo do contrato (a queda da rede e a limitação imposta saem da conta; "
-                        "o asterisco marca o mês em que o expurgo mudou o número). "
-                        "Meta: " + (meta.get("origem") or ("a da BD Performance (Info Mensal) e da BD Thopen (Dados Mensais 2026), por usina e mês" if linha == "pr" else "o contrato não traz")) + ".")
+                           else ("por usina, da BD Performance" if e_pr else "sem meta")}]
+        out["fonte"] = ("O livro do PR e da disponibilidade de cada usina e mês (a conta da Visão gerencial já feita, de hora em "
+                        "hora; o mês fechado congela no dia 11 do seguinte): o PR que a Performance publica (desde 10/2026) e a "
+                        "disponibilidade do Fracttal e do COS. " + ("Com o expurgo do contrato: a queda da rede e a limitação "
+                        "imposta saem da conta. " if expurgado else "Sem o expurgo do contrato. ") + "O contrato pondera pela potência. "
+                        "Meta: " + (meta.get("origem") or ("a da BD Performance (Info Mensal) e da BD Thopen (Dados Mensais 2026), por usina e mês" if e_pr else "o contrato não traz")) + ".")
         if any(i < "2026-10" for i in ids):
             out["textos"].append("Antes de 10/2026 o banco não tem o PR nem a disponibilidade por mês: esses meses ficam sem dado.")
     resp = jsonify(out)

@@ -13,6 +13,7 @@ import pytest
 from pg_falso import ApiPGFalsa, Resposta
 
 from nexus.campo import decisao_pt, ronda_avulsa
+from nexus.comando import kpi_mes
 from nexus.cos import normalizacoes_banco
 from nexus.dados import calendario, carga, catalogo, equipamento, fato_pt, fato_ronda, fatos, geracao, historico, livros
 from nexus.dados import fato_almoxarifado, fato_chamado, fato_inventario, fato_tarefa_os, fato_uso_os, programacao
@@ -78,6 +79,7 @@ def test_todo_fato_declara_tipo_chave_e_medidas_com_unidade():
 
 CABS = {"fechamento": fatos.CAB_FECHAMENTO, "ronda": fato_ronda.CAB_RONDA, "pt": fato_pt.CAB_PT,
         "atividade_usina_mes": AM.CAB,
+        "kpi_usina_mes": kpi_mes.CAB,
         "programacao": programacao.CAB_PROGRAMACAO, "geracao_usina_dia": geracao.CAB_USINA_DIA,
         "geracao_inversor_dia": geracao.CAB_INVERSOR_DIA, "chamado": fato_chamado.CAB_CHAMADO,
         "tarefa_os": fato_tarefa_os.CAB_TAREFA_OS, "saldo_almox": fato_almoxarifado.CAB_SALDO,

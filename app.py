@@ -57,6 +57,10 @@ if __name__ == "__main__":
     # onde a chave do Andamento está, o servidor; NEXUS_NORMALIZACOES_PUBLICAR=0 desliga)
     from nexus.cos import normalizacoes_banco
     normalizacoes_banco.ligar(app)
+    # o PR e a disponibilidade de cada usina e mês, com e sem o expurgo, no banco, para a aba Indicadores dos contratos
+    # (27/11/2026; NEXUS_KPI_PUBLICAR=0 desliga)
+    from nexus.comando import kpi_mes
+    kpi_mes.ligar(app)
     from nexus.pcm.relatorios import agenda as relatorios_pcm
     relatorios_pcm.ligar(app)                # os relatórios do PCM nos horários de lá (14/10/2026; 0 = desliga)
     from nexus.auth import pre_carga

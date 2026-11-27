@@ -66,6 +66,7 @@ RESUMO = {
     "decisao_depara": "Como cada usina e inversor de cada fonte liga ao cadastro",
     "decisao_vinculo_os": "A OS do Fracttal vinculada a cada falha de string e de tracker",
     "meta_usina_mes": "Quanto cada usina gerou no mês contra a meta, pelo Gerencial",
+    "kpi_usina_mes": "O PR e a disponibilidade de cada usina no mês, com e sem expurgo",
     "desempenho_usina_dia": "A geração, o POA e o PR de cada usina dia a dia, contra a meta",
     "disponibilidade_os": "As OS de religamento e corretiva que tiraram disponibilidade",
     "disponibilidade_os_dia": "Quanto cada OS tirou da disponibilidade em cada dia",
@@ -275,6 +276,10 @@ PARA_QUE = {
     "decisao_cobertura": "Guarda cada decisão de incluir ou tirar uma usina de uma fonte do tempo real, tomada por um "
                          "administrador na tela Fontes do tempo real. A Plataforma de Performance lê esta tabela e só "
                          "coleta e mostra as usinas incluídas; usina nova numa fonte espera a liberação.",
+    "kpi_usina_mes": "Guarda, para cada usina e cada mês, o PR e a disponibilidade com e sem o expurgo do contrato (a "
+                     "queda da rede e a limitação imposta), já calculados pela conta da Visão gerencial, e a potência para "
+                     "a média do contrato. A aba Indicadores dos contratos lê daqui sem refazer a conta; o mês fechado "
+                     "fica como foi gravado.",
     "meta_usina_mes": "Guarda, para cada usina e cada mês, a produção, a meta até os dias cobertos, o atingimento e o "
                       "PR contra o PR previsto, os mesmos números da Visão gerencial da plataforma. É de onde a Visão "
                       "do responsável do Nexus tira a meta do mês de cada usina.",
