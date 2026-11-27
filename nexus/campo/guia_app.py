@@ -22,7 +22,10 @@ from pathlib import Path
 
 PASTA = Path(__file__).resolve().parents[1] / "static" / "guia-app"
 ID_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,40}")
-ARQ_RE = re.compile(r"telas/[a-z0-9][a-z0-9-]{0,60}\.html")
+ARQ_RE = re.compile(r"telas/[a-z0-9][a-z0-9-]{0,60}\.(html|png)")
+# o print do App em PNG (27/11/2026, Levi: "peça fotos novas para o app de campo"): o `arquivo` é o escuro e o
+# `arquivo_claro` o claro; o `arquivo_html` (o telefone antigo, só durante a troca) a tela não usa
+PNG_RE = re.compile(r"telas/[a-z0-9][a-z0-9-]{0,60}\.png")
 _FONTE_RE = re.compile(r"\s*\[([^\[\]]{1,120})\]\s*$")
 _CACHE: dict = {}
 
@@ -56,8 +59,12 @@ def _pergunta(p) -> dict | None:
     telas = []
     for t in p.get("telas") or []:
         arq = str((t or {}).get("arquivo") or "").strip() if isinstance(t, dict) else ""
-        if ARQ_RE.fullmatch(arq):           # o caminho vai ao src do iframe: só o formato do pacote
-            telas.append({"arquivo": arq, "legenda": str(t.get("legenda") or "").strip()})
+        if ARQ_RE.fullmatch(arq):           # o caminho vai ao src do iframe ou da imagem: só o formato do pacote
+            tela = {"arquivo": arq, "legenda": str(t.get("legenda") or "").strip()}
+            if arq.endswith(".png"):
+                claro = str(t.get("arquivo_claro") or "").strip()
+                tela.update(arquivo_claro=claro if PNG_RE.fullmatch(claro) else "", imagem=True)
+            telas.append(tela)
     resumo, regras, casos = _lista(p.get("resumo")), _lista(p.get("regras")), _lista(p.get("casos"))
     return {"id": pid, "titulo": titulo, "tema": str(p.get("tema") or "").strip() or "Outros",
             "publico": _lista(p.get("publico")), "resumo": resumo, "regras": [regra(r) for r in regras],

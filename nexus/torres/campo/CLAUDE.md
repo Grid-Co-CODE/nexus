@@ -3006,8 +3006,14 @@ alto, a separação por tema e o texto curto, "para quem tem pouco tempo, porém
   330 × 710 do desenho e é reduzido por inteiro, `scale(.9091)`, para o cartão de 300 × 646**: até 27/11/2026 era um
   iframe de 260 px para uma tela desenhada em 330, e o texto se cruzava; Levi: "prints mal dimensionados, tela mais
   estreita e palavras se cruzando". Mudou o `max-width` do `.fone` no `_fone.css` do pacote, muda a conta no
-  `guia-app.css`. No mesmo dia o Levi pediu prints novos ao chat do App, em PNG; quando chegarem, a tela passa a mostrar
-  a imagem),
+  `guia-app.css`). **Desde 27/11/2026 as telas são PRINTS do App de verdade em PNG** (pedido do Levi ao chat do App:
+  "peça fotos novas para o app de campo"): 780 × 1688 (390 × 844 em escala 2), sem moldura, dados fictícios, o `arquivo`
+  no escuro e o `arquivo_claro` no claro (`*-escuro.png` / `*-claro.png`; `PNG_RE` no `guia_app.py`, o claro fora do
+  formato cai no escuro). A tela mostra a imagem inteira e proporcional numa moldura daqui (`.gu-fone-caixa--img`,
+  `.gu-print`), no tema do Nexus, e o `guia-app.js` troca a imagem quando o tema troca; o iframe fica só para tela
+  em HTML (o `arquivo_html` do pacote, o telefone antigo, a tela não usa). Os prints de 27/11 saíram com a fonte
+  reserva do Windows (a Poppins não está no computador do App); quando ela for liberada, o App refaz com o mesmo nome
+  de arquivo e basta copiar de novo,
   "Todas as regras (N)" fechado com a fonte apagada no fim da frase (`[fa:...; vNNN]` do pacote vira `.gu-fonte`) e os
   casos. A pergunta sem tela diz que elas vêm na próxima leva. Acima de cada pergunta e nos grupos da lista, só o nome
   do setor (o tema), em verde Grid (21/11/2026, Levi: "só quero o nome do setor em verde grid"): o público saiu. O `incerto` ("Para conferir") só para o administrador e o

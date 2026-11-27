@@ -12,7 +12,10 @@
   function tema() { return raiz.getAttribute("data-tema") === "claro" ? "claro" : "escuro"; }
   function avisar(f) { try { f.contentWindow && f.contentWindow.postMessage({ tipo: "tema", tema: tema() }, location.origin); } catch (e) { /* telefone ainda sem janela */ } }
   fones.forEach(function (f) { f.addEventListener("load", function () { avisar(f); }); });
-  new MutationObserver(function () { fones.forEach(avisar); }).observe(raiz, { attributes: true, attributeFilter: ["data-tema"] });
+  // os prints do App em PNG (27/11/2026): a imagem do tema da vez (data-escuro / data-claro)
+  var prints = Array.prototype.slice.call(document.querySelectorAll("img[data-guia-print]"));
+  function trocarPrints() { prints.forEach(function (im) { var s = im.getAttribute("data-" + tema()); if (s && im.getAttribute("src") !== s) im.setAttribute("src", s); }); }
+  new MutationObserver(function () { fones.forEach(avisar); trocarPrints(); }).observe(raiz, { attributes: true, attributeFilter: ["data-tema"] });
 
   var campo = document.querySelector("[data-guia-busca]");
   if (!campo) return;

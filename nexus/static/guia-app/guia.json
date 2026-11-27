@@ -1,8 +1,8 @@
 {
  "versao": 1,
- "atualizado_em": "2026-11-22",
- "app": "v368 no ar (22/11/2026): regras lidas no código; as telas são as do desenho novo, já publicado",
- "tema": "cada tela aceita ?tema=claro|escuro e a mensagem postMessage({tipo:'tema', tema})",
+ "atualizado_em": "2026-11-27",
+ "app": "v394 no ar (27/11/2026): regras lidas no código; as telas são prints do App de verdade (bancada de telas, dados fictícios), 390x844 em escala 2 (780x1688 px), sem moldura",
+ "tema": "arquivo = o print no tema escuro; arquivo_claro = o mesmo print no tema claro; arquivo_html = a tela antiga em HTML (aceita ?tema=claro|escuro), só enquanto o Nexus troca a leitura",
  "temas": [
   "PT e APR",
   "Segurança",
@@ -61,20 +61,28 @@
    ],
    "telas": [
     {
-     "arquivo": "telas/pontos-1.html",
-     "legenda": "O ciclo, a posição e os quatro indicadores"
+     "arquivo": "telas/pontos-1-escuro.png",
+     "legenda": "O ciclo, a posição e os quatro indicadores",
+     "arquivo_claro": "telas/pontos-1-claro.png",
+     "arquivo_html": "telas/pontos-1.html"
     },
     {
-     "arquivo": "telas/pontos-2.html",
-     "legenda": "Por que uma tarefa não contou"
+     "arquivo": "telas/pontos-2-escuro.png",
+     "legenda": "Por que uma tarefa não contou",
+     "arquivo_claro": "telas/pontos-2-claro.png",
+     "arquivo_html": "telas/pontos-2.html"
     },
     {
-     "arquivo": "telas/pontos-3.html",
-     "legenda": "A programação e o bônus da semana"
+     "arquivo": "telas/pontos-3-escuro.png",
+     "legenda": "A programação e o bônus da semana",
+     "arquivo_claro": "telas/pontos-3-claro.png",
+     "arquivo_html": "telas/pontos-3.html"
     },
     {
-     "arquivo": "telas/pontos-4.html",
-     "legenda": "Pontualidade: indicador, não soma ponto"
+     "arquivo": "telas/pontos-4-escuro.png",
+     "legenda": "Pontualidade: indicador, não soma ponto",
+     "arquivo_claro": "telas/pontos-4-claro.png",
+     "arquivo_html": "telas/pontos-4.html"
     }
    ]
   },
@@ -116,20 +124,28 @@
    ],
    "telas": [
     {
-     "arquivo": "telas/tracker-parado-1.html",
-     "legenda": "Na chegada, a linha Trackers diz quantos estão parados"
+     "arquivo": "telas/tracker-parado-1-escuro.png",
+     "legenda": "Na chegada, a linha Trackers diz quantos estão parados",
+     "arquivo_claro": "telas/tracker-parado-1-claro.png",
+     "arquivo_html": "telas/tracker-parado-1.html"
     },
     {
-     "arquivo": "telas/tracker-parado-2.html",
-     "legenda": "A lista por cabine e inversor, com o chamado aberto avisado"
+     "arquivo": "telas/tracker-parado-2-escuro.png",
+     "legenda": "A lista por cabine e inversor, com o chamado aberto avisado",
+     "arquivo_claro": "telas/tracker-parado-2-claro.png",
+     "arquivo_html": "telas/tracker-parado-2.html"
     },
     {
-     "arquivo": "telas/tracker-parado-3.html",
-     "legenda": "Não normalizado: motivo, ação e o chamado"
+     "arquivo": "telas/tracker-parado-3-escuro.png",
+     "legenda": "Não normalizado: motivo, ação e o chamado",
+     "arquivo_claro": "telas/tracker-parado-3-claro.png",
+     "arquivo_html": "telas/tracker-parado-3.html"
     },
     {
-     "arquivo": "telas/tracker-parado-4.html",
-     "legenda": "Sem ligação com o Fracttal: busca pela plaqueta"
+     "arquivo": "telas/tracker-parado-4-escuro.png",
+     "legenda": "Sem ligação com o Fracttal: busca pela plaqueta",
+     "arquivo_claro": "telas/tracker-parado-4-claro.png",
+     "arquivo_html": "telas/tracker-parado-4.html"
     }
    ]
   },
@@ -170,20 +186,28 @@
    ],
    "telas": [
     {
-     "arquivo": "telas/justificar-1.html",
-     "legenda": "Cada tarefa aberta tem o botão Justificar"
+     "arquivo": "telas/justificar-1-escuro.png",
+     "legenda": "Cada tarefa aberta tem o botão Justificar",
+     "arquivo_claro": "telas/justificar-1-claro.png",
+     "arquivo_html": "telas/justificar-1.html"
     },
     {
-     "arquivo": "telas/justificar-2.html",
-     "legenda": "Os motivos que tiram da programação vêm primeiro"
+     "arquivo": "telas/justificar-2-escuro.png",
+     "legenda": "Os motivos que tiram da programação vêm primeiro",
+     "arquivo_claro": "telas/justificar-2-claro.png",
+     "arquivo_html": "telas/justificar-2.html"
     },
     {
-     "arquivo": "telas/justificar-3.html",
-     "legenda": "Três motivos exigem o texto"
+     "arquivo": "telas/justificar-3-escuro.png",
+     "legenda": "Três motivos exigem o texto",
+     "arquivo_claro": "telas/justificar-3-claro.png",
+     "arquivo_html": "telas/justificar-3.html"
     },
     {
-     "arquivo": "telas/justificar-4.html",
-     "legenda": "A tarefa justificada sai da fila e vai para a seção própria"
+     "arquivo": "telas/justificar-4-escuro.png",
+     "legenda": "A tarefa justificada sai da fila e vai para a seção própria",
+     "arquivo_claro": "telas/justificar-4-claro.png",
+     "arquivo_html": "telas/justificar-4.html"
     }
    ]
   },
@@ -228,20 +252,28 @@
    ],
    "telas": [
     {
-     "arquivo": "telas/almoxarifado-1.html",
-     "legenda": "A peça entra na própria tarefa"
+     "arquivo": "telas/almoxarifado-1-escuro.png",
+     "legenda": "A peça entra na própria tarefa",
+     "arquivo_claro": "telas/almoxarifado-1-claro.png",
+     "arquivo_html": "telas/almoxarifado-1.html"
     },
     {
-     "arquivo": "telas/almoxarifado-2.html",
-     "legenda": "Só aparece o que tem saldo nesta usina"
+     "arquivo": "telas/almoxarifado-2-escuro.png",
+     "legenda": "Só aparece o que tem saldo nesta usina",
+     "arquivo_claro": "telas/almoxarifado-2-claro.png",
+     "arquivo_html": "telas/almoxarifado-2.html"
     },
     {
-     "arquivo": "telas/almoxarifado-3.html",
-     "legenda": "Uma contagem por mês, sem ver o saldo"
+     "arquivo": "telas/almoxarifado-3-escuro.png",
+     "legenda": "Uma contagem por mês, sem ver o saldo",
+     "arquivo_claro": "telas/almoxarifado-3-claro.png",
+     "arquivo_html": "telas/almoxarifado-3.html"
     },
     {
-     "arquivo": "telas/almoxarifado-4.html",
-     "legenda": "Em branco é não contei; 0 é não tem"
+     "arquivo": "telas/almoxarifado-4-escuro.png",
+     "legenda": "Em branco é não contei; 0 é não tem",
+     "arquivo_claro": "telas/almoxarifado-4-claro.png",
+     "arquivo_html": "telas/almoxarifado-4.html"
     }
    ]
   },
@@ -274,8 +306,10 @@
    "incerto": [],
    "telas": [
     {
-     "arquivo": "telas/sincronizacao-1.html",
-     "legenda": "Cada registro diz a situação e o que fazer"
+     "arquivo": "telas/sincronizacao-1-escuro.png",
+     "legenda": "Cada registro diz a situação e o que fazer",
+     "arquivo_claro": "telas/sincronizacao-1-claro.png",
+     "arquivo_html": "telas/sincronizacao-1.html"
     }
    ]
   },
@@ -305,8 +339,10 @@
    "incerto": [],
    "telas": [
     {
-     "arquivo": "telas/conta-fracttal-1.html",
-     "legenda": "O aviso vermelho com o botão Conectar"
+     "arquivo": "telas/conta-fracttal-1-escuro.png",
+     "legenda": "O aviso vermelho com o botão Conectar",
+     "arquivo_claro": "telas/conta-fracttal-1-claro.png",
+     "arquivo_html": "telas/conta-fracttal-1.html"
     }
    ]
   },
@@ -338,8 +374,10 @@
    "incerto": [],
    "telas": [
     {
-     "arquivo": "telas/os-sumiu-1.html",
-     "legenda": "A seção das OSs fora da programação"
+     "arquivo": "telas/os-sumiu-1-escuro.png",
+     "legenda": "A seção das OSs fora da programação",
+     "arquivo_claro": "telas/os-sumiu-1-claro.png",
+     "arquivo_html": "telas/os-sumiu-1.html"
     }
    ]
   },
@@ -367,8 +405,10 @@
    "incerto": [],
    "telas": [
     {
-     "arquivo": "telas/pausar-1.html",
-     "legenda": "As OSs pausadas, com o Retomar"
+     "arquivo": "telas/pausar-1-escuro.png",
+     "legenda": "As OSs pausadas, com o Retomar",
+     "arquivo_claro": "telas/pausar-1-claro.png",
+     "arquivo_html": "telas/pausar-1.html"
     }
    ]
   },
@@ -395,7 +435,13 @@
    ],
    "casos": [],
    "incerto": [],
-   "telas": []
+   "telas": [
+    {
+     "arquivo": "telas/apr-1-escuro.png",
+     "legenda": "Uma APR para a OS inteira, hoje, no primeiro Iniciar",
+     "arquivo_claro": "telas/apr-1-claro.png"
+    }
+   ]
   },
   {
    "id": "pt",
@@ -421,7 +467,13 @@
    ],
    "casos": [],
    "incerto": [],
-   "telas": []
+   "telas": [
+    {
+     "arquivo": "telas/pt-1-escuro.png",
+     "legenda": "Marcou atividade crítica: a PT vai junto, na mesma APR",
+     "arquivo_claro": "telas/pt-1-claro.png"
+    }
+   ]
   },
   {
    "id": "camera",
@@ -449,8 +501,10 @@
    ],
    "telas": [
     {
-     "arquivo": "telas/camera-1.html",
-     "legenda": "A escolha da câmera, explicada"
+     "arquivo": "telas/camera-1-escuro.png",
+     "legenda": "A escolha da câmera, explicada",
+     "arquivo_claro": "telas/camera-1-claro.png",
+     "arquivo_html": "telas/camera-1.html"
     }
    ]
   },
@@ -478,12 +532,16 @@
    "incerto": [],
    "telas": [
     {
-     "arquivo": "telas/ronda-1.html",
-     "legenda": "A chegada, com a ronda sugerida"
+     "arquivo": "telas/ronda-1-escuro.png",
+     "legenda": "A chegada, com a ronda sugerida",
+     "arquivo_claro": "telas/ronda-1-claro.png",
+     "arquivo_html": "telas/ronda-1.html"
     },
     {
-     "arquivo": "telas/ronda-2.html",
-     "legenda": "Etapa a etapa"
+     "arquivo": "telas/ronda-2-escuro.png",
+     "legenda": "Etapa a etapa",
+     "arquivo_claro": "telas/ronda-2-claro.png",
+     "arquivo_html": "telas/ronda-2.html"
     }
    ]
   },
@@ -511,8 +569,10 @@
    "incerto": [],
    "telas": [
     {
-     "arquivo": "telas/extintores-1.html",
-     "legenda": "A conferência do mês"
+     "arquivo": "telas/extintores-1-escuro.png",
+     "legenda": "A conferência do mês",
+     "arquivo_claro": "telas/extintores-1-claro.png",
+     "arquivo_html": "telas/extintores-1.html"
     }
    ]
   },
@@ -577,20 +637,28 @@
    ],
    "telas": [
     {
-     "arquivo": "telas/chamado-1.html",
-     "legenda": "O Concluir pergunta se ficou resolvido"
+     "arquivo": "telas/chamado-1-escuro.png",
+     "legenda": "O Concluir pergunta se ficou resolvido",
+     "arquivo_claro": "telas/chamado-1-claro.png",
+     "arquivo_html": "telas/chamado-1.html"
     },
     {
-     "arquivo": "telas/chamado-2.html",
-     "legenda": "Só os fabricantes deste tipo de equipamento"
+     "arquivo": "telas/chamado-2-escuro.png",
+     "legenda": "Só os fabricantes deste tipo de equipamento",
+     "arquivo_claro": "telas/chamado-2-claro.png",
+     "arquivo_html": "telas/chamado-2.html"
     },
     {
-     "arquivo": "telas/chamado-3.html",
-     "legenda": "O App mostra as perguntas antes de concluir"
+     "arquivo": "telas/chamado-3-escuro.png",
+     "legenda": "O App mostra as perguntas antes de concluir",
+     "arquivo_claro": "telas/chamado-3-claro.png",
+     "arquivo_html": "telas/chamado-3.html"
     },
     {
-     "arquivo": "telas/chamado-4.html",
-     "legenda": "A Inspeção nasce na fila do técnico"
+     "arquivo": "telas/chamado-4-escuro.png",
+     "legenda": "A Inspeção nasce na fila do técnico",
+     "arquivo_claro": "telas/chamado-4-claro.png",
+     "arquivo_html": "telas/chamado-4.html"
     }
    ]
   }

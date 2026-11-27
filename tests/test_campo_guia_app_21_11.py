@@ -9,6 +9,7 @@ que os temas aparecem) e a lista por tema; cada pergunta com o resumo, as telas 
 "Todas as regras (N)" fechado com a fonte separada e os casos; o "incerto" só para o administrador e o PCM; a pergunta
 sem tela diz que elas vêm depois; sem o guia, a página abre e diz. Guia de mentira; nada de nome real."""
 import json
+import re
 
 import pytest
 
@@ -130,6 +131,8 @@ def test_o_guia_de_verdade_no_repositorio_abre_e_nao_tem_tela_faltando():
     for p in g["perguntas"]:
         for t in p["telas"]:
             assert (G.PASTA / t["arquivo"]).is_file(), t["arquivo"]
+            if t.get("arquivo_claro"):
+                assert (G.PASTA / t["arquivo_claro"]).is_file(), t["arquivo_claro"]
 
 
 def test_os_temas_seguem_a_ordem_que_o_pacote_manda(tmp_path, monkeypatch):
@@ -170,3 +173,49 @@ def test_o_telefone_abre_no_tamanho_em_que_a_tela_foi_desenhada(app, guia):
     assert ".gu-fone iframe{display:block;width:330px;height:710px;border:0;background:transparent;transform:scale(.9091);transform-origin:0 0}" in css
     fone = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "guia-app" / "telas" / "_fone.css").read_text(encoding="utf-8")
     assert "body.guia-tela .fone{width:100%;max-width:330px" in fone
+
+
+@pytest.fixture
+def guia_png(tmp_path, monkeypatch):
+    """O pacote de 27/11/2026: cada tela é um PNG do App de verdade, no escuro (`arquivo`) e no claro (`arquivo_claro`);
+    o HTML antigo vem em `arquivo_html` só durante a troca."""
+    pasta = tmp_path / "guia-app"
+    (pasta / "telas").mkdir(parents=True)
+    guia = json.loads(json.dumps(GUIA))
+    guia["perguntas"][0]["telas"] = [
+        {"arquivo": "telas/pontos-1-escuro.png", "arquivo_claro": "telas/pontos-1-claro.png",
+         "arquivo_html": "telas/pontos-1.html", "legenda": "O ciclo e a posição"},
+        {"arquivo": "telas/pontos-2-escuro.png", "arquivo_claro": "../fora.png", "legenda": "Sem o claro válido"}]
+    (pasta / "guia.json").write_text(json.dumps(guia, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(G, "PASTA", pasta)
+    G.limpar()
+    yield pasta
+    G.limpar()
+
+
+def test_o_print_do_app_em_png_no_tema_do_nexus(app, guia_png):
+    """27/11/2026, Levi: "peça fotos novas para o app de campo". O App mandou os prints de verdade em PNG (780 x 1688, os
+    dois temas): a tela mostra a IMAGEM (sem iframe, proporcional, nada se cruza), no tema do Nexus, e troca com ele; o
+    claro inválido (fora de telas/) cai no escuro."""
+    g = G.carregar()
+    t1, t2 = g["perguntas"][0]["telas"]
+    assert t1 == {"arquivo": "telas/pontos-1-escuro.png", "arquivo_claro": "telas/pontos-1-claro.png",
+                  "legenda": "O ciclo e a posição", "imagem": True}
+    assert t2["arquivo_claro"] == "" and t2["imagem"] is True
+    escuro = _cliente(app, admin=True).get(URL).get_data(as_text=True)
+    p = escuro.split('id="p-pontos"', 1)[1].split('id="p-', 1)[0]
+    assert "<iframe" not in p
+    assert re.search(r'<img class="gu-print" src="/static/guia-app/telas/pontos-1-escuro\.png" '
+                     r'data-escuro="/static/guia-app/telas/pontos-1-escuro\.png" '
+                     r'data-claro="/static/guia-app/telas/pontos-1-claro\.png" alt="O ciclo e a posição" '
+                     r'width="390" height="844" loading="lazy" data-guia-print>', p)
+    claro = _cliente(app, admin=True, tema="claro").get(URL).get_data(as_text=True)
+    assert 'src="/static/guia-app/telas/pontos-1-claro.png"' in claro
+    # sem o claro válido, o escuro nos dois temas
+    assert 'src="/static/guia-app/telas/pontos-2-escuro.png" data-escuro="/static/guia-app/telas/pontos-2-escuro.png" data-claro="/static/guia-app/telas/pontos-2-escuro.png"' in claro
+    from pathlib import Path
+    raiz = Path(__file__).resolve().parent.parent / "nexus" / "static"
+    js = (raiz / "guia-app.js").read_text(encoding="utf-8")
+    assert "data-guia-print" in js and 'getAttribute("data-" + tema())' in js
+    css = (raiz / "guia-app.css").read_text(encoding="utf-8")
+    assert ".gu-fone-caixa--img{height:auto;" in css and ".gu-print{display:block;width:100%;height:auto;" in css

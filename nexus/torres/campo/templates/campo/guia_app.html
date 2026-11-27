@@ -61,8 +61,15 @@
         <div class="gu-fones">
           {% for t in p.telas %}
           <figure class="gu-fone">
+            {% if t.imagem %}
+            {# o print do App de verdade (27/11/2026, Levi: "peça fotos novas para o app de campo"): a imagem no tema do
+               Nexus, proporcional, com a moldura daqui; o guia-app.js troca com o tema #}
+            {% set esc = url_for('static', filename='guia-app/' ~ t.arquivo) %}{% set cla = url_for('static', filename='guia-app/' ~ (t.arquivo_claro or t.arquivo)) %}
+            <div class="gu-fone-caixa gu-fone-caixa--img"><img class="gu-print" src="{{ cla if tema == 'claro' else esc }}" data-escuro="{{ esc }}" data-claro="{{ cla }}" alt="{{ t.legenda or p.titulo }}" width="390" height="844" loading="lazy" data-guia-print></div>
+            {% else %}
             {# o telefone no tamanho do desenho, reduzido por inteiro (27/11/2026: "tela mais estreita e palavras se cruzando") #}
             <div class="gu-fone-caixa"><iframe src="{{ url_for('static', filename='guia-app/' ~ t.arquivo, tema=tema) }}" title="{{ t.legenda or p.titulo }}" loading="lazy" data-guia-fone></iframe></div>
+            {% endif %}
             {% if t.legenda %}<figcaption>{{ t.legenda }}</figcaption>{% endif %}
           </figure>
           {% endfor %}
