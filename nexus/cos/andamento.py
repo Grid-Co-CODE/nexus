@@ -132,17 +132,27 @@ def api_da_ronda(config) -> str:
 # HTTPS e o navegador barra página HTTP dentro dele, então o site vem pelo Caddy do servidor da Ronda COS. Sem a variável,
 # o endereço sai do do Andamento: o servidor dele por IP vira `https://console.<IP com hífens>.sslip.io` (o provisório
 # até a TI criar o DNS). Com um nome (não IP), só pela variável.
+# ⚠ O Andamento EM HTTPS (27/11/2026, auditoria de segurança): `https://andamento.<IP com hífens>.sslip.io` também dá o
+# console, pelo mesmo IP. Sem isto, gravar o endereço HTTPS na tela de chaves derrubava o Console — a variável do site
+# não está na tela, só no .env do servidor. Qualquer outro nome continua só pela variável.
 WEB_RONDA = "NEXUS_COS_WEB_URL"
+
+
+def _ip_valido(partes: list[str]) -> bool:
+    return len(partes) == 4 and all(x.isdigit() and int(x) < 256 for x in partes)
 
 
 def web_da_ronda(config) -> str:
     v = _valor(config, WEB_RONDA).rstrip("/")
     if v:
         return v
-    host = urllib.parse.urlsplit(fonte(config).url).hostname or ""
+    host = (urllib.parse.urlsplit(fonte(config).url).hostname or "").lower()
     partes = host.split(".")
-    if len(partes) == 4 and all(x.isdigit() and int(x) < 256 for x in partes):
+    if _ip_valido(partes):
         return f"https://console.{'-'.join(partes)}.sslip.io"
+    # `<serviço>.<a-b-c-d>.sslip.io`: o IP vem do rótulo com hífens, antes do sslip.io
+    if len(partes) == 4 and partes[2:] == ["sslip", "io"] and _ip_valido(partes[1].split("-")):
+        return f"https://console.{partes[1]}.sslip.io"
     return ""
 
 

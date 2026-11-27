@@ -29,6 +29,19 @@ def test_o_endereco_do_site_pela_variavel_ou_pelo_ip_do_andamento(ligada):
     assert AND.web_da_ronda(ligada.config) == ""          # um nome, e não IP: só pela variável
 
 
+def test_o_andamento_em_https_pelo_sslip_tambem_da_o_console(ligada):
+    # 27/11/2026: gravar o Andamento em HTTPS (`andamento.<IP com hífens>.sslip.io`) derrubava o Console.
+    ligada.config.update(NEXUS_COS_WEB_URL="", NEXUS_COS_ANDAMENTO_URL="https://andamento.192-0-2-10.sslip.io")
+    assert AND.web_da_ronda(ligada.config) == "https://console.192-0-2-10.sslip.io"
+    ligada.config["NEXUS_COS_ANDAMENTO_URL"] = "https://Andamento.192-0-2-10.SSLIP.io/"
+    assert AND.web_da_ronda(ligada.config) == "https://console.192-0-2-10.sslip.io"
+    # o que não é IP no rótulo, ou outro domínio, continua só pela variável
+    for url in ("https://andamento.999-0-2-10.sslip.io", "https://andamento.192-0-2.sslip.io",
+                "https://andamento.192-0-2-10.exemplo.io", "https://a.b.192-0-2-10.sslip.io"):
+        ligada.config["NEXUS_COS_ANDAMENTO_URL"] = url
+        assert AND.web_da_ronda(ligada.config) == "", url
+
+
 def test_a_moldura_do_console_e_da_conferencia(ligada, logado):
     html = logado.get("/t/cos/console?registro=abc 1&x=2").get_data(as_text=True)
     assert 'src="https://console.192-0-2-10.sslip.io/console?registro=abc+1"' in html
