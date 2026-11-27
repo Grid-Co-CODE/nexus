@@ -179,52 +179,40 @@ def tecnicos_nas_usinas(linhas: list, eventos: list) -> dict:
     return out
 
 
-def linha_do_tempo(cos: dict | None, uids, nome_de, ficha_de, eventos: list, agora: datetime) -> list:
-    """Os eventos de HOJE (Brasília) das usinas com ocorrência aberta, do mais novo ao mais velho: [{"hora", "uid",
-    "usina", "codigo", "texto", "tag", "tom", "fonte"}]. Do COS, a abertura de hoje ("Nova · OS N", o grupo e a falha) e
-    a última nota de hoje ("Atualizada"); do Nexus Field, só o técnico daquelas usinas: chegou (ou começou o dia nela),
-    saiu, ou saiu para ela com a chegada prevista. Sem a fotografia do COS, nada."""
+TOM_DO_GRUPO = {g[0]: g[3] for g in GRUPOS}
+
+
+def ocorrencias_recentes(cos: dict | None, uids, nome_de, ficha_de, tecnicos: dict, agora: datetime) -> list:
+    """As ocorrências abertas do COS, da mais nova para a mais velha (27/11/2026, Levi: "mostrar as ocorrências atuais, as
+    que aconteceram agora, as ocorrências mais recentes do COS, e aí mostrar se o técnico chegou, se ele está chegando, se
+    ele está em deslocamento"): [{"uid", "usina", "codigo", "quando" (a abertura: "HH:MM" hoje, "dd/mm HH:MM" antes),
+    "ha", "texto" (o grupo e a falha), "os", "nota" (a última nota do COS com a hora), "tom", "tecnicos"}]. O técnico é o
+    de `tecnicos_nas_usinas` (na usina desde, ou a caminho com a chegada prevista); sem ninguém, a lista vazia (só quem tem
+    o Nexus Field aparece: a tela diz isso, não "sem técnico"). Sem a fotografia do COS, nada."""
     if cos is None:
         return []
     ocs = {str(k): v for k, v in (cos.get("ocs") or {}).items() if v}
     lidas = {str(x) for x in cos.get("lidas") or ()}
-    com_oc = [str(u) for u in uids if str(u) in lidas and str(u) in ocs]
-    hoje = agora.astimezone(_BRT).date()
     itens = []
-
-    def item(inst, uid, texto, tag, tom, fonte, cod=""):
-        itens.append((inst, {"hora": inst.astimezone(_BRT).strftime("%H:%M"), "uid": uid, "usina": nome_de(uid),
-                             "codigo": cod, "texto": texto, "tag": tag, "tom": tom, "fonte": fonte}))
-    codigo = {}
-    for uid in com_oc:
-        for o in ocs[uid]:
-            cod = _codigo(o, ficha_de(uid) or {})
-            codigo.setdefault(uid, cod)
-            abriu = AND.instante(o.get("abertura"))
-            if abriu and abriu.astimezone(_BRT).date() == hoje:
-                falha = str(o.get("falha") or "").strip() or CU.motivo(o)
-                os_ = str(o.get("os") or "")
-                item(abriu, uid, f"{NOME_DO_GRUPO[grupo(o)]}: {falha}", "Nova" + (f" · OS {os_}" if os_.isdigit() else ""),
-                     "critico", "Ronda COS", cod)
-            nota = o.get("ultima_nota") or {}
-            quando = AND.instante(nota.get("quando"))
-            if quando and quando.astimezone(_BRT).date() == hoje and str(nota.get("texto") or "").strip():
-                item(quando, uid, str(nota["texto"]).strip(), "Atualizada", "alerta", "Ronda COS", cod)
-    tem = set(com_oc)
-    for e in eventos:
-        inst = AND.instante(e.get("instante"))
-        if not inst or inst.astimezone(_BRT).date() != hoje:
+    for uid in (str(u) for u in uids):
+        if uid not in lidas or uid not in ocs:
             continue
-        u, destino, nome = str(e.get("usina_id")), str(e.get("destino_usina_id")), e.get("nome") or "Técnico"
-        if e.get("tipo") in ("chegou", "inicio") and u in tem:
-            item(inst, u, f"{nome} chegou na usina", "Técnico na usina", "ok", "Nexus Field", codigo.get(u, ""))
-        elif e.get("tipo") == "saiu" and u in tem:
-            item(inst, u, f"{nome} saiu da usina", "Técnico saiu", "neutro", "Nexus Field", codigo.get(u, ""))
-        elif e.get("tipo") == "saiu" and destino in tem:
-            chega = _hhmm(e.get("chegada_prevista"))
-            item(inst, destino, f"{nome} a caminho" + (f", chegada prevista {chega}" if chega else ""), "Técnico a caminho",
-                 "info", "Nexus Field", codigo.get(destino, ""))
-    return [i for _inst, i in sorted(itens, key=lambda x: x[0], reverse=True)]
+        for o in ocs[uid]:
+            abriu = AND.instante(o.get("abertura"))
+            g = grupo(o)
+            falha = str(o.get("falha") or "").strip() or CU.motivo(o)
+            os_ = str(o.get("os") or "")
+            nota = o.get("ultima_nota") or {}
+            itens.append((abriu, {
+                "uid": uid, "usina": nome_de(uid), "codigo": _codigo(o, ficha_de(uid) or {}),
+                "quando": _hora(o.get("abertura"), agora) if abriu else "",
+                "ha": duracao(int((agora - abriu).total_seconds() // 60)) if abriu else "",
+                "texto": f"{NOME_DO_GRUPO[g]}: {falha}", "os": f"OS {os_}" if os_.isdigit() else "ainda sem OS",
+                "nota": f"{_hora(nota.get('quando'), agora)} · {nota.get('texto')}".strip(" ·") if nota.get("texto") else "",
+                "tom": TOM_DO_GRUPO[g], "tecnicos": list(tecnicos.get(uid) or [])}))
+    # a mais nova primeiro; a sem abertura (não devia acontecer) vai para o fim
+    itens.sort(key=lambda x: x[0].timestamp() if x[0] else float("-inf"), reverse=True)
+    return [i for _a, i in itens]
 
 
 def contagem(agora_por_usina: dict) -> list:

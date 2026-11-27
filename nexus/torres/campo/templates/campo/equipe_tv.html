@@ -114,24 +114,31 @@
         </div>
       </div>
     </section>
-    {# à direita, os eventos de hoje das ocorrências (26/11/2026, Levi: "do lado direito vai ter os eventos de hoje focados nas
-       ocorrências [...] do COS"): a abertura e a nota do COS, e o técnico só quando é de uma usina com ocorrência #}
-    <section class="eqtv-tl" aria-label="Eventos de hoje nas ocorrências">
-      <header class="eqtv-cos-cab"><div><p class="gc-eyebrow">COS · Linha do tempo</p><h2>Eventos de hoje nas ocorrências</h2></div></header>
-      <p class="eqtv-agora"><span>Agora · {{ hora }}</span></p>
-      {# não rola sozinha (27/11/2026, Levi: "não precisa ficar rolando automático não [...] pode até scrollar com um scroll
-         invisível"): o mais novo fica em cima, e o resto rola na mão #}
+    {# à direita, as ocorrências mais recentes do COS e o técnico de cada uma (27/11/2026, Levi: "mostrar as ocorrências
+       atuais, as que aconteceram agora, as ocorrências mais recentes do COS, e aí mostrar se o técnico chegou, se ele está
+       chegando"): a mais nova em cima, e a coluna rola na mão ("não precisa ficar rolando automático não") #}
+    <section class="eqtv-tl" aria-label="Ocorrências mais recentes">
+      <header class="eqtv-cos-cab"><div><p class="gc-eyebrow">COS · Da mais nova para a mais antiga</p><h2>Ocorrências mais recentes</h2></div></header>
+      {% set na = recentes|selectattr('tecnicos')|list %}
+      <p class="eqtv-agora"><span>Agora · {{ hora }}</span>{% if recentes %}<small>{{ recentes|length }} abertas · {{ na|length }} com técnico na usina ou a caminho</small>{% endif %}</p>
       <div class="eqtv-lista eqtv-lista--mao">
         <ol class="eqtv-tl-lista">
-          {% for e in linha_tempo %}
-          <li class="eqtv-tl-item" data-tv-uid="{{ e.uid }}" tabindex="0"><time>{{ e.hora }}</time>
-            <div class="eqtv-ev eqtv-ev--{{ e.tom }}"><div><b>{% if e.codigo %}{{ e.codigo }} {% endif %}{{ e.usina }}</b> <span>{{ e.texto }}</span><small>{{ e.fonte }}</small></div>
-              <span class="cn-pill cn-{{ e.tom }}">{{ e.tag }}</span></div></li>
+          {% for o in recentes %}
+          <li class="eqtv-tl-item" data-tv-uid="{{ o.uid }}" tabindex="0"><time>{{ o.quando }}</time>
+            <div class="eqtv-ev eqtv-ev--{{ o.tom }}">
+              <div class="eqtv-ev-corpo">
+                <p><b>{% if o.codigo %}{{ o.codigo }} {% endif %}{{ o.usina }}</b> <span class="eqtv-ev-ha">há {{ o.ha }}</span></p>
+                <p class="eqtv-ev-txt">{{ o.texto }}</p>
+                <p class="eqtv-ev-nota">{% if o.nota %}{{ o.nota }} · {% endif %}{{ o.os }}</p>
+                {% for x in o.tecnicos %}<span class="eqtv-tec eqtv-tec--{{ x.tipo }}"><i class="ph ph-{{ 'map-pin' if x.tipo == 'na_usina' else 'navigation-arrow' }}" aria-hidden="true"></i>{{ x.texto }}</span>{% endfor %}
+              </div>
+            </div></li>
           {% else %}
-          <li class="eqtv-vazio">{{ 'Nenhum evento das ocorrências hoje.' if p.ligada else 'Sem a leitura do COS agora.' }}</li>
+          <li class="eqtv-vazio">{{ 'Nenhuma ocorrência aberta no COS agora.' if p.ligada else 'Sem a leitura do COS agora.' }}</li>
           {% endfor %}
         </ol>
       </div>
+      <p class="eqtv-nota-tec">O técnico aparece quando o Nexus Field dele está na usina ou indo para ela.</p>
     </section>
   </main>
 </div>

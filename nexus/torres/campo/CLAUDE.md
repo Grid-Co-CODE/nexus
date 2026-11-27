@@ -1983,12 +1983,14 @@ equipes"; "pode até clicar e dar um zoom automático. Mas é importante ter um 
     cartão ou num evento dá o zoom com o resumo (o estado, o motivo e o técnico na usina ou a caminho), para o giro, e o
     **Brasil inteiro** volta pelo botão ou sozinho em 45 s; o **Sair** fica sempre à vista no alto do mapa (o do topo só
     aparecia ao mexer o mouse: "Eu não encontrei esse botão");
-  - **direita:** os **eventos de hoje das ocorrências** (`linha_do_tempo`), do mais novo ao mais velho: do COS, a abertura
-    de hoje ("Nova · OS N", o grupo e a falha) e a última nota de hoje ("Atualizada"), com a hora do COS; do Nexus Field, só
-    o técnico das usinas com ocorrência aberta (chegou, saiu, a caminho com a chegada prevista). O "Normalizada" e o
-    "Fechada" da referência não vêm: a fotografia do COS só traz as abertas. **Não rola sozinha** (27/11/2026, Levi: "não
-    precisa ficar rolando automático não [...] pode até scrollar com um scroll invisível"): o mais novo fica em cima e o
-    resto rola na mão, com a barra escondida.
+  - **direita:** as **ocorrências mais recentes do COS** (`ocorrencias_recentes`; 27/11/2026, Levi: "mostrar as
+    ocorrências atuais, as que aconteceram agora, as ocorrências mais recentes do COS, e aí mostrar se o técnico chegou,
+    se ele está chegando, se ele está em deslocamento"): cada ocorrência aberta, da mais nova para a mais velha, com a
+    abertura, há quanto tempo, o grupo e a falha, a última nota do COS com a hora, a OS e o técnico ligado a ela (na
+    usina desde, ou a caminho com a chegada prevista; só quem tem o Nexus Field, e a coluna diz isso no pé). A 1ª
+    versão (26/11) era uma linha do tempo de eventos (abertura, nota, técnico chegou e saiu) e saiu: "está mostrando
+    quem chegou, quem não chegou, quem deixou de chegar". **Não rola sozinha** ("não precisa ficar rolando automático
+    não [...] pode até scrollar com um scroll invisível"): a mais nova fica em cima e o resto rola na mão.
   - **27/11/2026, os ajustes do Levi:** abre com o foco nas usinas ("Eu quero que abra focado nas usinas [...] as usinas
     poderiam ficar com bolinha redonda, né? E as equipes um pouquinho menores"): o tipo Alarmes virou **Usinas**, a usina
     é a bolinha (`usinas-bola`, maior quanto mais grave; o losango fica para a tela) e o título é "Usinas, alarmes e

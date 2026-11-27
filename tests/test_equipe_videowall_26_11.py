@@ -71,22 +71,23 @@ COS = {"ocs": {7: [_oc(tipo_tarefa="Religamento", tipo_falha="Desligamento de us
 NOMES = {"7": "Alto Paraná 1", "8": "Tanabi", "9": "Cipó Guaçu", "12": "Colorado 2"}
 
 
-def test_a_linha_do_tempo_de_hoje_das_ocorrencias():
-    lt = PA.linha_do_tempo(COS, ["7", "8", "9", "12"], NOMES.get, lambda u: {}, EVENTOS, AGORA)
-    assert [(e["hora"], e["uid"], e["tag"], e["texto"]) for e in lt] == [
-        ("14:45", "7", "Técnico na usina", "Ana Teste chegou na usina"),
-        ("14:30", "7", "Atualizada", "Técnico a caminho"),
-        ("14:19", "8", "Técnico a caminho", "Bia Teste a caminho, chegada prevista 15:40"),
-        ("13:00", "7", "Nova · OS 18858", "Usina parada: Queda total, trip 27"),
-        ("11:00", "7", "Técnico saiu", "Ana Teste saiu da usina"),
-        ("09:10", "8", "Atualizada", "Peça pedida"),
-        ("07:00", "7", "Técnico na usina", "Ana Teste chegou na usina")]
-    # a abertura e a nota de ontem não são de hoje; o técnico da usina 12 (sem ocorrência aberta) não entra
-    assert all(e["uid"] != "9" and e["uid"] != "12" for e in lt)
-    assert lt[0]["usina"] == "Alto Paraná 1" and lt[3]["codigo"] == "APR100" and lt[3]["tom"] == "critico"
-    assert {e["fonte"] for e in lt} == {"Ronda COS", "Nexus Field"}
-    # sem a leitura do COS, nada (nem o técnico: sem saber qual usina tem ocorrência)
-    assert PA.linha_do_tempo(None, ["7"], NOMES.get, lambda u: {}, EVENTOS, AGORA) == []
+def test_as_ocorrencias_mais_recentes_com_o_tecnico():
+    """A coluna da direita (27/11/2026, Levi: "É interessante mostrar as ocorrências atuais, as que aconteceram agora, as
+    ocorrências mais recentes do COS, e aí mostrar se o técnico chegou, se ele está chegando, se ele está em
+    deslocamento"): cada ocorrência aberta, da mais nova para a mais velha, com a abertura, há quanto tempo, a falha, a
+    OS, a última nota do COS e o técnico ligado a ela (na usina desde, ou a caminho com a chegada prevista)."""
+    tec = PA.tecnicos_nas_usinas(LINHAS, EVENTOS)
+    oc = PA.ocorrencias_recentes(COS, ["7", "8", "9", "12"], NOMES.get, lambda u: {}, tec, AGORA)
+    assert [(o["uid"], o["quando"], o["ha"]) for o in oc] == [
+        ("7", "13:00", PA.duracao(120)), ("9", "25/11 22:00", PA.duracao(17 * 60)), ("8", "24/11 09:00", PA.duracao(54 * 60))]
+    a = oc[0]
+    assert (a["usina"], a["codigo"], a["texto"], a["os"], a["nota"], a["tom"]) == (
+        "Alto Paraná 1", "APR100", "Usina parada: Queda total, trip 27", "OS 18858", "14:30 · Técnico a caminho", "critico")
+    assert a["tecnicos"] == [{"nome": "Ana Teste", "tipo": "na_usina", "texto": "Ana Teste na usina desde 14:45"}]
+    assert oc[2]["tecnicos"] == [{"nome": "Bia Teste", "tipo": "a_caminho", "texto": "Bia Teste a caminho, chega 15:40"}]
+    assert oc[1]["tecnicos"] == [] and oc[1]["nota"] == "25/11 23:00 · Sem retorno" and oc[1]["tom"] == "semcom"
+    # sem a leitura do COS, nada
+    assert PA.ocorrencias_recentes(None, ["7"], NOMES.get, lambda u: {}, tec, AGORA) == []
 
 
 def test_a_contagem_do_mapa():
@@ -142,8 +143,9 @@ def test_o_video_wall_em_tres_colunas(cliente, pontos, setor, com_mapa_base, mon
     assert "data-eqtv-rola-tl" not in html
     assert "data-tv-brasil" in mapa and "data-tv-gira" in mapa and "Sair" in mapa
     assert "críticas" in mapa and "normais" in mapa and "Equipes em deslocamento" in mapa
-    # à direita, os eventos de hoje das ocorrências: a Naira chegando na Alfa (a usina com ocorrência)
-    assert "Eventos de hoje nas ocorrências" in tl and "Naira Teste chegou na usina" in tl and "Técnico na usina" in tl
+    # à direita, as ocorrências mais recentes do COS com o técnico de cada uma (27/11/2026): a Naira na Alfa
+    assert "Ocorrências mais recentes" in tl and "Queda total" in tl and "Naira Teste na usina desde" in tl
+    assert "Eventos de hoje" not in tl and "chegou na usina" not in tl
     d = _dados(html)
     # o mapa do vídeo wall: o radar pelo Nexus, o que dizer de cada usina no zoom e o clima (avisos) para a vez da Chuva
     assert d["radar"]["lista"] == "/t/campo/equipe/radar.json" and d["radar"]["bloco"] == "/t/campo/equipe/radar/"
