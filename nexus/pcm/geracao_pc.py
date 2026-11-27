@@ -202,9 +202,12 @@ def pacote(config, rid: str, comp: dict) -> bytes:
     motor = G.caminho_motor(config)
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        for f in sorted(pasta.iterdir()):
-            if f.is_file() and f.name not in ("status.json", "log_motor.txt"):
-                z.write(f, f"rodada/{f.name}")
+        # a pasta inteira, com as SUBPASTAS: os feriados moram em `Feriados/` (a prova no ar de 27/11/2026 levou só os
+        # arquivos de cima, e o motor rodou a W49 sem feriados); fora a saída, o status e o log, que são da volta
+        for f in sorted(pasta.rglob("*")):
+            rel = f.relative_to(pasta)
+            if f.is_file() and rel.parts[0] != "saida" and rel.as_posix() not in ("status.json", "log_motor.txt"):
+                z.write(f, "rodada/" + rel.as_posix())
         z.writestr("pcm/__init__.py", "")
         for nome in MODULOS_DA_FAMA:
             z.write(AQUI / nome, f"pcm/{nome}")

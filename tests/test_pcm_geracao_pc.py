@@ -80,6 +80,9 @@ def test_rodada_no_pc_de_ponta_a_ponta(app, cliente, pc, tmp_path, origem):
     assert {"rodada.json", "pcm/fama_motor.py", "pcm/fama_base.py", "pcm/semana.py", "pcm/__init__.py",
             "rodada/Observacoes_Semana.txt"} <= nomes
     assert any(n.startswith("pcm/motor/") and n.endswith(".py") for n in nomes)
+    # as subpastas vão junto: sem a dos feriados o motor roda a semana sem feriados (a prova no ar de 27/11/2026)
+    feriados = [n for n in nomes if n.startswith("rodada/Feriados/")]
+    assert feriados and all(n.endswith(".xlsx") for n in feriados), sorted(nomes)
     assert "status.json" not in {n.split("/")[-1] for n in nomes}
     meta = json.loads(z.read("rodada.json"))
     assert meta["semana"] == "2026-W41" and meta["id"] == rid
