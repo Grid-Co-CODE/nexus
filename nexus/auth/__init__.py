@@ -56,6 +56,9 @@ log = logging.getLogger(__name__)
 # (a regra do anônimo do RLS do Supabase, com limite por IP); os arquivos abrem só com o link assinado
 ROTAS_PUBLICAS = {"auth.entrar", "casca.saude", "static", "torre_hseq.extintores_foto_receber",
                   "torre_hseq.extintores_info_receber", "torre_pcm.motivo_do_app", "torre_pcm.inventario_foto_receber",
+                  # o aplicativo "Nexus PCM" (Gerar no PC, 27/11/2026): a chave do computador ligado protege cada uma
+                  "torre_pcm.pc_ola", "torre_pcm.pc_rodada", "torre_pcm.pc_pacote", "torre_pcm.pc_credencial",
+                  "torre_pcm.pc_andamento", "torre_pcm.pc_entregar",
                   "torre_zeladoria.cronograma_api", "torre_campo.equipe_aparelho", "torre_campo.equipe_posicoes",
                   "torre_campo.equipe_revogar", "torre_base.emails_evento_app",
                   "sso.preflight", "sso.eu", "sso.ler", "sso.gravar", "sso.progresso", "sso.arquivo_enviar",

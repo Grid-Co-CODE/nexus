@@ -380,6 +380,75 @@ def iniciar(config, semana: str) -> dict:
     return st
 
 
+# ── a vigia da memória (27/11/2026) ───────────────────────────────────────────────────────────────────────────────────
+# O caso: a W49 morreu quatro vezes no servidor (26/11 e 27/11), sempre na leitura das 48 mil OS, sem deploy nenhum. O motor
+# roda dentro do teto de memória do serviço do Nexus (3 GB, com o Nexus em 2,5 GB), e quando a soma passa, o Linux derruba o
+# serviço INTEIRO (todo mundo perde o Nexus e a rodada vira "interrompida"). A vigia lê o uso do grupo do processo (cgroup
+# v2: memory.current e memory.max) enquanto o motor roda, anota no log e, a `MARGEM_MB` do teto, para SÓ o motor: o Nexus
+# fica de pé e a tela diz para gerar no PC (`geracao_pc.py`). Fora do Linux ou sem teto, só roda.
+MARGEM_MB = 256
+VIGIA_S = 5.0
+ANOTA_S = 60.0
+
+
+class MemoriaCheia(RuntimeError):
+    """O Nexus parou o motor perto do teto de memória do serviço."""
+
+
+def _memoria() -> tuple[int, int] | None:
+    """(o uso, o teto) do grupo do processo, em MB; None sem cgroup v2 com teto (Windows, servidor sem teto)."""
+    try:
+        grupo = Path("/proc/self/cgroup").read_text()
+    except OSError:
+        return None
+    v2 = next((l[3:].strip() for l in grupo.splitlines() if l.startswith("0::")), None)
+    if v2 is None:
+        return None
+    for base in (Path("/sys/fs/cgroup" + v2.rstrip("/")), Path("/sys/fs/cgroup")):
+        try:
+            teto = (base / "memory.max").read_text().strip()
+            uso = int((base / "memory.current").read_text().strip())
+        except (OSError, ValueError):
+            continue
+        if teto == "max":
+            return None
+        return uso // 2**20, int(teto) // 2**20
+    return None
+
+
+def rodar_vigiado(cmd: list, cwd: str, env: dict, log, timeout: int) -> int:
+    """O `subprocess.run` do motor com a vigia da memória; devolve o código. `MemoriaCheia` se parou pelo teto e
+    `subprocess.TimeoutExpired` no tempo, como o `run`."""
+    p = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=log, stderr=subprocess.STDOUT)
+    t0 = time.monotonic()
+    anotou = 0.0
+    while True:
+        try:
+            return p.wait(timeout=VIGIA_S)
+        except subprocess.TimeoutExpired:
+            pass
+        agora = time.monotonic()
+        if agora - t0 > timeout:
+            p.kill()
+            p.wait()
+            raise subprocess.TimeoutExpired(cmd, timeout)
+        m = _memoria()
+        if m is None:
+            continue
+        uso, teto = m
+        if agora - anotou >= ANOTA_S:
+            log.write(f"[memória] o serviço do Nexus usa {uso} MB de {teto} MB\n".encode("utf-8"))
+            log.flush()
+            anotou = agora
+        if uso >= teto - MARGEM_MB:
+            p.kill()
+            p.wait()
+            log.write(f"[memória] o Nexus parou o motor com {uso} MB de {teto} MB, antes de o servidor cair\n"
+                      .encode("utf-8"))
+            log.flush()
+            raise MemoriaCheia(f"{uso} de {teto} MB")
+
+
 def _executar(pasta: Path, st: dict, env: dict, motor: Path, origem: Path, saida: Path, fama: dict | None = None) -> None:
     """Roda o motor e confere a planilha. `fama` (só com NEXUS_FAMA_PROGRAMA=1, `_fama`): antes do motor, as OS da FAMA
     no cache do Fracttal da rodada; depois, a planilha volta a dizer FAMA-<id>. Sem ela, a rodada de sempre."""
@@ -399,38 +468,23 @@ def _executar(pasta: Path, st: dict, env: dict, motor: Path, origem: Path, saida
                 # FAMA fora e a rodada sai a de sempre (revisão de 13/11/2026): com a FAMA ligada por padrão, ele não
                 # pode travar a semana do PCM. O env fica o de antes (sem o TTL longo): o motor lê o Fracttal sozinho
                 try:
-                    env = FM.antes_do_motor(pasta, st, env, motor, fama, f, TEMPO_MAX_S)
+                    env = FM.antes_do_motor(pasta, st, env, motor, fama, f, TEMPO_MAX_S, rodar=rodar_vigiado)
+                except MemoriaCheia:
+                    raise                    # sem memória, o motor também não passaria: a rodada para aqui
                 except Exception as ex:      # noqa: BLE001 — a FamaErro diz o motivo; outro erro, só o nome dele
                     motivo = str(ex)[:300] if isinstance(ex, FM.FamaErro) else f"o adaptador falhou ({type(ex).__name__})"
                     st["fama"] = {"fora": motivo}
                     f.write(f"[FAMA] as OS da FAMA ficaram fora desta rodada: {motivo}\n".encode("utf-8"))
                     f.flush()
-            r = subprocess.run([sys.executable, str(motor), "--semana", st["semana"]], cwd=str(pasta), env=env,
-                               stdout=f, stderr=subprocess.STDOUT, timeout=TEMPO_MAX_S)
-        st["codigo"] = r.returncode
-        if r.returncode == 0 and saida.exists():
-            if tentou:
-                # mesmo com o erro no meio do adaptador: o "OSs ID" substituto que tenha chegado à planilha volta a dizer
-                # FAMA-<id> (o `publicar` o reconhece e o tira da semana que vai ao App)
-                st["fama"]["planilha"] = FM.depois_do_motor(saida)
-            # as tarefas tiradas da semana uma a uma (o "sem:"): falhar aqui derruba a rodada, porque publicar a semana
-            # com a tarefa que o PCM tirou seria pior que não ter a semana
-            st["sem"] = aplicar_sem(pasta / I.OBSERVACOES, saida)
-            st["estado"] = "ok"
-            st["resumo"] = comparar.resumo(saida)
-            # o que olhar antes de publicar (blocos fora da semana, horas estouradas por equipe e dia e por OS...)
-            try:
-                st["conferencia"] = comparar.conferir(saida, st["semana"])
-            except Exception as ex:      # noqa: BLE001 — a conferência não derruba a rodada; a publicação a exige
-                st["conferencia_erro"] = f"{type(ex).__name__}: {str(ex)[:200]}"
-            oficial = _oficial(origem, st["semana"])
-            if oficial:
-                shutil.copy2(oficial, pasta / "oficial.xlsx")
-                st["oficial"] = {"arquivo": oficial.name, "atualizado": _quando(oficial.stat().st_mtime)}
-                st["comparacao"] = comparar.comparar(pasta / "oficial.xlsx", saida)
-        else:
-            st["estado"] = "falhou"
-            st["erro"] = _cauda(log, 12) or f"o motor terminou com código {r.returncode} sem planilha"
+            codigo = rodar_vigiado([sys.executable, str(motor), "--semana", st["semana"]], str(pasta), env, f,
+                                   TEMPO_MAX_S)
+        st["codigo"] = codigo
+        concluir(pasta, st, saida, origem, codigo, depois_da_fama=tentou)
+    except MemoriaCheia as ex:
+        st["estado"] = "falhou"
+        st["memoria"] = True
+        st["erro"] = (f"Faltou memória no servidor ({ex}): o Nexus parou o motor antes de o servidor cair. Gere no PC pelo "
+                      f"aplicativo Nexus PCM (abaixo, em Gerar no PC).")
     except subprocess.TimeoutExpired:
         st["estado"] = "falhou"
         st["erro"] = f"o motor passou de {TEMPO_MAX_S // 60} min e foi parado"
@@ -440,6 +494,34 @@ def _executar(pasta: Path, st: dict, env: dict, motor: Path, origem: Path, saida
     st["fim"] = datetime.now(_BRT).isoformat(timespec="seconds")
     st["duracao_s"] = int(time.monotonic() - t0)
     _gravar(pasta, st)
+
+
+def concluir(pasta: Path, st: dict, saida: Path, origem: Path | None, codigo: int, depois_da_fama: bool = False) -> None:
+    """O fim da rodada depois do motor, o MESMO para a rodada do servidor e a do PC (27/11/2026): a FAMA de volta na
+    planilha, o "sem:", o resumo, a conferência e a comparação com a oficial. Não grava o status (quem chama grava)."""
+    if codigo == 0 and saida.exists():
+        if depois_da_fama:
+            # mesmo com o erro no meio do adaptador: o "OSs ID" substituto que tenha chegado à planilha volta a dizer
+            # FAMA-<id> (o `publicar` o reconhece e o tira da semana que vai ao App)
+            st.setdefault("fama", {})["planilha"] = FM.depois_do_motor(saida)
+        # as tarefas tiradas da semana uma a uma (o "sem:"): falhar aqui derruba a rodada, porque publicar a semana
+        # com a tarefa que o PCM tirou seria pior que não ter a semana
+        st["sem"] = aplicar_sem(pasta / I.OBSERVACOES, saida)
+        st["estado"] = "ok"
+        st["resumo"] = comparar.resumo(saida)
+        # o que olhar antes de publicar (blocos fora da semana, horas estouradas por equipe e dia e por OS...)
+        try:
+            st["conferencia"] = comparar.conferir(saida, st["semana"])
+        except Exception as ex:      # noqa: BLE001 — a conferência não derruba a rodada; a publicação a exige
+            st["conferencia_erro"] = f"{type(ex).__name__}: {str(ex)[:200]}"
+        oficial = _oficial(origem, st["semana"])
+        if oficial:
+            shutil.copy2(oficial, pasta / "oficial.xlsx")
+            st["oficial"] = {"arquivo": oficial.name, "atualizado": _quando(oficial.stat().st_mtime)}
+            st["comparacao"] = comparar.comparar(pasta / "oficial.xlsx", saida)
+    else:
+        st["estado"] = "falhou"
+        st["erro"] = _cauda(pasta / "log_motor.txt", 12) or f"o motor terminou com código {codigo} sem planilha"
 
 
 def casa_tarefa(palavra, tarefa, codigo="") -> bool:

@@ -18,6 +18,7 @@ from markupsafe import Markup, escape
 
 from flask import abort, current_app, jsonify, redirect, render_template, request, session
 
+from . import geracao_pc as GPC
 from . import fonte, geracao, gestao as G, historico_banco as HB, insumos as I, motivos as M, motivos_app as MA
 from . import gestao_confiab as GC, observacoes as O
 from ..cadastro import setor_ids as SID
@@ -135,6 +136,8 @@ def _ctx_gerar(cfg, rodada=None, erro=None, semana=None, ok=None) -> dict:
             # o motor daqui atrás do do PCM (24/11/2026): a semana gerada aqui pode sair diferente da do robô
             "copias_pcm": CP.diferentes(cfg, "motor"),
             "admin": bool(session.get("admin")), "pode": pode_programar(), "app_sel": app_sel,
+            "computadores": GPC.computadores(cfg) if pode_programar() else [],
+            "app_pcm_url": str(cfg.get("NEXUS_PCM_APP_URL") or "").strip(),
             "pode_publicar": bool(sel) and not PB.motivos_para_nao_publicar(cfg, sel["id"]),
             "log": geracao.log(cfg, sel["id"], 40) if sel else "", "semana_sugerida": semana,
             "observacoes": texto_obs, "herdada_de": herdada_de,
@@ -181,7 +184,8 @@ def gerar():
                   "copiado": "Observações copiadas da semana anterior.",
                   "importado_repo": "Observações importadas do repositório do PCM.",
                   "publicada": "Semana publicada no repositório do PCM. O robô do PCM regrava o banco_dados.json do "
-                               "App em 5 a 10 minutos."}
+                               "App em 5 a 10 minutos.",
+                  "pc_desligado": "Computador desligado: o aplicativo dele não gera mais."}
         return render_template("pcm/gerar.html", **_ctx_gerar(
             cfg, rodada=request.args.get("rodada"), semana=request.args.get("semana"),
             ok=avisos.get(request.args.get("feito") or "")))
@@ -841,6 +845,110 @@ def tecnicos_historico():
                            usina=str(base.por_id[uid].get("nome") or f"Usina {uid}"))
 
 
+# ── Gerar no PC (27/11/2026, `geracao_pc.py`): o computador ligado e a API do aplicativo "Nexus PCM" ────────────────────
+# o aplicativo para baixar (`NEXUS_PCM_APP_URL`, o .exe publicado): sem ele, a tela diz que o administrador o entrega (27/11/2026:
+# o 1º foi mandado à pessoa do PCM pelo Levi). Link direto, e não um redirecionamento do Nexus para fora
+
+
+def gerar_pc_ligar():
+    """Liga um computador ao "Gerar no PC": o código aparece uma vez, na própria tela. Quem programa (PCM, admin)."""
+    cfg = current_app.config
+    if _de_outro_site() or not pode_programar():
+        abort(403)
+    try:
+        cod = GPC.ligar(cfg, request.form.get("nome"), _quem(), request.host_url.rstrip("/") + na_raiz(""))
+    except GPC.Recusado as ex:
+        return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro=str(ex))), 400
+    resp = render_template("pcm/gerar.html", **_ctx_gerar(cfg, ok="Computador ligado. Copie o código agora: ele não "
+                                                                     "aparece de novo."), codigo_pc=cod)
+    return resp, 200, {"Cache-Control": "no-store"}
+
+
+def gerar_pc_desligar():
+    cfg = current_app.config
+    if _de_outro_site() or not pode_programar():
+        abort(403)
+    GPC.desligar(cfg, str(request.form.get("id") or ""), _quem())
+    return redirect(na_raiz("/t/pcm/gerar?feito=pc_desligado"), code=303)
+
+
+def _computador():
+    """O computador ligado do pedido do aplicativo (a chave no `Authorization: Bearer`), ou 401."""
+    cab = request.headers.get("Authorization") or ""
+    comp = GPC.quem_e(current_app.config, cab[7:] if cab.lower().startswith("bearer ") else "")
+    if comp is None:
+        abort(401)
+    return comp
+
+
+def _erro_pc(msg: str, status: int = 400):
+    return jsonify({"ok": False, "erro": msg}), status
+
+
+def pc_ola():
+    """O aplicativo confere a conexão: o nome do computador e a semana que a tela de Gerar sugere."""
+    comp = _computador()
+    return jsonify({"ok": True, "computador": comp.get("nome"), "semana": geracao.semana_padrao()})
+
+
+def pc_rodada():
+    comp = _computador()
+    semana = str((request.get_json(silent=True) or {}).get("semana") or "").strip()
+    try:
+        st = GPC.abrir_rodada(current_app.config, semana, comp)
+    except ValueError:
+        return _erro_pc("Semana inválida. Use o formato 2026-W49.")
+    except geracao.NaoPronto as ex:
+        return _erro_pc(f"Ainda não dá para gerar: {ex}.", 409)
+    return jsonify({"ok": True, "id": st["id"], "semana": st["semana"],
+                    "tela": request.host_url.rstrip("/") + na_raiz("/t/pcm/gerar?rodada=") + st["id"]})
+
+
+def pc_pacote(rid):
+    comp = _computador()
+    try:
+        dados = GPC.pacote(current_app.config, rid, comp)
+    except GPC.Recusado as ex:
+        return _erro_pc(str(ex), 409)
+    return dados, 200, {"Content-Type": "application/zip", "Cache-Control": "no-store"}
+
+
+def pc_credencial():
+    _computador()
+    try:
+        cred = GPC.credencial(current_app.config)
+    except GPC.Recusado as ex:
+        return _erro_pc(str(ex), 409)
+    resp = jsonify(dict(cred, ok=True))
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+def pc_andamento(rid):
+    comp = _computador()
+    try:
+        GPC.andamento(current_app.config, rid, comp, (request.get_json(silent=True) or {}).get("etapa"))
+    except GPC.Recusado as ex:
+        return _erro_pc(str(ex), 409)
+    return jsonify({"ok": True})
+
+
+def pc_entregar(rid):
+    comp = _computador()
+    try:
+        relato = json.loads(request.form.get("relato") or "{}")
+    except ValueError:
+        relato = {}
+    plan = request.files.get("planilha")
+    log_ = request.files.get("log")
+    try:
+        r = GPC.entregar(current_app.config, rid, comp, plan.read() if plan else None, log_.read() if log_ else b"",
+                         relato if isinstance(relato, dict) else {})
+    except GPC.Recusado as ex:
+        return _erro_pc(str(ex), 409)
+    return jsonify(dict(r, ok=True, tela=request.host_url.rstrip("/") + na_raiz("/t/pcm/gerar?rodada=") + rid))
+
+
 def registrar_pcm(bp) -> None:
     """As rotas da programação semanal na torre PCM, na ordem de antes. Cada uma mora no alto deste módulo desde
     08/11/2026 (o mapa do desembaraço: eram 25 funções dentro desta, que não se testavam nem se trocavam sozinhas);
@@ -854,6 +962,16 @@ def registrar_pcm(bp) -> None:
     bp.add_url_rule("/gerar/observacoes", view_func=gerar_observacoes, methods=["POST"])
     bp.add_url_rule("/gerar/observacoes/copiar", view_func=gerar_observacoes_copiar, methods=["POST"])
     bp.add_url_rule("/gerar/estado", view_func=gerar_estado)
+    bp.add_url_rule("/gerar/pc/ligar", view_func=gerar_pc_ligar, methods=["POST"])
+    bp.add_url_rule("/gerar/pc/desligar", view_func=gerar_pc_desligar, methods=["POST"])
+    # a API do aplicativo "Nexus PCM": rotas públicas no portão (`auth.ROTAS_PUBLICAS`), protegidas pela chave do
+    # computador ligado (`_computador`), como as rotas do App de Campo pela chave dele
+    bp.add_url_rule("/pc/ola", view_func=pc_ola)
+    bp.add_url_rule("/pc/rodada", view_func=pc_rodada, methods=["POST"])
+    bp.add_url_rule("/pc/rodada/<rid>/pacote", view_func=pc_pacote)
+    bp.add_url_rule("/pc/credencial", view_func=pc_credencial)
+    bp.add_url_rule("/pc/rodada/<rid>/andamento", view_func=pc_andamento, methods=["POST"])
+    bp.add_url_rule("/pc/rodada/<rid>/entregar", view_func=pc_entregar, methods=["POST"])
     bp.add_url_rule("/tarefas", view_func=tarefas)
     bp.add_url_rule("/gestao", view_func=gestao)
     bp.add_url_rule("/quadro", view_func=quadro)

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block titulo %}Gerar a semana{% endblock %}
-{% set rotulo = {'rodando': 'Rodando', 'ok': 'Terminou', 'falhou': 'Falhou', 'interrompida': 'Interrompida'} %}
+{% set rotulo = {'rodando': 'Rodando', 'ok': 'Terminou', 'falhou': 'Falhou', 'interrompida': 'Interrompida', 'no_pc': 'No PC'} %}
 {% macro hora(iso) %}{{ iso[8:10] ~ '/' ~ iso[5:7] ~ ' ' ~ iso[11:16] if iso else '' }}{% endmacro %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
@@ -42,16 +42,22 @@
   <p class="gc-ajuda">Começou em {{ hora(sel.inicio) }}{% if sel.fim %}, terminou em {{ hora(sel.fim) }}
     ({{ sel.duracao_s // 60 }} min {{ sel.duracao_s % 60 }} s){% endif %}. Credencial do Fracttal: {{ sel.credencial }}.</p>
 
-  {% if sel.estado == 'rodando' %}
+  {% if sel.estado in ('rodando', 'no_pc') %}
+  {% if sel.estado == 'no_pc' %}
+  <div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-desktop"></i><div><strong>Rodando no computador {{ sel.pc.nome }}.</strong>
+    Etapa: {{ sel.pc.etapa or 'preparando' }}{% if sel.pc.atualizado %} (às {{ hora(sel.pc.atualizado) }}){% endif %}. A planilha volta
+    sozinha pelo aplicativo Nexus PCM, e esta página se atualiza quando ela chegar.</div></div>
+  {% else %}
   <div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-hourglass-medium"></i><div><strong>O motor está lendo o Fracttal.</strong>
     Esta página se atualiza sozinha quando ele terminar; pode sair e voltar depois.</div></div>
+  {% endif %}
   <script>
   (function () {
     var id = {{ sel.id|tojson }};
     function ver() {
       fetch(nexusRota("/t/pcm/gerar/estado") + "?rodada=" + encodeURIComponent(id), {credentials: "same-origin"})
         .then(function (r) { return r.json(); })
-        .then(function (j) { if (j.estado !== "rodando") location.reload(); else setTimeout(ver, 5000); })
+        .then(function (j) { if (j.estado !== {{ sel.estado|tojson }}) location.reload(); else setTimeout(ver, 5000); })
         .catch(function () { setTimeout(ver, 10000); });
     }
     setTimeout(ver, 5000);
@@ -59,7 +65,7 @@
   </script>
   {% elif sel.estado == 'interrompida' %}
   <div class="pcm-aviso pcm-aviso--critico"><i class="ph ph-plugs"></i><div><strong>A rodada foi interrompida.</strong>
-    O Nexus reiniciou enquanto o motor rodava. Gere de novo.</div></div>
+    O Nexus reiniciou enquanto o motor rodava. Gere de novo, ou gere no PC pelo aplicativo Nexus PCM (abaixo).</div></div>
   {% endif %}
 
   {% if sel.erro %}
@@ -277,6 +283,69 @@
     <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"{% if not conf.pronto %} disabled{% endif %}><i class="ph ph-play"></i> Gerar em sombra</button>
   </form>
   {% if not conf.pronto %}<p class="gc-ajuda">Falta insumo no bloco 1: o botão libera quando estiver tudo pronto.</p>{% endif %}
+
+  {# Gerar no PC (27/11/2026): o motor roda no computador de uma pessoa do PCM pelo aplicativo Nexus PCM #}
+  <div class="pcm-pc" id="gerar-no-pc">
+    <h3 class="pcm-pc-tit"><i class="ph ph-desktop"></i> Gerar no PC</h3>
+    <p class="gc-ajuda">O motor roda no computador de uma pessoa do PCM, pelo aplicativo <b>Nexus PCM</b>, com os mesmos
+      insumos e as OS da FAMA, e a planilha volta sozinha para cá, pronta para conferir e publicar. Use quando a geração no
+      servidor for interrompida.</p>
+    {% if app_pcm_url %}
+    <div class="pcm-pc-acoes">
+      <a class="gc-btn gc-btn--ui" href="{{ app_pcm_url|na_raiz }}" rel="noopener"><i class="ph ph-download-simple"></i> Baixar o aplicativo</a>
+    </div>
+    {% else %}
+    <p class="gc-ajuda">O aplicativo (NexusPCM.exe) é entregue pelo administrador do Nexus. Depois de abri-lo, ligue o
+      computador aqui embaixo e cole o código nele.</p>
+    {% endif %}
+    {% if codigo_pc %}
+    <div class="pcm-pc-codigo">
+      <label class="gc-rotulo" for="pc-codigo">Código do computador (cole no aplicativo; não aparece de novo)</label>
+      <div class="pcm-pc-copia"><input id="pc-codigo" class="gc-campo" value="{{ codigo_pc }}" readonly>
+        <button class="gc-btn gc-btn--ui" type="button" data-copiar="pc-codigo"><i class="ph ph-copy"></i> Copiar</button></div>
+    </div>
+    <script>
+    (function () {
+      var b = document.querySelector("[data-copiar]");
+      if (!b) return;
+      b.addEventListener("click", function () {
+        var i = document.getElementById(b.dataset.copiar);
+        i.select();
+        (navigator.clipboard ? navigator.clipboard.writeText(i.value) : Promise.reject()).catch(function () { document.execCommand("copy"); });
+        b.innerHTML = '<i class="ph ph-check"></i> Copiado';
+      });
+    })();
+    </script>
+    {% endif %}
+    {% if pode %}
+    {% if computadores %}
+    <ul class="pcm-pc-lista">
+      {% for c in computadores %}
+      <li class="pcm-pc-item{% if not c.ativo %} pcm-pc-item--desligado{% endif %}">
+        <span class="pcm-pc-nome">{{ c.nome }}</span>
+        <span class="gc-ajuda">{% if c.ativo %}ligado em {{ hora(c.criado_em) }}{% if c.ultimo_uso %}, usado em {{ hora(c.ultimo_uso) }}{% endif %}{% else %}desligado{% endif %}</span>
+        {% if c.ativo %}
+        <form method="post" action="{{ raiz }}/t/pcm/gerar/pc/desligar" data-confirmar="Desligar o computador {{ c.nome }}? O aplicativo dele para de gerar.">
+          <input type="hidden" name="id" value="{{ c.id }}">
+          <button class="gc-btn gc-btn--ui gc-btn--fantasma" type="submit">Desligar</button>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    <form class="pcm-pc-ligar" method="post" action="{{ raiz }}/t/pcm/gerar/pc/ligar">
+      <label class="gc-rotulo" for="pc-nome">Ligar um computador</label>
+      <div class="pcm-pc-copia"><input id="pc-nome" name="nome" class="gc-campo" maxlength="60" placeholder="Ex.: PC do PCM no escritório" required>
+        <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-link"></i> Gerar o código</button></div>
+    </form>
+    <script>
+    document.querySelectorAll("#gerar-no-pc form[data-confirmar]").forEach(function (f) {
+      f.addEventListener("submit", function (e) { if (!window.confirm(f.dataset.confirmar)) e.preventDefault(); });
+    });
+    </script>
+    {% endif %}
+  </div>
 </section>
 
 {# ── 4. histórico ── #}

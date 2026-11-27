@@ -54,7 +54,7 @@
 .pcm-aviso--ok{border-color:var(--verde-a35);background:var(--verde-suave)}
 .pcm-aviso--ok i{color:var(--verde-texto)}
 .pcm-sit--ok{color:var(--verde-texto);background:var(--verde-suave)}
-.pcm-sit--rodando{color:var(--alerta);background:var(--alerta-a10)}
+.pcm-sit--rodando,.pcm-sit--no_pc{color:var(--alerta);background:var(--alerta-a10)}
 .pcm-sit--falhou,.pcm-sit--interrompida{color:var(--critico);background:var(--critico-suave)}
 .pcm-rodada{border:1px solid var(--linha);border-radius:var(--raio-md);padding:16px 18px;margin:0 0 22px;display:grid;gap:10px}
 .pcm-rodada-topo{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
@@ -2020,3 +2020,16 @@ details.inv-card:not([open])>summary{border-bottom:0}
   .ins-c{grid-template-columns:1fr;gap:4px}
   .ins-c-n{text-align:left}
 }
+
+/* Gerar no PC (27/11/2026): o motor no computador do PCM pelo aplicativo Nexus PCM */
+.pcm-pc{margin-top:18px;padding-top:16px;border-top:1px solid var(--linha);display:grid;gap:10px}
+.pcm-pc-tit{margin:0;font-size:15px;display:flex;align-items:center;gap:8px}
+.pcm-pc-acoes{display:flex;gap:8px;flex-wrap:wrap}
+.pcm-pc-copia{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pcm-pc-copia .gc-campo{flex:1 1 280px;min-width:0}
+.pcm-pc-codigo .gc-campo{font-family:var(--fonte-mono,monospace);font-size:12px}
+.pcm-pc-lista{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.pcm-pc-item{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--linha);border-radius:var(--raio-md)}
+.pcm-pc-item form{margin-left:auto}
+.pcm-pc-item--desligado{opacity:.6}
+.pcm-pc-nome{font-weight:600}

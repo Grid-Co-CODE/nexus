@@ -36,7 +36,9 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from . import fama_os as F
+# o vocabulário puro (`fama_base`), e não o `fama_os`: este módulo vai no pacote do "Gerar no PC" (27/11/2026), onde não
+# há banco nem cadastro; o `fama_os` (que lê os livros) só entra na `entrada`, que roda no Nexus
+from . import fama_base as F
 from .semana import _norm
 
 VARIAVEL = "NEXUS_FAMA_PROGRAMA"
@@ -267,38 +269,43 @@ def entrada(config, ler_o_fracttal: bool) -> dict | None:
     sai a de sempre, com o motivo; antes ela não saía), porque tirar a preventiva do Fracttal e pôr OS
     da FAMA que já podem ter andado lá seria pior que a semana de sempre; o livro fresco e sem OS (a FAMA não tem nada para
     a Grid) = None, a semana de sempre."""
+    from . import fama_os as FO
     try:
-        lido = F._linhas_fama(config)
+        lido = FO._linhas_fama(config)
     except Exception as ex:      # noqa: BLE001 — o nome do erro, nunca a mensagem (pode trazer endereço)
         raise FamaErro(f"não consegui ler as OS da FAMA ({type(ex).__name__})") from ex
-    if F.velho(lido.gerado_em):
-        quando = F.quando(lido.gerado_em)
+    if FO.velho(lido.gerado_em):
+        quando = FO.quando(lido.gerado_em)
         raise FamaErro(f"a leitura da FAMA parou ({f'a última é de {quando}' if quando else 'nenhuma leitura no livro'}): "
                        f"a FAMA fica fora desta rodada")
     if not lido.linhas:
         return None
     try:
-        cadastro = F.cadastro_das_usinas(config)
+        cadastro = FO.cadastro_das_usinas(config)
     except Exception as ex:      # noqa: BLE001
         raise FamaErro(f"não consegui ler o cadastro das usinas ({type(ex).__name__})") from ex
     return {"linhas": lido.linhas, "cadastro": cadastro, "ler_o_fracttal": ler_o_fracttal,
             "tirar_preventivas": vai_ao_app(config)}
 
 
-def antes_do_motor(pasta: Path, st: dict, env: dict, motor: Path, fama: dict, log, timeout: int) -> dict:
+def antes_do_motor(pasta: Path, st: dict, env: dict, motor: Path, fama: dict, log, timeout: int, rodar=None) -> dict:
     """Na rodada, antes do motor: a leitura do Fracttal (só na de verdade; na da foto o cache é a foto), as OS da FAMA no
     cache e a linha do resumo no log (só contagens). Devolve o ambiente do motor (na de verdade, com o TTL longo)."""
     pasta = Path(pasta)
     if fama["ler_o_fracttal"]:
         log.write("[FAMA] lendo o Fracttal antes do motor, para pôr as OS da FAMA na semana\n".encode("utf-8"))
         log.flush()
+        cmd = [sys.executable, "-c", PRE_LEITURA, str(Path(motor).parent)]
         try:
-            r = subprocess.run([sys.executable, "-c", PRE_LEITURA, str(Path(motor).parent)], cwd=str(pasta), env=env,
-                               stdout=log, stderr=subprocess.STDOUT, timeout=timeout)
+            # `rodar` (27/11/2026): o servidor passa o seu, com a vigia da memória (`geracao.rodar_vigiado`); a
+            # `MemoriaCheia` dele sobe como está (a rodada para, e não sai a de sempre sem a FAMA)
+            codigo = (rodar(cmd, str(pasta), env, log, timeout) if rodar else
+                      subprocess.run(cmd, cwd=str(pasta), env=env, stdout=log, stderr=subprocess.STDOUT,
+                                     timeout=timeout).returncode)
         except subprocess.TimeoutExpired as ex:
             raise FamaErro(f"a leitura do Fracttal antes do motor passou de {timeout // 60} min") from ex
-        if r.returncode != 0 or not (pasta / CACHE).is_file():
-            raise FamaErro(f"a leitura do Fracttal antes do motor falhou (código {r.returncode})")
+        if codigo != 0 or not (pasta / CACHE).is_file():
+            raise FamaErro(f"a leitura do Fracttal antes do motor falhou (código {codigo})")
         env = dict(env, PROG_API_TTL_MIN=TTL_MIN)
     st["fama"] = aplicar_no_cache(pasta, fama["linhas"], fama["cadastro"], fama.get("tirar_preventivas", True))
     x = st["fama"]

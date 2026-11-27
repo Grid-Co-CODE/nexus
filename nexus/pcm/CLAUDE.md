@@ -2403,6 +2403,38 @@ Antes de ligar a `NEXUS_FAMA_APP`: os técnicos das usinas da FAMA com o "execut
   frescor e o motor de verdade com a foto de mentira). Ver a tela: uma cópia de prova com o banco de mentira e o livro da
   FAMA gravado pela carga da parte A (desktop e 375 px, escuro e claro), sem rolagem lateral a 375 px.
 
+## Gerar no PC e a vigia da memória (`geracao_pc.py`, `ferramentas/nexus_pcm_app/`; 27/11/2026)
+
+- **Por quê:** a W49 morreu quatro vezes no servidor (26/11 às 17:34, 17:58 e 18:26; 27/11 às 08:45), sempre na leitura das
+  48 mil OS e sem deploy nenhum. O motor roda dentro do teto de memória do serviço (3 GB; o Nexus sozinho em 2,5 GB) e,
+  quando a soma passa, o Linux derruba o serviço inteiro ("O Nexus reiniciou enquanto o motor rodava"). Levi, 27/11: rodar a
+  programação "no computador dela e aí salva no Nexus", "algo bem feito", as chaves vindas do Nexus (o PC não tem `.env`) e
+  com a FAMA.
+- **A vigia (`geracao.rodar_vigiado`):** no servidor, o motor e a leitura da FAMA antes dele rodam vigiados: o uso do grupo
+  do processo (cgroup v2, `memory.current`/`memory.max`) vai ao log a cada minuto e, a `MARGEM_MB` (256) do teto, o Nexus
+  para SÓ o motor (`MemoriaCheia`): o serviço fica de pé, a rodada sai "falhou" com `memoria: true` e o erro manda gerar no PC.
+  Fora do Linux ou sem teto, só roda. A `MemoriaCheia` na leitura da FAMA não cai na "rodada sem FAMA": para a rodada.
+- **O computador ligado:** quem programa (PCM, admin) cria em Gerar a semana → Gerar no PC → "Ligar um computador" um código
+  (`NXPCM1.` + o endereço do Nexus e uma chave aleatória), mostrado UMA vez (`Cache-Control: no-store`). O Nexus guarda só o
+  hash, em `computadores_pcm.json` na pasta de trabalho do PCM (configuração de acesso da instalação, como os administradores
+  de Base → Acessos), e o "Desligar" corta na hora.
+- **A API do aplicativo** (`/t/pcm/pc/*`, públicas no portão e protegidas pela chave no `Authorization: Bearer`): `ola`,
+  `rodada` (a MESMA preparação do servidor, `geracao._preparar`, e a FAMA do banco, estado `no_pc`, que nunca é
+  "interrompida"), `rodada/<id>/pacote` (os insumos, o motor e `fama_motor.py`/`fama_base.py`/`semana.py`; a FAMA vai sem o
+  título, só a sigla da preventiva, e o cadastro só com nomes e equipe), `credencial` (as chaves do Fracttal, só na memória do
+  aplicativo; nunca no pacote), `andamento` (a etapa que a tela mostra) e `entregar` (a planilha e o log; o Nexus termina pelo
+  MESMO `geracao.concluir` do servidor: FAMA de volta a FAMA-<id>, o "sem:", o resumo, a conferência e a comparação). A
+  rodada só aceita o computador que a abriu, e a terminada recusa.
+- **A FAMA pura (`fama_base.py`):** o vocabulário e as contas da FAMA que não leem banco saíram do `fama_os.py` (que os
+  reexporta); o `fama_motor.py` importa só ele, e a `entrada` (que lê o banco) importa o `fama_os` na hora. É o que deixa o
+  adaptador rodar igual no servidor e no pacote.
+- **O aplicativo** (`ferramentas/nexus_pcm_app/README.md`): um `.exe` (PyInstaller) com a janela, a conexão cifrada pelo
+  Windows (DPAPI) e as etapas; o motor roda num processo dele mesmo (`--motor`). O link "Baixar o aplicativo" só aparece com o
+  `NEXUS_PCM_APP_URL` (o .exe publicado); sem ele, a tela diz que o administrador entrega o aplicativo (o 1º foi entregue assim).
+- **Provar:** `tests/test_pcm_geracao_pc.py` (a chave e o desligar, a API sem chave, a rodada de ponta a ponta, o motor que
+  falhou, o computador errado, a FAMA sem título, o pacote importável sem o Nexus, a tela, o aplicativo de verdade contra o
+  Nexus de teste e a vigia).
+
 ## A tela Gerar (`templates/pcm/gerar.html` + `_observacoes.html`, estilo em `static/pcm.css`)
 
 Desde 05/10/2026 (Levi: "está confuso, separe por blocos"), em quatro blocos numerados, na ordem do trabalho: **1** o
