@@ -29,6 +29,9 @@ FOTOS_EM_MEMORIA = 80
 TELAS_EM_MEMORIA = 150       # a versão de tela da foto ampliada (~100 a 250 kB)
 TELA_PX = 1600               # a ampliada: o lado maior (a do App vem com 1280x1700), em JPEG progressivo
 ARQUIVOS_MAX = 6000          # a cópia em disco: passou disso, as mais antigas saem
+# e o teto em TAMANHO (27/11/2026): a cópia chegou a 1 GB e o serviço do Nexus bateu na cota de disco do usuário dele no
+# servidor (Errno 122), travando a geração da semana do PCM. É só cópia: a foto que saiu é baixada de novo do Fracttal
+MB_MAX = 300
 MINIS_EM_MEMORIA = 600       # as últimas miniaturas (~10 kB cada)
 PARALELO = 6                 # downloads ao preparar as miniaturas de uma OS (o arquivo vem do S3, não é pedido à API)
 FOTO_MAX = 10 * 1024 * 1024
@@ -67,6 +70,9 @@ def configurar(pasta) -> None:
     miniatura de cada foto, pelo arquivo do Fracttal. Sobrevive ao reinício (cada deploy reinicia o Nexus). Sem ela (os
     testes), só a memória. Quem chama é o `nexus.campo.instalar`."""
     _PASTA["dir"] = Path(pasta) if pasta else None
+    if _PASTA["dir"] is not None and _PASTA["dir"].is_dir():
+        # a poda logo ao subir, por trás: a cópia que passou do teto (o 1 GB de 27/11/2026) volta a ele sem esperar 200 fotos
+        threading.Thread(target=_podar, args=(_PASTA["dir"],), name="nexus-fotos-ronda-poda", daemon=True).start()
 
 
 def _id_arquivo(valor) -> str:
@@ -102,17 +108,22 @@ def _para_o_disco(nome: str, corpo: bytes) -> None:
 
 
 def _podar(d: Path) -> None:
-    """Passou de ARQUIVOS_MAX, saem as mais antigas (pela data do arquivo)."""
+    """Passou de ARQUIVOS_MAX arquivos ou de MB_MAX, saem as mais antigas (pela data do arquivo) até caber nos dois."""
     try:
-        arqs = sorted((p for p in d.iterdir() if p.is_file() and not p.name.endswith(".tmp")),
-                      key=lambda p: p.stat().st_mtime)
+        arqs = sorted(((p, p.stat()) for p in d.iterdir() if p.is_file() and not p.name.endswith(".tmp")),
+                      key=lambda x: x[1].st_mtime)
     except OSError:
         return
-    for p in arqs[:max(0, len(arqs) - ARQUIVOS_MAX)]:
+    n, total = len(arqs), sum(st.st_size for _, st in arqs)
+    for p, st in arqs:
+        if n <= ARQUIVOS_MAX and total <= MB_MAX * 2**20:
+            break
         try:
             p.unlink()
         except OSError:
-            pass
+            continue
+        n -= 1
+        total -= st.st_size
 
 
 def _ext(url) -> str:
