@@ -1992,9 +1992,12 @@ equipes"; "pode até clicar e dar um zoom automático. Mas é importante ter um 
   - **27/11/2026, os ajustes do Levi:** abre com o foco nas usinas ("Eu quero que abra focado nas usinas [...] as usinas
     poderiam ficar com bolinha redonda, né? E as equipes um pouquinho menores"): o tipo Alarmes virou **Usinas**, a usina
     é a bolinha (`usinas-bola`, maior quanto mais grave; o losango fica para a tela) e o título é "Usinas, alarmes e
-    equipes"; acima do mapa, **a legenda do que cada cor engloba** (`parede.LEGENDA`: "crítico engloba isso, a atenção
-    engloba isso [...]"), a régua de `comando.usinas.classificar` em palavras (mudou a régua, muda o texto); e o mapa
-    acompanha o tamanho da caixa (`ResizeObserver`), porque na bancada o desenho ficava com metade dela.
+    equipes"; **o que cada cor engloba vai junto da contagem**, no alto do mapa e curto (`parede.CONTAGEM`: o número, o
+    rótulo e "usina desligada, rede ou religamento", "inversor, tracker ou string", "o COS não enxerga a usina", "sem
+    ocorrência aberta", "o COS não trouxe a usina"; a régua de `comando.usinas.classificar` em palavras, mudou lá, muda
+    aqui). A 1ª versão do mesmo dia pôs a legenda num bloco à parte, acima do mapa, e o Levi: "deixou o mapa pequeno [...]
+    o foco principal é o mapa". E o mapa acompanha o tamanho da caixa (`ResizeObserver`), porque na bancada o desenho
+    ficava com metade dela.
   - Prova: `tests/test_equipe_videowall_26_11.py`.
 
 **A 2ª parte (a seguir):** na tela, o painel da usina na visão de Usinas (as ocorrências, os técnicos mais perto, a chuva

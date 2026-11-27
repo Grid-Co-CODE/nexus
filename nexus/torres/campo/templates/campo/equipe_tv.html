@@ -90,16 +90,13 @@
        Chuva, Equipes; Levi: "a cada 20 segundos vai mudar"); o clique numa usina, num cartão ou num evento dá o zoom, e o
        Brasil inteiro volta pelo botão ou sozinho ("é importante ter um botão para voltar pro mapa") #}
     <section class="eqtv-mapa" aria-label="O mapa" data-tv-giro-s="{{ giro_s }}">
-      {# o que cada cor engloba (27/11/2026, Levi: "crítico engloba isso, a atenção engloba isso [...] normais isso"), pela
-         régua de Comando > Usinas; a usina com mais de uma ocorrência fica na cor da mais grave #}
-      <dl class="eqtv-legenda">
-        {% for id, nome, texto in legenda %}<div class="eqtv-legenda-i eqtv-legenda-i--{{ id }}"><dt>{{ nome }}</dt><dd>{{ texto }}</dd></div>{% endfor %}
-      </dl>
       <header class="eqtv-mapa-cab">
         {# abre com o foco nas usinas (27/11/2026, Levi: "Eu quero que abra focado nas usinas [...] ênfase em usinas"): a
            usina vira a bolinha na cor do estado, e o técnico fica menor #}
         <h2>Usinas, alarmes e equipes</h2>
-        <span class="eqtv-conta">{% for k in contagem %}<span class="eqtv-conta-i eqtv-conta-i--{{ k.id }}"><b>{{ k.n }}</b>{{ k.rotulo }}</span>{% endfor %}</span>
+        {# a contagem e o que cada cor engloba, juntos e curtos (27/11/2026, Levi: "unir o texto [...] de explicação com esse
+           usinas, alarmes e equipes [...] o foco principal é o mapa"); a usina com mais de uma ocorrência fica na mais grave #}
+        <span class="eqtv-conta">{% for k in contagem %}<span class="eqtv-conta-i eqtv-conta-i--{{ k.id }}"><b>{{ k.n }}</b><span><strong>{{ k.rotulo }}</strong><small>{{ k.explica }}</small></span></span>{% endfor %}</span>
         <div class="cn-seg eqtv-tipo" role="group" aria-label="O que o mapa mostra">
           <button type="button" data-tv-tipo="usinas" aria-pressed="true"><i class="ph ph-solar-panel" aria-hidden="true"></i>Usinas</button>
           <button type="button" data-tv-tipo="chuva" aria-pressed="false"><i class="ph ph-cloud-rain" aria-hidden="true"></i>Chuva</button>

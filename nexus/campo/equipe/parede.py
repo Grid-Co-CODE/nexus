@@ -139,19 +139,16 @@ def montar(cos: dict | None, uids, nome_de, ficha_de, agora: datetime) -> dict:
 # do COS; a do técnico, a do Nexus Field; sem a fotografia do COS, a linha do tempo fica vazia.
 _BRT = timezone(timedelta(hours=-3))
 NOME_DO_GRUPO = {g[0]: g[1] for g in GRUPOS}
-# o que cada cor engloba (27/11/2026, Levi: "acima desse alarmes e equipes explicasse, ó, crítico engloba isso, a atenção
-# engloba isso, comunicação engloba isso, normais isso"): a régua de Comando > Usinas (`comando.usinas.classificar`), em
-# palavras. Mudou a régua lá, muda o texto aqui. (id, nome, o que engloba)
-LEGENDA = (("critico", "Crítico", "Usina desligada: desligamento de usina, cabine, SKID ou QGBT desligado, proteção atuou, "
-            "falta de energia da rede e religamento em campo com OS"),
-           ("alerta", "Atenção", "Inversor desligado ou em falha, tracker parado, string sem corrente e as outras "
-            "ocorrências abertas (furto, corretiva)"),
-           ("semcom", "Sem comunicação", "Falha de comunicação: o COS não enxerga a usina (logger, inversor ou relé sem "
-            "resposta); ela pode estar gerando"),
-           ("ok", "Normal", "Nenhuma ocorrência aberta no COS"),
-           ("neutro", "Sem leitura", "A fotografia do COS não trouxe a usina agora"))
-# a contagem do mapa, nas palavras do Agora de Comando > Usinas (a mesma régua que pinta a usina)
-CONTAGEM = (("critico", "críticas"), ("alerta", "em atenção"), ("semcom", "sem comunicação"), ("ok", "normais"))
+# a contagem do mapa, nas palavras do Agora de Comando > Usinas (a mesma régua que pinta a usina), com o que cada cor
+# engloba em poucas palavras (27/11/2026, Levi: "crítico engloba isso, a atenção engloba isso [...]"; e no mesmo dia, ao
+# ver a legenda num bloco à parte: "unir o texto [...] com esse usinas, alarmes e equipes e tentar deixar o texto mais
+# resumido, porque deixou o mapa pequeno"). É a régua de `comando.usinas.classificar`: mudou lá, muda aqui.
+# (id, rótulo, o que engloba)
+CONTAGEM = (("critico", "críticas", "usina desligada, rede ou religamento"),
+            ("alerta", "em atenção", "inversor, tracker ou string"),
+            ("semcom", "sem comunicação", "o COS não enxerga a usina"),
+            ("ok", "normais", "sem ocorrência aberta"),
+            ("neutro", "sem leitura", "o COS não trouxe a usina"))
 
 
 def _hhmm(iso_utc) -> str:
@@ -231,12 +228,13 @@ def linha_do_tempo(cos: dict | None, uids, nome_de, ficha_de, eventos: list, ago
 
 
 def contagem(agora_por_usina: dict) -> list:
-    """[{"id", "n", "rotulo"}] das usinas do mapa por cor do Agora (crítico, atenção, sem comunicação, normal)."""
-    n = {k: 0 for k, _r in CONTAGEM}
+    """[{"id", "n", "rotulo", "explica"}] das usinas do mapa por cor do Agora (crítico, atenção, sem comunicação, normal
+    e sem leitura)."""
+    n = {k: 0 for k, _r, _e in CONTAGEM}
     for a in (agora_por_usina or {}).values():
         if a and a.get("tom") in n:
             n[a["tom"]] += 1
-    return [{"id": k, "n": n[k], "rotulo": r} for k, r in CONTAGEM]
+    return [{"id": k, "n": n[k], "rotulo": r, "explica": e} for k, r, e in CONTAGEM]
 
 
 def deslocamentos(linhas: list, eventos: list, nome_de) -> list:

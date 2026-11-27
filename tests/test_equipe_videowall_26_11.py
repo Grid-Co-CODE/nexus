@@ -92,9 +92,14 @@ def test_a_linha_do_tempo_de_hoje_das_ocorrencias():
 def test_a_contagem_do_mapa():
     agora = {"7": {"tom": "critico"}, "8": {"tom": "alerta"}, "9": {"tom": "semcom"}, "12": {"tom": "ok"},
              "13": {"tom": "ok"}, "14": {"tom": "neutro"}}
-    # as palavras do Agora de Comando > Usinas (a mesma régua de cor): crítico, atenção, sem comunicação, normal
-    assert PA.contagem(agora) == [{"id": "critico", "n": 1, "rotulo": "críticas"}, {"id": "alerta", "n": 1, "rotulo": "em atenção"},
-                                  {"id": "semcom", "n": 1, "rotulo": "sem comunicação"}, {"id": "ok", "n": 2, "rotulo": "normais"}]
+    # as palavras do Agora de Comando > Usinas (a mesma régua de cor), cada uma com o que engloba em poucas palavras
+    # (27/11/2026, Levi: "unir o texto [...] de explicação com esse usinas, alarmes e equipes e tentar deixar o texto mais
+    # resumido, porque deixou o mapa pequeno")
+    c = PA.contagem(agora)
+    assert [(x["id"], x["n"], x["rotulo"]) for x in c] == [("critico", 1, "críticas"), ("alerta", 1, "em atenção"),
+                                                            ("semcom", 1, "sem comunicação"), ("ok", 2, "normais"),
+                                                            ("neutro", 1, "sem leitura")]
+    assert all(x["explica"] and len(x["explica"]) <= 40 for x in c)
 
 
 def test_as_equipes_em_deslocamento():
@@ -129,11 +134,10 @@ def test_o_video_wall_em_tres_colunas(cliente, pontos, setor, com_mapa_base, mon
         assert f'data-tv-tipo="{tipo}"' in mapa
     assert 'data-tv-tipo="alarmes"' not in mapa and 'data-tv-tipo="usinas" aria-pressed="true"' in mapa
     assert "Usinas, alarmes e equipes" in mapa
-    # a legenda acima do mapa ("explicasse, ó, crítico engloba isso, a atenção engloba isso..."), pela régua do Comando
-    leg = html.split('class="eqtv-legenda"', 1)[1].split("</dl>", 1)[0]
-    for termo in ("Crítico", "Atenção", "Sem comunicação", "Normal", "Sem leitura", "religamento em campo", "Inversor",
-                  "Falha de comunicação", "Nenhuma ocorrência aberta"):
-        assert termo in leg, termo
+    # o que cada cor engloba, junto da contagem no alto do mapa e curto (27/11/2026: a legenda separada encolhia o mapa)
+    assert 'class="eqtv-legenda"' not in html
+    for termo in ("usina desligada", "inversor", "o COS não enxerga", "sem ocorrência aberta", "o COS não trouxe"):
+        assert termo in mapa, termo
     # a linha do tempo não rola sozinha (Levi: "não precisa ficar rolando automático não"): rola na mão
     assert "data-eqtv-rola-tl" not in html
     assert "data-tv-brasil" in mapa and "data-tv-gira" in mapa and "Sair" in mapa

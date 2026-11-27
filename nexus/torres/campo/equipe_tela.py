@@ -1085,7 +1085,7 @@ def _tela_tv(b, coords, nomes_usina, mapa_js, filtro, agora, linhas=(), eventos=
     local = agora.astimezone(_BRT)
     r = current_app.make_response(render_template(
         "campo/equipe_tv.html", torre=TORRE, tela=TORRE.tela("equipe"), p=painel, mapa_js=mapa_js,
-        contagem=contagem, deslocamentos=desloc, linha_tempo=linha_tempo, giro_s=GIRO_TV_S, legenda=PA.LEGENDA,
+        contagem=contagem, deslocamentos=desloc, linha_tempo=linha_tempo, giro_s=GIRO_TV_S,
         recarrega_s=RECARREGA_TV_S, hora=local.strftime("%H:%M"), data=f"{DIAS[local.weekday()]}, {local:%d/%m}",
         prazo=_prazo_da_tv(), q_sair=dict(filtro["q"]), link_chaves=bool(session.get("admin"))))
     r.headers["Cache-Control"] = "no-store"         # a posição de pessoas não fica na cópia do navegador nem de proxy
