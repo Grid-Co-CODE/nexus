@@ -106,7 +106,8 @@ def test_a_aba_abre_pelo_livro_sem_esperar_a_conta(carga, cliente, monkeypatch):
     d = adm.get("/t/comando/contratos/indicadores.json", query_string={"cliente": "Solar Alfa"}).get_json()
     assert not d.get("montando") and d["usinas"][0]["usina"] == "Zeta 1" and d["usinas"][0]["mwp"] == 2.5
     linhas = {l["id"]: l for l in d["usinas"][0]["linhas"]}
-    assert linhas["pr"]["cels"]["2026-10"]["txt"] == "80,0" and linhas["pr_exp"]["cels"]["2026-10"]["txt"] == "81,2"
+    assert "pr" not in linhas and linhas["pr_exp"]["cels"]["2026-10"]["txt"] == "81,2"
+    assert "o original (sem o expurgo) 80,0%" in linhas["pr_exp"]["cels"]["2026-10"]["dica"]
     assert linhas["disp_exp"]["cels"]["2026-10"]["txt"] == "98,5"
 
 
@@ -138,3 +139,16 @@ def test_o_historico_das_bds_entra_conferido():
     ger2 = [dict(r, data_id=int(str(r["data_id"]).replace("202609", "202608", 1))) for r in ger if str(r["data_id"]).startswith("202610")]
     ls2, _ = KM.linhas_do_historico(ger2 + ger, g, AGORA)
     assert all(l[_i("disp_pct")] == "" for l in ls2 if l[_i("data_id_mes")] == 20260801)
+
+
+def test_sem_a_fonte_do_expurgo_nao_grava_e_o_mes_errado_se_refaz(monkeypatch):
+    """27/11/2026: o livro gravado do PC sem a carga dos contratos saiu com o expurgado igual ao bruto, e outubro
+    congelou assim. Com o aviso de uma fonte do expurgo na conta, a volta não grava; `refazer` troca o mês congelado."""
+    g_sem = dict(G, avisos=["os contratos (a carga inicial não está neste servidor)"])
+    r = KM.publicar({"GRIDCO_SQL_TOKEN": "t"}, g_sem, sessao=SimpleNamespace(), agora=AGORA, forcar=True, geracao=[])
+    assert "recusou" in r and "os contratos" in r["recusou"]
+    banco = [dict(zip(KM.CAB, ["7-202610", "20261001", "7", KM.LIGADA_POR, "SOLAR ALFA", "2500", "80.0", "80.0", "97.0", "97.0",
+                               "1000", "1200", "1", "x", KM.FONTE_CONTA]))]
+    novas = KM.linhas_do_portfolio(G, AGORA)
+    assert KM.mesclar(banco, novas, AGORA.date())[0][0][_i("disp_exp_pct")] == "97.0"          # congelado: fica
+    assert KM.mesclar(banco, novas, AGORA.date(), refazer={"2026-10"})[0][0][_i("disp_exp_pct")] == 98.5

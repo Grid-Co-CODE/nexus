@@ -88,30 +88,31 @@ def test_a_matriz_do_ano_contratual():
     mpm = _linha(z1, "MPM")["cels"]
     assert (mpm["2026-09"]["tom"], mpm["2026-10"]["tom"], mpm["2026-11"]["tom"]) == ("ok", "critico", "")   # o mês em curso não é falta
     assert mpm["2026-12"]["txt"] == "—"
-    pr = _linha(z1, "pr")["cels"]
+    pr = _linha(z1, "pr_exp")["cels"]
     assert pr["2026-09"]["txt"] == "s/d"                                 # antes de 10/2026: sem dado, nunca 0
     assert pr["2026-10"]["tom"] == "critico" and pr["2026-11"]["tom"] == "ok"
     assert pr["2027-01"]["txt"] == ""                                    # o que ainda não chegou fica em branco
     # a disponibilidade em duas linhas (27/11/2026): sem o expurgo e com ele, cada uma contra a garantia
-    disp, dexp = _linha(z1, "disp")["cels"], _linha(z1, "disp_exp")["cels"]
-    assert (disp["2026-10"]["txt"], disp["2026-10"]["tom"]) == ("96,0", "alerta")             # 2 pontos abaixo dos 98
-    assert (dexp["2026-10"]["txt"], dexp["2026-10"]["tom"]) == ("97,5", "alerta") and "sem o expurgo 96,0%" in dexp["2026-10"]["dica"]
-    assert disp["2026-11"]["txt"] == dexp["2026-11"]["txt"] == "99,0" and dexp["2026-11"]["tom"] == "ok"
+    # só a expurgada na tabela (27/11/2026: "Mostra só expurgada"); o original na dica e na gaveta
+    assert [l["id"] for l in z1["linhas"] if l["grupo"] == "kpi"] == ["pr_exp", "disp_exp"]
+    dexp = _linha(z1, "disp_exp")["cels"]
+    assert (dexp["2026-10"]["txt"], dexp["2026-10"]["tom"]) == ("97,5", "alerta") and "o original (sem o expurgo) 96,0%" in dexp["2026-10"]["dica"]
+    assert dexp["2026-11"]["txt"] == "99,0" and dexp["2026-11"]["tom"] == "ok" and "não mudou" in dexp["2026-11"]["dica"]
     roc = _linha(z1, "rocada")
     assert roc["cels"]["2026-10"]["txt"] == "03/10 +1" and roc["acum"]["txt"] == "3/4" and roc["acum"]["tom"] == "alerta"
     assert _linha(z1, "lavagem")["acum"]["txt"] == "0/2"
     # o total: preventivas somadas, o PR do mês pela potência
     tot = {l["id"]: l for l in d["total"]}
     assert tot["MPM"]["cels"]["2026-10"]["txt"] == "1/2"
-    assert tot["pr"]["cels"]["2026-10"]["txt"] == "76,8"                 # (75 × 3 + 82 × 1) / 4
-    assert tot["pr"]["nome"] == "PR ponderado" and tot["pr_exp"]["cels"]["2026-10"]["txt"] == "76,8"   # sem expurgo no mês
+    assert tot["pr_exp"]["cels"]["2026-10"]["txt"] == "76,8"             # (75 × 3 + 82 × 1) / 4
+    assert tot["pr_exp"]["nome"] == "PR expurgado" and "pr" not in tot and "disp" not in tot
     assert d["resumo"]["prev"]["MPM"] == [2, 4] and d["resumo"]["fora_pr"] == 1
 
 
 def test_sem_meta_a_celula_fica_sem_cor():
     d = _montar(contrato={})
     z1 = next(u for u in d["usinas"] if u["uid"] == 1)
-    assert _linha(z1, "pr")["cels"]["2026-10"]["tom"] == "" and d["resumo"]["fora_pr"] == 0
+    assert _linha(z1, "pr_exp")["cels"]["2026-10"]["tom"] == "" and d["resumo"]["fora_pr"] == 0
 
 
 @pytest.fixture
@@ -174,7 +175,7 @@ def test_o_pr_acima_de_100_e_leitura_errada_e_os_cartoes_do_alto():
     expurgo, as cores das preventivas e a usina que mais pesa."""
     us = [{"uid": 1, "usina": "Zeta 1", "mwp": 1.0, "meses": {"2026-10": {"pr": 1375.5, "disp": 96.0}}, "com_expurgo": {"2026-10": {"disp": 99.0}}}]
     d = _montar(usinas=us)
-    pr = _linha(d["usinas"][0], "pr")["cels"]["2026-10"]
+    pr = _linha(d["usinas"][0], "pr_exp")["cels"]["2026-10"]
     assert pr["txt"] == "s/d" and "leitura errada" in pr["dica"]
     r = _montar()["resumo"]
     assert [b["tom"] for b in r["pr_barras"][:4]] == ["vazio", "alerta", "ok", "futuro"]       # out/26: 76,8 contra 78
@@ -217,7 +218,7 @@ def test_a_gaveta_da_celula_explica_com_as_os(carga, cliente, relogio, monkeypat
     assert d["os"][1]["id"] == 999 and d["os"][1]["final"] == "2026-10-11"
     assert {n["rot"]: n["val"] for n in d["numeros"]} == {"OS": "2", "Tarefas feitas": "1", "Tarefas planejadas": "2", "Tarefas abertas": "1"}
     d = adm.get("/t/comando/contratos/indicadores/celula.json", query_string=dict(q, uid="t", linha="disp_exp", mes="acum")).get_json()
-    assert d["usinas"][0]["val"] == "98,5%" and "sem o expurgo 97,0%" in d["usinas"][0]["extra"]
+    assert d["usinas"][0]["val"] == "98,5%" and "original 97,0%" in d["usinas"][0]["extra"]
     d = adm.get("/t/comando/contratos/indicadores/celula.json", query_string=dict(q, uid="t", linha="disp", mes="acum")).get_json()
     assert d["usinas"][0]["val"] == "97,0%" and "Sem o expurgo" in d["fonte"]
     assert any("Antes de 10/2026" in x for x in d["textos"])
@@ -232,16 +233,15 @@ def test_a_meta_de_pr_da_bd_e_as_linhas_da_tabela():
     vegetação na ronda, não importa isso daí não")."""
     d = _montar(contrato={}, metas_pr={1: {"2026-10": 78.0, "2026-11": 78.0}, 2: {"2026-10": 80.0}})
     z1 = next(u for u in d["usinas"] if u["uid"] == 1)
-    pr = _linha(z1, "pr")["cels"]
+    pr = _linha(z1, "pr_exp")["cels"]
     assert pr["2026-10"]["tom"] == "critico" and "meta 78,0%" in pr["2026-10"]["dica"] and pr["2026-11"]["tom"] == "ok"
     assert d["metas"]["pr"]["origem"].startswith("da BD Performance") and d["metas"]["disp"]["pct"] == 99.0
-    ordem = ["MPM", "MPS", "MPA", "rocada", "lavagem", "pr", "pr_exp", "disp", "disp_exp"]
+    ordem = ["MPM", "MPS", "MPA", "rocada", "lavagem", "pr_exp", "disp_exp"]
     assert [l["id"] for l in z1["linhas"]] == ordem and [l["id"] for l in d["total"]] == ordem
     tot = {l["id"]: l for l in d["total"]}
-    assert [tot[k]["nome"] for k in ("pr", "pr_exp", "disp", "disp_exp")] == ["PR ponderado", "PR expurgado", "Disponibilidade",
-                                                                               "Disponibilidade expurgada"]
+    assert [tot[k]["nome"] for k in ("pr_exp", "disp_exp")] == ["PR expurgado", "Disponibilidade expurgada"]
     # o PR do contrato no mês contra a meta do mês pela potência: (78 × 3 + 80 × 1) / 4 = 78,5; o PR 76,8 fica amarelo
-    assert tot["pr"]["cels"]["2026-10"]["tom"] == "alerta" and "78,5" in tot["pr"]["cels"]["2026-10"]["dica"]
+    assert tot["pr_exp"]["cels"]["2026-10"]["tom"] == "alerta" and "78,5" in tot["pr_exp"]["cels"]["2026-10"]["dica"]
 
 
 def test_os_servicos_de_zeladoria_como_o_historico_do_radar():
@@ -297,9 +297,9 @@ def test_o_pr_expurgado_e_a_lavagem_pelo_prazo_do_contrato():
     zel = {1: {"lavagem": ["2026-03-10", "2026-11-12"], "rocada": []}, 2: {"lavagem": ["2026-10-05"]}}
     d = _montar(usinas=usinas, zel=zel, zel_min={1: {"lavagem": 2, "rocada": 4}, 2: {}}, zel_desde="2026-09")
     z1 = next(u for u in d["usinas"] if u["uid"] == 1)
-    pr, pe = _linha(z1, "pr")["cels"], _linha(z1, "pr_exp")["cels"]
-    assert pr["2026-10"]["txt"] == "74,0" and pe["2026-10"]["txt"] == "75,0" and "sem o expurgo 74,0%" in pe["2026-10"]["dica"]
-    assert pe["2026-11"]["txt"] == "76,0" and "sem o expurgo" not in pe["2026-11"]["dica"]   # o expurgo não mudou
+    pe = _linha(z1, "pr_exp")["cels"]
+    assert pe["2026-10"]["txt"] == "75,0" and "o original (sem o expurgo) 74,0%" in pe["2026-10"]["dica"]
+    assert pe["2026-11"]["txt"] == "76,0" and "não mudou" in pe["2026-11"]["dica"]
     lav, roc = _linha(z1, "lavagem")["cels"], _linha(z1, "rocada")["cels"]
     # a última em 10/03 e uma a cada 6 meses: venceu em 10/09
     assert (lav["2026-09"]["txt"], lav["2026-09"]["tom"]) == ("atrasada", "critico") and "venceu em 10/09/26" in lav["2026-09"]["dica"]
@@ -315,7 +315,7 @@ def test_o_pr_expurgado_e_a_lavagem_pelo_prazo_do_contrato():
     assert (tot["lavagem"]["cels"]["2026-10"]["txt"], tot["lavagem"]["cels"]["2026-10"]["tom"]) == ("1 atras.", "critico")
     assert (tot["lavagem"]["cels"]["2026-11"]["txt"], tot["lavagem"]["cels"]["2026-11"]["tom"]) == ("1", "ok")
     r = d["resumo"]
-    assert r["pr"] == tot["pr_exp"]["acum"]["txt"] and r["pr_sem_expurgo"] == tot["pr"]["acum"]["txt"]
+    assert (r["pr"], r["pr_sem_expurgo"]) == ("75,5", "75,0")              # o original no cartão, só porque mudou
     assert I.passo_do_contrato(2) == 6 and I.passo_do_contrato(4) == 3 and I.passo_do_contrato(None) is None
     # o relógio começa no início da vigência: o contrato que começou em 20/10 não deve a lavagem vencida em setembro
     d = _montar(contrato={"inicio": "2026-10-20"}, usinas=usinas, zel=zel, zel_min={1: {"lavagem": 2, "rocada": 4}, 2: {}},

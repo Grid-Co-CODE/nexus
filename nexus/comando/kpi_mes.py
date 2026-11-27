@@ -221,16 +221,17 @@ def linhas_do_historico(geracao: list[dict], g: dict, agora: datetime) -> tuple[
     return out, rel
 
 
-def mesclar(banco: list[dict], novas: list[list], hoje: date) -> tuple[list[list], int]:
+def mesclar(banco: list[dict], novas: list[list], hoje: date, refazer=()) -> tuple[list[list], int]:
     """(as linhas a gravar, quantas ficaram congeladas do banco). O mês congelado que está no banco fica como está; o
-    que não está no banco entra pela conta (o 1º retrato dele). A linha do banco que não veio na conta fica."""
+    que não está no banco entra pela conta (o 1º retrato dele). A linha do banco que não veio na conta fica. `refazer` =
+    os meses ("AAAA-MM") que a conta troca mesmo congelados (o conserto de um mês gravado errado)."""
     i = {c: n for n, c in enumerate(CAB)}
     do_banco = {str(r.get("kpi_id")): [r.get(c, "") for c in CAB] for r in banco or [] if r.get("kpi_id")}
     out, congeladas = dict(do_banco), 0
     for l in novas:
         k = l[i["kpi_id"]]
         mes = str(l[i["data_id_mes"]])
-        if k in do_banco and congelado(f"{mes[:4]}-{mes[4:6]}", hoje):
+        if k in do_banco and congelado(f"{mes[:4]}-{mes[4:6]}", hoje) and f"{mes[:4]}-{mes[4:6]}" not in refazer:
             congeladas += 1
             continue
         out[k] = l
@@ -278,8 +279,14 @@ def _ultima(base, sessao) -> datetime | None:
     return d if d is None or d.tzinfo else d.replace(tzinfo=timezone.utc)
 
 
+# a conta sem uma das fontes do expurgo gravaria o expurgado igual ao bruto: em 27/11/2026 o livro foi gravado do PC, que
+# não tem a carga dos contratos (sem a cláusula de expurgo, nada sai da conta), e outubro congelou sem o expurgo. Com um
+# destes avisos na conta, a volta não grava
+AVISOS_QUE_TRAVAM = ("os contratos", "expurgo")
+
+
 def publicar(config, portfolio: dict | None = None, *, sessao=None, agora=None, forcar=False, historico=False,
-             geracao: list[dict] | None = None) -> dict:
+             geracao: list[dict] | None = None, refazer=()) -> dict:
     """Uma volta: confere a última gravação, faz a conta (ou usa o `portfolio` dado, nos testes), mescla com o banco e
     grava se mudou. Devolve só contagens."""
     import requests
@@ -295,6 +302,9 @@ def publicar(config, portfolio: dict | None = None, *, sessao=None, agora=None, 
     if portfolio is None:
         from ..torres.comando.gerencial_tela import dados_gerencial
         portfolio = dados_gerencial()
+    falta = [a for a in portfolio.get("avisos") or [] if any(t in str(a) for t in AVISOS_QUE_TRAVAM)]
+    if falta:
+        return {"recusou": "a conta saiu sem uma fonte do expurgo (" + "; ".join(falta) + "): o livro fica como está"}
     novas = linhas_do_portfolio(portfolio, agora)
     if not novas:
         return {"recusou": "a conta da Visão gerencial saiu sem nenhum mês: o livro fica como está"}
@@ -306,7 +316,7 @@ def publicar(config, portfolio: dict | None = None, *, sessao=None, agora=None, 
                                              portfolio, agora)
         chaves = {l[0] for l in novas}
         novas = novas + [l for l in hist if l[0] not in chaves]
-    todas, congeladas = mesclar(banco, novas, agora.date())
+    todas, congeladas = mesclar(banco, novas, agora.date(), refazer)
     if len({l[0] for l in todas}) != len(todas):
         return {"recusou": "usina e mês repetidos: o grão quebrou; o livro fica como está"}
     h = sha(todas)

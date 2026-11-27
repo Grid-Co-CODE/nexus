@@ -537,6 +537,7 @@ def contratos_indicadores_celula():
         mt = I.metas(c, (vis.get("fichas") or {}).get(cliente))
         meta = (mt["pr"] if e_pr else mt["disp"]) or {}
         metas_bd = _metas_pr_bd(alvo, nomes) if e_pr and not meta else {}
+        clausulas: set = set()
         for u in sorted((usinas[x] for x in alvo), key=lambda x: -(x.get("mwp") or 0)):
             for mid in ids:
                 mm = (u.get("meses") or {}).get(mid) or {}
@@ -544,16 +545,33 @@ def contratos_indicadores_celula():
                 if e_pr:
                     v = ex.get("pr") if expurgado and ex.get("pr") is not None else mm.get("pr")
                     v = v if v is not None and 0 < v <= I.PR_MAX else None
-                    extra = ((f"sem o expurgo {_br(mm.get('pr'))}% · " if expurgado and ex.get("pr") is not None and mm.get("pr") is not None
-                              and round(ex["pr"], 2) != round(mm["pr"], 2) else "")
-                             + (f"geração {_br(mm.get('prod_kwh'), 0)} kWh de {_br(mm.get('meta_kwh'), 0)} kWh previstos"
-                                if mm.get("prod_kwh") is not None else "")) if mm else ""
+                    extra = (f"geração {_br(mm.get('prod_kwh'), 0)} kWh" + (f" de {_br(mm.get('meta_kwh'), 0)} kWh previstos"
+                                                                          if mm.get("meta_kwh") is not None else "")
+                             if mm.get("prod_kwh") is not None else "")
                 else:
                     v = ex.get("disp") if expurgado and ex.get("disp") is not None else mm.get("disp")
-                    extra = f"sem o expurgo {_br(mm.get('disp'))}%" if expurgado and mm.get("disp") is not None else ""
-                    item = next((i for i in ((u.get("score") or {}).get(mid) or {}).get("itens") or [] if i.get("nome") == "Disponibilidade"), None)
-                    if item and item.get("expurgo") and uid_txt != "t":
-                        out["textos"].append(f"{next(m['rot'] for m in meses if m['id'] == mid)}: {item['expurgo']}")
+                    extra = ""
+                # o original (sem o expurgo) e o porquê (Levi, 27/11/2026: "quando a pessoa clicar na expurgada, ele pode
+                # ver a original e entender por que aquilo ali está expurgado"): o texto do item da nota do contrato
+                if expurgado:
+                    o = mm.get("pr") if e_pr else mm.get("disp")
+                    o = o if o is not None and (not e_pr or 0 < o <= I.PR_MAX) else None
+                    if mm.get("fonte") == "historico bd":
+                        extra = "do histórico das BDs: antes de 10/2026 não há registro de expurgo" + (" · " + extra if extra else "")
+                    elif o is not None and v is not None:
+                        extra = ((f"original {_br(o)}%" + (" (o expurgo não mudou)" if round(o, 2) == round(v, 2) else ""))
+                                 + (" · " + extra if extra else ""))
+                    if o is not None and v is not None and round(o, 2) != round(v, 2):
+                        rot_m = next(m["rot"] for m in meses if m["id"] == mid)
+                        item = next((i for i in ((u.get("score") or {}).get(mid) or {}).get("itens") or []
+                                     if i.get("nome") == ("Geração e PR" if e_pr else "Disponibilidade")), None)
+                        porque = (item or {}).get("expurgo") or ""
+                        if uid_txt == "t" and ", pela cláusula" in porque:
+                            # no contrato inteiro, a cláusula vai uma vez só, no alto; na usina, o texto inteiro
+                            clausulas.add(porque[porque.index("pela cláusula"):].split(". Sem o expurgo")[0])
+                            porque = porque.split(", pela cláusula")[0] + "."
+                        out["textos"].append(f"{u.get('usina')} · {rot_m}: de {_br(o)}% para {_br(v)}%"
+                                             + (f". {porque}" if porque else ""))
                 if v is None and not mm:
                     continue
                 mu = meta.get("pct") if meta else (metas_bd.get(u.get("uid")) or {}).get(mid)
@@ -563,6 +581,10 @@ def contratos_indicadores_celula():
                                       "val": _br(v) + "%" if v is not None else "s/d", "tom": I.tom_kpi(v, mu), "extra": extra})
         out["numeros"] = [{"rot": "Meta do contrato" if meta else "Meta", "val": (_br(meta["pct"]) + "%") if meta.get("pct") is not None
                            else ("por usina, da BD Performance" if e_pr else "sem meta")}]
+        if expurgado and out["textos"]:
+            out["textos"].insert(0, "Por que o número mudou: o expurgo do contrato tira da conta a queda da rede e a limitação "
+                                    "imposta (as horas e a energia que não são da Grid)"
+                                    + (", " + "; ".join(sorted(clausulas)) if clausulas else "") + ".")
         out["fonte"] = ("O livro do PR e da disponibilidade de cada usina e mês (a conta da Visão gerencial já feita, de hora em "
                         "hora; o mês fechado congela no dia 11 do seguinte): o PR que a Performance publica (desde 10/2026) e a "
                         "disponibilidade do Fracttal e do COS. " + ("Com o expurgo do contrato: a queda da rede e a limitação "

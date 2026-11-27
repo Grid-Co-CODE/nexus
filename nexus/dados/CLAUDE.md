@@ -435,7 +435,10 @@ contratos. Medido em 27/11/2026 (ensaio, sem gravar): 266 linhas, 133 usinas, ou
 vem uma vez do `nexus_geracao · fato_geracao_usina_dia` (`fonte = historico bd`): o PR pela energia ÷ (irradiação × a
 potência da Performance), com a irradiação do dia pela média das abas, só na usina em que essa conta bate com o PR da
 Performance nos meses em comum (3 pontos); a disponibilidade da BD (em fração no fato: 0,98), sem o mês todo zerado (não
-lançado); o expurgo vazio. Ensaio de 27/11: 986 linhas, 01/2025 a 09/2026.
+lançado); o expurgo vazio. Ensaio de 27/11: 986 linhas, 01/2025 a 09/2026. **A trava do expurgo** (27/11/2026): a 1ª gravação, do PC, saiu
+sem o expurgo (o PC não tem a carga dos contratos, e sem a cláusula nada sai da conta) e outubro congelou assim; foi
+refeita com `publicar(refazer={"2026-10", "2026-11"})`. Desde então a volta não grava com um aviso de fonte do expurgo na
+conta (`AVISOS_QUE_TRAVAM`: os contratos, a queda da rede, a limitação).
 
 ## Os textos reservados (19/11/2026; `textos_reservados.py`, `ferramentas/textos_reservados.py`)
 

@@ -42,11 +42,12 @@ PR_MAX = 100.0
 _MESES = ("jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez")
 _PCT = re.compile(r"(\d{2,3}(?:[.,]\d+)?)\s*%")
 # a vegetação e a sujidade da ronda saíram em 27/11/2026 (Levi: "Sobre sujidade e vegetação na ronda, não importa isso
-# daí não"); o PR e a disponibilidade vão com e sem o expurgo ("Eu tô sentindo falta do PR ponderado, PR expurgado")
+# daí não"); do PR e da disponibilidade, só o EXPURGADO ("ponderado expurgado é a mesma coisa [...] Tem dado que está se
+# repetindo sem necessidade [...] Mostra só expurgada [...] quando a pessoa clicar na expurgada, ele pode ver a original
+# e entender por que aquilo ali está expurgado"): o original fica na dica e na gaveta
 LINHAS = (("MPM", "MPM", "manut"), ("MPS", "MPS", "manut"), ("MPA", "MPA", "manut"),
           ("rocada", "Supressão vegetal", "manut"), ("lavagem", "Lavagem de módulos", "manut"),
-          ("pr", "PR", "kpi"), ("pr_exp", "PR expurgado", "kpi"),
-          ("disp", "Disponibilidade", "kpi"), ("disp_exp", "Disponibilidade expurgada", "kpi"))
+          ("pr_exp", "PR expurgado", "kpi"), ("disp_exp", "Disponibilidade expurgada", "kpi"))
 # a garantia de disponibilidade onde o contrato não traz o número (Levi, 26/11/2026: "Garantia de disponibilidade. Bota
 # 99% para tudo [...] As que faltam, bota 99%")
 DISP_PADRAO = 99.0
@@ -404,10 +405,10 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
                     extra = txt_meta
                 else:
                     extra = f"; garantia {_br(meta)}%" if meta is not None else ""
-                if k == "pr_exp" and pr_b is not None and round(v, 2) != round(pr_b, 2):
-                    extra += f"; sem o expurgo {_br(pr_b)}%"
-                if k == "disp_exp" and disp_b is not None and round(v, 2) != round(disp_b, 2):
-                    extra += f"; sem o expurgo {_br(disp_b)}%"
+                orig = pr_b if k == "pr_exp" else (disp_b if k == "disp_exp" else None)
+                if orig is not None:
+                    extra += (f"; o original (sem o expurgo) {_br(orig)}%" if round(v, 2) != round(orig, 2)
+                              else "; o expurgo não mudou o número")
                 historico = mm.get("fonte") == "historico bd"
                 if historico and k.endswith("_exp") and not ex.get(k[:-4]):
                     extra += "; antes de 10/2026 o expurgo não tem registro: é o número sem o expurgo"
@@ -471,6 +472,7 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
     metas_ok = [v for v in meta_c.values() if v is not None]
     meta_pr_ac = meta_pr if meta_pr is not None else (round(sum(metas_ok) / len(metas_ok), 1) if metas_ok else None)
     pond = {k: {mid: _media_pesada(v) for mid, v in kpi_mes[k].items()} for k in kpis}
+    ac_kpi = {}
     for k, nome in (("pr", "PR ponderado"), ("pr_exp", "PR expurgado"), ("disp", "Disponibilidade"),
                     ("disp_exp", "Disponibilidade expurgada")):
         cels = {}
@@ -482,15 +484,19 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
             elif m["id"] not in meses_com_dado:
                 cels[m["id"]] = {"txt": "s/d", "tom": "", "dica": "sem dado no banco antes de 10/2026"}
             else:
+                orig = pond[k[:-4]].get(m["id"]) if k.endswith("_exp") else None
                 cels[m["id"]] = {"txt": _br(v) if v is not None else "s/d", "tom": tom_kpi(v, mm),
-                                 "dica": ("com o expurgo do contrato; " if k.endswith("_exp") else "sem o expurgo; ")
-                                         + "ponderado pela potência das usinas" + (f"; meta {_br(mm)}%" if mm is not None else "")}
-        ac = _media_pesada([(v, 1.0) for v in pond[k].values() if v is not None])
+                                 "dica": "com o expurgo do contrato, ponderado pela potência das usinas"
+                                         + (f"; meta {_br(mm)}%" if mm is not None else "")
+                                         + (f"; o original (sem o expurgo) {_br(orig)}%" if orig is not None and v is not None
+                                            and round(orig, 1) != round(v, 1) else "")}
+        a = _media_pesada([(v, 1.0) for v in pond[k].values() if v is not None])
         ma = meta_pr_ac if k.startswith("pr") else meta_disp
-        total.append({"id": k, "nome": nome, "grupo": "kpi", "sub": "% ponderado", "cels": cels,
-                      "acum": {"txt": _br(ac) if ac is not None else "s/d", "tom": tom_kpi(ac, ma), "dica": "a média dos meses com dado"}})
+        ac_kpi[k] = {"txt": _br(a) if a is not None else "s/d", "tom": tom_kpi(a, ma), "dica": "a média dos meses com dado"}
+        if k.endswith("_exp"):                       # na tabela, só o expurgado; o original fica na dica e na gaveta
+            total.append({"id": k, "nome": nome, "grupo": "kpi", "sub": "% ponderado", "cels": cels, "acum": ac_kpi[k]})
     tp = {s: [sum(v[0] for v in tot_prev[s].values()), sum(v[1] for v in tot_prev[s].values())] for s in SIGLAS}
-    ac = {k: next(l["acum"] for l in total if l["id"] == k) for k in kpis + ("rocada", "lavagem")}
+    ac = {**{k: next(l["acum"] for l in total if l["id"] == k) for k in ("rocada", "lavagem")}, **ac_kpi}
 
     # os quatro números do alto (o mockup da sugestão): o PR e a disponibilidade EXPURGADOS do contrato, com o sem expurgo
     # ao lado e o mês a mês em miniatura; as preventivas e os serviços do ano; o que ficou fora da meta
@@ -514,7 +520,7 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
         return "" if not t else ("ok" if f >= t else ("critico" if ano_fechado else "alerta"))
     pior = max(out_us, key=lambda x: x["fora_kpi"], default=None)
     pior = pior if pior and pior["fora_kpi"] else None
-    sem = {k: (ac[k]["txt"] if ac[k]["txt"] != "s/d" else None) for k in ("pr", "disp")}
+    sem = {k: (ac[k]["txt"] if ac[k]["txt"] not in ("s/d", ac[k + "_exp"]["txt"]) else None) for k in ("pr", "disp")}
     return {"ok": True, "ano": ano, "meses": ms, "mes_hoje": mes_hoje, "ano_fechado": ano_fechado,
             "metas": mt, "usinas": out_us, "total": total,
             "resumo": {"pr": ac["pr_exp"]["txt"], "pr_tom": ac["pr_exp"]["tom"], "pr_sem_expurgo": sem["pr"],

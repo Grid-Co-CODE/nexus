@@ -144,12 +144,14 @@ visão gerencial para o CEO, para os heads darem uma olhada, vai ser muito impor
   `ano_contratual`; a linha de fatos mostra o aniversário, e a aba Pontos ganha a Atenção 30 dias antes
   (`pontos.ANIVERSARIO_DIAS`). Sem início da vigência, a aba diz que falta.
 - **De onde vem cada linha** (as fontes que as telas donas já usam, juntadas em `contratos_tela._fontes_da_ligacao`):
-  - **PR e disponibilidade, cada um em duas linhas, sem e com o expurgo do contrato** (Levi, 27/11/2026: "Eu tô sentindo
-    falta do PR ponderado, PR expurgado"; "Disponibilidade expurgada também, mesma lógica"): na usina, PR, PR expurgado,
-    Disponibilidade e Disponibilidade expurgada; no contrato, as quatro pela potência ("PR ponderado"). Cada linha contra
-    a meta; o "fora da meta" e os cartões do alto contam o EXPURGADO (o número do contrato), com o sem expurgo ao lado. O
-    expurgo é o `com_expurgo` da Visão gerencial (`comando/expurgos.py`: a queda da rede e a limitação imposta saem da
-    conta, `pr × (prod + E) ÷ prod`); a sujidade e a vegetação não entram (o chat da Performance, 26/11/2026);
+  - **Só o PR expurgado e a disponibilidade expurgada** (Levi, 27/11/2026: "ponderado expurgado é a mesma coisa [...]
+    Tem dado que está se repetindo sem necessidade [...] Mostra só expurgada [...] quando a pessoa clicar na expurgada,
+    ele pode ver a original e entender por que aquilo ali está expurgado"; no mesmo dia, antes, as quatro linhas, sem e
+    com o expurgo): na usina e no contrato (pela potência), contra a meta. O original (sem o expurgo) fica na dica da
+    célula e na gaveta, com o porquê do mês (o texto do item da nota do contrato, "Disponibilidade" ou "Geração e PR");
+    o cartão do alto mostra o original só quando o expurgo mudou o número. O expurgo é o `com_expurgo` da Visão gerencial
+    (`comando/expurgos.py`: a queda da rede e a limitação imposta saem da conta, `pr × (prod + E) ÷ prod`); a sujidade e a
+    vegetação não entram (o chat da Performance, 26/11/2026);
   - **de onde vem o PR e a disponibilidade: o livro `nexus_kpi_usina_mes`** (`comando/kpi_mes.py`; Levi: "Pode até
     criar um book sobre isso para você não ficar carregando, calculando toda vez que abre"): a conta da Visão gerencial
     já feita, por usina e mês, gravada de hora em hora (:47) pelo laço do app, só quando muda; o mês fechado congela no

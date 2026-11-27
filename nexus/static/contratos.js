@@ -823,7 +823,7 @@
   // PR expurgado"; "Sobre sujidade e vegetação na ronda, não importa isso daí não")
   // na usina, a supressão e a lavagem mostram o DIA em que foram feitas (dia/mês); no contrato, quantas usinas (Levi,
   // 27/11/2026: "se esse número aí for o dia [...] tem que ter um disclaimer falando que é dia")
-  var SUB_IND = {MPM: "mensal", MPS: "semestral", MPA: "anual", rocada: "dia feita (dia/mês)", lavagem: "dia feita (dia/mês)", pr: "%", pr_exp: "%", disp: "%", disp_exp: "%"};
+  var SUB_IND = {MPM: "mensal", MPS: "semestral", MPA: "anual", rocada: "dia feita (dia/mês)", lavagem: "dia feita (dia/mês)", pr_exp: "% · clique: o original", disp_exp: "% · clique: o original"};
   function pedirInd(c, n) {
     var ch = c.cliente + "|" + (n || "");
     if (IND[ch] && !IND[ch].montando) return IND[ch];
@@ -865,10 +865,10 @@
     function abaixo(l) { return l && l.length ? " · <b>" + l.length + (l.length === 1 ? " mês" : " meses") + " abaixo da meta</b> (" + esc(l.join(", ")) + ")" : ""; }
     var h = '<div class="ind-cartoes">';
     h += '<section class="ind-cartao"><h4><i class="ph ph-chart-line-up" aria-hidden="true"></i>PR expurgado · acumulado</h4><div class="ind-val">' + grande(r.pr, r.pr_tom) + meta(mt.pr) + "</div>" +
-      "<p>" + (r.pr_sem_expurgo ? "sem expurgo " + esc(r.pr_sem_expurgo) + "%" : "sem expurgo: sem dado") + " · " + (r.usinas_n || 0) + (r.usinas_n === 1 ? " usina" : " usinas") +
+      "<p>" + (r.pr_sem_expurgo ? "original " + esc(r.pr_sem_expurgo) + "% · " : "") + (r.usinas_n || 0) + (r.usinas_n === 1 ? " usina" : " usinas") +
       ", ponderado pela potência" + abaixo(r.pr_abaixo) + "</p>" + barrinhas(r.pr_barras) + "</section>";
     h += '<section class="ind-cartao"><h4><i class="ph ph-plugs-connected" aria-hidden="true"></i>Disponibilidade expurgada · acumulada</h4><div class="ind-val">' + grande(r.disp, r.disp_tom) + meta(mt.disp) + "</div>" +
-      "<p>" + (r.disp_sem_expurgo ? "sem expurgo " + esc(r.disp_sem_expurgo) + "%" : "sem expurgo: sem dado") + ", ponderada pela potência" + abaixo(r.disp_abaixo) + "</p>" + barrinhas(r.disp_barras) + "</section>";
+      "<p>" + (r.disp_sem_expurgo ? "original " + esc(r.disp_sem_expurgo) + "% · " : "") + "ponderada pela potência" + abaixo(r.disp_abaixo) + "</p>" + barrinhas(r.disp_barras) + "</section>";
     var itens = [["MPM", pv.MPM, pt.MPM], ["MPS", pv.MPS, pt.MPS], ["MPA", pv.MPA, pt.MPA], ["Supressão", r.rocada, r.rocada_tom], ["Lavagem", r.lavagem, r.lavagem_tom]];
     // cinco colunas iguais, o nome e o valor centralizados, sem texto embaixo (Levi, 26/11/2026: "a nomenclatura deles
     // centralizada e os valores centralizados [...] tem um texto enorme aí ocupando espaço"); a explicação fica na dica
