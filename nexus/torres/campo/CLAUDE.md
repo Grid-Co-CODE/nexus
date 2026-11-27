@@ -1982,9 +1982,16 @@ equipes"; "pode até clicar e dar um zoom automático. Mas é importante ter um 
     contagem pelo Agora de Comando > Usinas (`contagem`: críticas, em atenção, sem comunicação, normais), o tipo que **gira
     a cada 20 s** (`GIRO_TV_S`: **Usinas**, onde abre, com a usina em bolinha na cor do Agora e o técnico menor; Chuva, o **último quadro
     do radar, parado** (27/11/2026, Levi: "esse GIF aí do clima, não precisa não, deixa sempre no último": só ele é pedido,
-    sem o tocar e sem a barra do tempo; fica a hora e a escala) e os avisos do INMET, por isso o
+    sem o tocar e sem a barra do tempo; fica a hora e a escala, que diz **Chuva** fraca/forte, e ao lado a chave dos
+    **avisos do INMET**: amarelo Perigo potencial, laranja Perigo, vermelho Grande perigo, tracejado o que ainda vai
+    começar) e os avisos do INMET, que **se explicam no mouse** (27/11/2026, Levi: "essas linhas aí, elas querem dizer
+    tipo perigo, né? Mas o que?": `dicaAviso` mostra o evento e o nível, o que o nível quer dizer, quando vale, o que é e
+    o que pode acontecer na usina, o texto do `clima.explica` que o `clima.mapa._geo` põe em cada área; a área do aviso
+    futuro ganhou um preenchimento quase transparente, `avisos-area`, só para o mouse achar), por isso o
     vídeo wall lê o clima sempre, sem levar o `clima=1` aos links; Equipes, o foco no técnico), a barrinha do giro, as
-    **Equipes em deslocamento** (`deslocamentos`) com a rota tracejada até a usina de destino; o **clique** numa usina, num
+    **Equipes em deslocamento** (`deslocamentos`) com a rota tracejada até a usina de destino; o **clique** (o zoom vai
+    ao 15 na usina e ao 14 no técnico, `ZOOM_USINA`/`ZOOM_TECNICO`, 27/11/2026: "zoom maior para a gente conseguir ver
+    ali a parte da usina"; na tela, o clique na usina também vai ao 15) numa usina, num
     cartão ou num evento dá o zoom com o resumo (o estado, o motivo e o técnico na usina ou a caminho), para o giro, e o
     **Brasil inteiro** volta pelo botão ou sozinho em 45 s; o **Sair** fica sempre à vista no alto do mapa (o do topo só
     aparecia ao mexer o mouse: "Eu não encontrei esse botão");

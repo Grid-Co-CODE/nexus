@@ -125,3 +125,48 @@ def test_o_bloco_do_radar_leva_o_molde_sem_codificar():
               "'/v2/radar/abc123','https://app.exemplo/t/campo/equipe?tv=1')))")
     assert r == "https://app.exemplo/t/campo/equipe/radar/v2/radar/abc123/256/{z}/{x}/{y}/8/1_1.png"
     assert "blocoDoRadar(D.radar.bloco, q.path, location.href)" in _js("campo-mapa.js")
+
+
+# ── 27/11/2026, a 2ª rodada do Levi no vídeo wall ─────────────────────────────────────────────────────────────────────
+# "gostaria que desse um zoom maior para a gente conseguir ver ali a parte da usina [...] esse fraco e forte poderia
+# dizer que é chuva [...] essas linhas aí, elas querem dizer tipo perigo, né? Mas o que? Ao passar o mouse nessas linhas
+# aí com pintada de amarelo, laranja, não aparece muita coisa não. Se estiver explicando assim o que está acontecendo"
+
+
+def test_o_zoom_na_usina_chega_perto_de_ver_a_usina():
+    """O clique na usina (na TV e na tela) vai ao zoom 15, onde o satélite mostra a usina; até ali era 10 na TV e 13 na
+    tela. O técnico vai ao 14."""
+    js = _js("campo-mapa.js")
+    assert "ZOOM_USINA = 15, ZOOM_TECNICO = 14" in js
+    assert "zoom: z || ZOOM_TECNICO" in _funcao(js, "tvZoom")
+    assert "ZOOM_USINA)" in _funcao(js, "tvZoomUsina")
+    assert "zoom: Math.max(mapa.getZoom(), ZOOM_USINA)" in js
+
+
+def test_a_escala_do_radar_diz_que_e_chuva_e_mostra_os_avisos():
+    tpl = (RAIZ.parent / "torres" / "campo" / "templates" / "campo" / "_equipe_mapa_ml.html").read_text(encoding="utf-8")
+    assert '<span class="eq-radar-leg" aria-hidden="true"><b>Chuva</b><i></i><small>fraca</small><small>forte</small></span>' in tpl
+    # a chave dos avisos do INMET, ao lado da escala da chuva
+    assert "Avisos do INMET" in tpl and "Perigo potencial" in tpl and "Grande perigo" in tpl and "tracejado" in tpl
+
+
+def test_o_aviso_do_inmet_se_explica_no_mouse():
+    """A área do aviso leva, para a dica do mapa: o evento, o nível com o que ele quer dizer, quando vale, o que é e o que
+    pode acontecer na usina (o texto do Clima e risco, `clima.explica`); e o mapa mostra isso ao passar o mouse (também na
+    área do aviso que ainda vai começar, que antes era só o contorno tracejado)."""
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
+    from nexus.performance.clima import fontes as F
+    from nexus.performance.clima import mapa as M
+    ref = datetime(2026, 11, 27, 15, 0, tzinfo=timezone(timedelta(hours=-3)))
+    geo = {"type": "Polygon", "coordinates": [[[-50, -20], [-49, -20], [-49, -19], [-50, -20]]]}
+    a = F.Aviso("1", ref, "Tempestade", "Perigo", 2, ref - timedelta(hours=1), ref + timedelta(hours=8), geo, (-50, -20, -49, -19))
+    vista = SimpleNamespace(cruza=lambda caixa: True)
+    g = M._geo(SimpleNamespace(dados={"avisos": [a]}), None, None, [], vista, ref)
+    p = g["avisos"]["features"][0]["properties"]
+    assert p["evento"] == "Tempestade" and p["severidade"] == "Perigo" and p["quer_dizer"] == "é provável que cause estrago"
+    assert p["validade"].startswith("em vigor") and p["o_que_e"].startswith("Chuva forte com raios")
+    assert p["na_usina"].startswith("Raio nos equipamentos")
+    js = _js("campo-mapa.js")
+    assert 'mapa.on("mousemove", "avisos-area", dicaAviso)' in js
+    assert '{ id: "avisos-area", type: "fill", source: "avisos"' in js

@@ -91,6 +91,9 @@
   var raiz = document.documentElement;
   var REDUZIDO = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   var BRASIL = [[-74.1, -33.9], [-34.7, 5.4]];
+  // o zoom do clique (27/11/2026, Levi: "gostaria que desse um zoom maior para a gente conseguir ver ali a parte da
+  // usina [...] ainda está um pouquinho longe"): no 15 o satélite mostra a usina; até ali era 10 na TV e 13 na tela
+  var ZOOM_USINA = 15, ZOOM_TECNICO = 14;
   var FONTE = ["Noto Sans Regular"], FONTE_M = ["Noto Sans Medium"], FONTE_I = ["Noto Sans Italic"];
 
   function avisar(texto) { aviso.textContent = texto; aviso.hidden = false; }
@@ -418,6 +421,8 @@
       // o clima: a área do aviso (o que ainda vai começar, só o contorno tracejado), os focos e o anel perto de usina
       { id: "avisos", type: "fill", source: "avisos", filter: ["!", ["get", "futuro"]], paint: { "fill-color": corAviso, "fill-opacity": 0.24 } },
       { id: "avisos-futuro", type: "line", source: "avisos", filter: ["get", "futuro"], paint: { "line-color": corAviso, "line-width": 1.5, "line-dasharray": [3, 2] } },
+      // a área do aviso que ainda vai começar, quase transparente: só para o mouse achar o aviso (o contorno é fino)
+      { id: "avisos-area", type: "fill", source: "avisos", filter: ["get", "futuro"], paint: { "fill-color": corAviso, "fill-opacity": 0.05 } },
       { id: "focos", type: "circle", source: "focos", paint: { "circle-color": P.t["--severo"], "circle-opacity": 0.8, "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 1.6, 10, 3.2] } },
       { id: "aneis", type: "circle", source: "aneis", paint: { "circle-color": comAlfa(P.t["--critico"], 0.12), "circle-stroke-color": P.t["--critico"], "circle-stroke-width": 2, "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 6, 12, 14] } },
       { id: "rotas", type: "line", source: "rotas", paint: { "line-color": P.t["--info-cheio"], "line-width": 2.2, "line-dasharray": [2, 2] } },
@@ -662,7 +667,21 @@
   }
   mapa.on("mousemove", "usinas", dicaUsina);
   mapa.on("mousemove", "usinas-bola", dicaUsina);
-  ["tecnicos", "usinas", "usinas-bola"].forEach(function (id) {
+  // o aviso do INMET se explica no mouse (27/11/2026, Levi: "Ao passar o mouse nessas linhas aí com pintada de amarelo,
+  // laranja, não aparece muita coisa não"): o evento e o nível, o que o nível quer dizer e quando vale, o que é e o que
+  // pode acontecer na usina. A usina e o técnico mandam na dica: o aviso só fala onde não há um deles
+  function dicaAviso(e) {
+    var sobre = ["usinas", "usinas-bola", "tecnicos"].filter(function (id) { return mapa.getLayer(id); });
+    if (mapa.queryRenderedFeatures(e.point, { layers: sobre }).length) return;
+    var p = e.features[0].properties, qd = String(p.quer_dizer || "");
+    mapa.getCanvas().style.cursor = "help";
+    mostrar(["Aviso do INMET: " + (p.evento || "") + (p.severidade ? " · " + p.severidade : ""),
+             (qd ? qd.charAt(0).toUpperCase() + qd.slice(1) + " · " : "") + (p.validade || ""),
+             p.o_que_e || "", p.na_usina ? "Na usina: " + p.na_usina : ""], e.point.x, e.point.y);
+  }
+  mapa.on("mousemove", "avisos", dicaAviso);
+  mapa.on("mousemove", "avisos-area", dicaAviso);
+  ["tecnicos", "usinas", "usinas-bola", "avisos", "avisos-area"].forEach(function (id) {
     mapa.on("mouseleave", id, function () { mapa.getCanvas().style.cursor = ""; esconder(); });
   });
   mapa.on("dragstart", esconder);
@@ -675,7 +694,7 @@
   mapa.on("click", "usinas", function (e) {
     if (D.tv) { tvZoomUsina(e.features[0].properties.id); return; }
     var c = e.features[0].geometry.coordinates;
-    mapa.flyTo({ center: c, zoom: Math.max(mapa.getZoom(), 13), duration: REDUZIDO ? 300 : 900, essential: true });
+    mapa.flyTo({ center: c, zoom: Math.max(mapa.getZoom(), ZOOM_USINA), duration: REDUZIDO ? 300 : 900, essential: true });
   });
   quadro.addEventListener("click", function (e) {
     var ch = e.target.closest("[data-eq-chuva]");
@@ -907,7 +926,7 @@
     if (TV.raiz) TV.raiz.classList.toggle("eqtv--chuva", t === "chuva");
     radarLigar(t === "chuva");
     if (t === "chuva" && RAD.q.length) radarMostrar(RAD.q.length - 1);
-    ["avisos", "avisos-futuro", "focos", "aneis"].forEach(function (id) {
+    ["avisos", "avisos-futuro", "avisos-area", "focos", "aneis"].forEach(function (id) {
       if (mapa.getLayer(id)) mapa.setLayoutProperty(id, "visibility", t === "chuva" ? "visible" : "none");
     });
     foco = t === "equipes" ? "tecnico" : "usina";
@@ -923,10 +942,10 @@
     clearInterval(TV.giro); tvMarcar(false);
     TV.giro = setInterval(function () { tvTipo(TV.TIPOS[(TV.TIPOS.indexOf(TV.tipo) + 1) % TV.TIPOS.length]); tvMarcar(false); }, TV.ms);
   }
-  function tvZoom(c, html) {
+  function tvZoom(c, html, z) {
     if (!c) return;
     TV.zoom = true; clearInterval(TV.giro); tvMarcar(true);
-    mapa.flyTo({ center: c, zoom: 10, duration: REDUZIDO ? 0 : 1200, essential: true });
+    mapa.flyTo({ center: c, zoom: z || ZOOM_TECNICO, duration: REDUZIDO ? 0 : 1200, essential: true });
     TV.pop.setLngLat(c).setHTML(html).addTo(mapa);
     if (TV.brasil) TV.brasil.hidden = false;
     clearTimeout(TV.volta); TV.volta = setTimeout(tvVoltar, 45000);
@@ -936,7 +955,7 @@
     if (!u) return;
     var cos = u.agora ? u.agora.rotulo + (u.agora.motivo ? " · " + u.agora.motivo : "") : "";
     var tec = ((D.tv_usinas || {})[String(uid)] || []).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("");
-    tvZoom(u.c, "<b>" + esc(u.nome) + "</b>" + (cos ? "<small>" + esc(cos) + "</small>" : "") + tec);
+    tvZoom(u.c, "<b>" + esc(u.nome) + "</b>" + (cos ? "<small>" + esc(cos) + "</small>" : "") + tec, ZOOM_USINA);
   }
   function tvVoltar() {
     if (!TV) return;

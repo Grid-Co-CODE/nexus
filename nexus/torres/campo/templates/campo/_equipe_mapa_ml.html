@@ -36,7 +36,10 @@
     <button type="button" class="eq-radar-tocar" data-eq-radar-tocar aria-label="Tocar as últimas 2 horas do radar"><i class="ph ph-play" aria-hidden="true"></i></button>
     <input type="range" min="0" max="0" value="0" step="1" data-eq-radar-quadro aria-label="A hora do radar">
     <span class="eq-radar-hora" data-eq-radar-hora>…</span>
-    <span class="eq-radar-leg" aria-hidden="true"><i></i><small>fraca</small><small>forte</small></span>
+    {# "Chuva" na escala (27/11/2026, Levi: "esse fraco e forte poderia dizer que é chuva, né? Às vezes a pessoa não
+       entende") e, no vídeo wall (onde a vez da Chuva mostra os avisos), a chave das cores dos avisos do INMET #}
+    <span class="eq-radar-leg" aria-hidden="true"><b>Chuva</b><i></i><small>fraca</small><small>forte</small></span>
+    {% if mapa_js.tv %}<span class="eq-radar-av"><b>Avisos do INMET</b><span><i class="eq-av1"></i>Perigo potencial</span><span><i class="eq-av2"></i>Perigo</span><span><i class="eq-av3"></i>Grande perigo</span><small>tracejado: ainda vai começar · passe o mouse para ver o aviso</small></span>{% endif %}
   </div>
   {% endif %}
   <p class="eq-ml-aviso" hidden></p>

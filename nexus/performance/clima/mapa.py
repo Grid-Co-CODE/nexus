@@ -888,9 +888,16 @@ def _geo(avisos_l, focos_l, indice, usinas: list, v: Vista, ref) -> dict:
     for a in (avisos_l.dados or {}).get("avisos") or ():
         if (a.fim is not None and a.fim < ref) or not v.cruza(a.caixa):
             continue
+        # o que a dica do Mapa de equipe diz ao passar o mouse (27/11/2026, Levi: "essas linhas aí, elas querem dizer
+        # tipo perigo, né? Mas o que? [...] Se estiver explicando assim o que está acontecendo"): o evento, o nível com o
+        # que ele quer dizer, quando vale, o que é e o que pode acontecer na usina (o texto do Clima e risco)
+        ex = E.evento(a.evento)
         feats.append({"type": "Feature", "geometry": a.geometria,
                       "properties": {"nivel": a.nivel, "futuro": not A.em_vigor(a, ref),
-                                     "titulo": f"{a.evento} · {a.severidade} · {V._validade(a, ref)}"}})
+                                     "titulo": f"{a.evento} · {a.severidade} · {V._validade(a, ref)}",
+                                     "evento": E.nome_amigavel(a.evento), "severidade": a.severidade,
+                                     "quer_dizer": E.QUER_DIZER_NIVEL.get(a.nivel, ""), "validade": V._validade(a, ref),
+                                     "o_que_e": ex["o_que_e"], "na_usina": ex["na_usina"]}})
     focos, aneis = [], set()
     if indice is not None:
         for f in focos_l.dados["focos"]:
