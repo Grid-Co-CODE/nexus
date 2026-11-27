@@ -272,3 +272,12 @@ def test_o_endereco_do_codigo_e_o_de_fora(app):
         assert T._endereco_publico() == "https://nexus.exemplo.test"
     with app.test_request_context("/t/pcm/gerar/pc/ligar", base_url="https://10.0.0.9:5070"):
         assert T._endereco_publico() == "https://10.0.0.9:5070"
+
+
+def test_a_preparacao_que_quebra_diz_o_motivo(cliente, pc, monkeypatch):
+    """O erro inesperado na preparação volta com o tipo e a mensagem (a prova de 27/11/2026 só via "O Nexus respondeu 500")."""
+    def quebra(*a, **k):
+        raise KeyError("usina_id")
+    monkeypatch.setattr(P, "abrir_rodada", quebra)
+    r = cliente.post("/t/pcm/pc/rodada", json={"semana": "2026-W49"}, headers=pc)
+    assert r.status_code == 500 and "KeyError" in r.get_json()["erro"] and "usina_id" in r.get_json()["erro"]

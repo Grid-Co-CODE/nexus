@@ -908,6 +908,9 @@ def pc_rodada():
         return _erro_pc("Semana inválida. Use o formato 2026-W49.")
     except geracao.NaoPronto as ex:
         return _erro_pc(f"Ainda não dá para gerar: {ex}.", 409)
+    except Exception as ex:      # noqa: BLE001 — o aplicativo mostra o motivo (a prova de 27/11/2026 só via "500")
+        logging.getLogger(__name__).exception("Gerar no PC: a preparação da rodada falhou")
+        return _erro_pc(f"O Nexus não conseguiu preparar a rodada ({type(ex).__name__}: {str(ex)[:200]}).", 500)
     return jsonify({"ok": True, "id": st["id"], "semana": st["semana"],
                     "tela": request.host_url.rstrip("/") + na_raiz("/t/pcm/gerar?rodada=") + st["id"]})
 
