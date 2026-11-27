@@ -957,6 +957,17 @@
     var tec = ((D.tv_usinas || {})[String(uid)] || []).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("");
     tvZoom(u.c, "<b>" + esc(u.nome) + "</b>" + (cos ? "<small>" + esc(cos) + "</small>" : "") + tec, ZOOM_USINA);
   }
+  // o + e o − do canto (27/11/2026): um nível por toque, pelo centro; param o giro como o clique e voltam sozinhos em 45 s.
+  // O − que chega ao tamanho do Brasil inteiro devolve o mapa de sempre (o enquadramento e o giro)
+  function tvZoomBotao(q) {
+    var brasil = (mapa.cameraForBounds(BRASIL, { padding: 16 }) || {}).zoom || 3;
+    var alvo = Math.min(18, mapa.getZoom() + (q === "mais" ? 1 : -1));
+    if (q === "menos" && alvo <= brasil + 0.25) { tvVoltar(); return; }
+    TV.zoom = true; clearInterval(TV.giro); tvMarcar(true);
+    if (TV.brasil) TV.brasil.hidden = false;
+    mapa.easeTo({ zoom: alvo, duration: REDUZIDO ? 0 : 400, essential: true });
+    clearTimeout(TV.volta); TV.volta = setTimeout(tvVoltar, 45000);
+  }
   function tvVoltar() {
     if (!TV) return;
     TV.zoom = false; clearTimeout(TV.volta); TV.pop.remove();
@@ -986,6 +997,8 @@
       var tb = e.target.closest("[data-tv-tipo]");
       if (tb) { tvTipo(tb.getAttribute("data-tv-tipo")); if (!TV.zoom) tvGirar(); return; }
       if (e.target.closest("[data-tv-brasil]")) { tvVoltar(); return; }
+      var zb = e.target.closest("[data-tv-zoom]");
+      if (zb) { tvZoomBotao(zb.getAttribute("data-tv-zoom")); return; }
       var el = e.target.closest("[data-tv-uid]");
       if (el) { tvZoomUsina(el.getAttribute("data-tv-uid")); return; }
       var tp = e.target.closest("[data-tv-pid]"), t = tp && porPid[tp.getAttribute("data-tv-pid")];

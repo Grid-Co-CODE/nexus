@@ -108,6 +108,12 @@
       </header>
       <div class="eq-quadro eqtv-quadro">
         {% include "campo/_equipe_mapa_ml.html" %}
+        {# o + e o − sempre à vista no canto (27/11/2026, Levi: "botões de dar zoom ou não dar, né, no canto superior
+           direito [...] Para ver mais de perto a usina"): aproximam e afastam pelo centro, a usina do clique #}
+        <div class="eqtv-zoom" role="group" aria-label="Zoom do mapa">
+          <button type="button" data-tv-zoom="mais" aria-label="Aproximar" title="Aproximar"><i class="ph ph-plus" aria-hidden="true"></i></button>
+          <button type="button" data-tv-zoom="menos" aria-label="Afastar" title="Afastar"><i class="ph ph-minus" aria-hidden="true"></i></button>
+        </div>
         <div class="eqtv-desloc" aria-label="Equipes em deslocamento">
           <h3>Equipes em deslocamento</h3>
           <ul>{% for d in deslocamentos %}<li><span><b>{{ d.nome }}</b>{% if d.saiu %} · saiu {{ d.saiu }}{% endif %}<small>{{ 'para ' ~ d.para if d.para else 'destino não programado' }}</small></span>{% if d.chega %}<em>chega {{ d.chega }}</em>{% endif %}</li>{% else %}<li class="eqtv-desloc-vazio">Ninguém em deslocamento agora.</li>{% endfor %}</ul>

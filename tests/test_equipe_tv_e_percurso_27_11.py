@@ -170,3 +170,18 @@ def test_o_aviso_do_inmet_se_explica_no_mouse():
     js = _js("campo-mapa.js")
     assert 'mapa.on("mousemove", "avisos-area", dicaAviso)' in js
     assert '{ id: "avisos-area", type: "fill", source: "avisos"' in js
+
+
+def test_o_video_wall_tem_os_botoes_de_zoom_no_canto():
+    """27/11/2026, Levi: "eu só adicionaria botões de dar zoom ou não dar, né, no canto superior direito [...] Para ver mais
+    de perto a usina". O + e o − ficam sempre à vista no canto de cima, à direita, do mapa; aproximam e afastam pelo
+    centro (a usina do clique), param o giro como o clique, e o − que volta ao tamanho do Brasil devolve o mapa inteiro."""
+    tpl = (RAIZ.parent / "torres" / "campo" / "templates" / "campo" / "equipe_tv.html").read_text(encoding="utf-8")
+    assert '<div class="eqtv-zoom" role="group" aria-label="Zoom do mapa">' in tpl
+    assert 'data-tv-zoom="mais" aria-label="Aproximar"' in tpl and 'data-tv-zoom="menos" aria-label="Afastar"' in tpl
+    css = _js("campo.css")
+    assert ".eqtv-zoom{position:absolute;top:12px;right:12px;" in css
+    js = _js("campo-mapa.js")
+    passo = _funcao(js, "tvZoomBotao")
+    assert "mapa.cameraForBounds(BRASIL" in passo and "tvVoltar()" in passo and "clearInterval(TV.giro)" in passo
+    assert 'e.target.closest("[data-tv-zoom]")' in js

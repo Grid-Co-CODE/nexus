@@ -1991,7 +1991,10 @@ equipes"; "pode até clicar e dar um zoom automático. Mas é importante ter um 
     vídeo wall lê o clima sempre, sem levar o `clima=1` aos links; Equipes, o foco no técnico), a barrinha do giro, as
     **Equipes em deslocamento** (`deslocamentos`) com a rota tracejada até a usina de destino; o **clique** (o zoom vai
     ao 15 na usina e ao 14 no técnico, `ZOOM_USINA`/`ZOOM_TECNICO`, 27/11/2026: "zoom maior para a gente conseguir ver
-    ali a parte da usina"; na tela, o clique na usina também vai ao 15) numa usina, num
+    ali a parte da usina"; na tela, o clique na usina também vai ao 15; e o **+ e o − sempre à vista no canto de cima, à
+    direita, do mapa**, `tvZoomBotao`, um nível por toque pelo centro, param o giro como o clique, e o − que chega ao
+    Brasil inteiro devolve o mapa de sempre; Levi: "botões de dar zoom ou não dar, né, no canto superior direito") numa
+    usina, num
     cartão ou num evento dá o zoom com o resumo (o estado, o motivo e o técnico na usina ou a caminho), para o giro, e o
     **Brasil inteiro** volta pelo botão ou sozinho em 45 s; o **Sair** fica sempre à vista no alto do mapa (o do topo só
     aparecia ao mexer o mouse: "Eu não encontrei esse botão");
