@@ -34,10 +34,14 @@
 .gu-resumo{margin:0 0 16px;padding-left:18px;max-width:78ch;font-size:15px;line-height:1.55;color:var(--tinta)}
 .gu-resumo li+li{margin-top:4px}
 .gu-fones{display:flex;gap:18px;overflow-x:auto;padding:2px 2px 10px;scrollbar-width:thin}
-.gu-fone{flex:none;width:260px;margin:0}
+/* o telefone abre com os 330 px em que a tela do App foi desenhada (`_fone.css`: body.guia-tela .fone{max-width:330px})
+   e é reduzido por inteiro para o cartão de 300 px (27/11/2026, Levi: "prints mal dimensionados, tela mais estreita e
+   palavras se cruzando": o iframe de 260 px apertava o desenho e o texto se cruzava). Mudou o desenho lá, muda aqui */
+.gu-fone{flex:none;width:300px;margin:0}
+.gu-fone-caixa{width:300px;height:646px;overflow:hidden}
 /* sem color-scheme próprio: a moldura herda o do Nexus (escuro ou claro), o mesmo que a tela do telefone declara; se os
    dois não batem, o navegador pinta o fundo da moldura (o retângulo atrás do telefone) */
-.gu-fone iframe{display:block;width:260px;height:572px;border:0;background:transparent}
+.gu-fone iframe{display:block;width:330px;height:710px;border:0;background:transparent;transform:scale(.9091);transform-origin:0 0}
 .gu-fone figcaption{margin-top:8px;font-size:12.5px;line-height:1.4;color:var(--tinta-2)}
 .gu-sem-tela{margin:0 0 12px;font-size:13px}
 .gu-regras{margin:12px 0 0;max-width:86ch}

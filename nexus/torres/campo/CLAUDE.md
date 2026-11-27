@@ -3002,7 +3002,12 @@ alto, a separação por tema e o texto curto, "para quem tem pouco tempo, porém
   fora (o CSS do telefone é do App, como o clone da Zeladoria).
 - **A tela** (`/t/campo/guia-app`, a última da Usinas 360°): a busca sem acento (título, resumo, regras e casos; o
   `data-busca` já vem sem acento do servidor), os chips de tema na ordem do `temas` do pacote (Todos primeiro), a lista
-  por tema ao lado (fixa no desktop) e cada pergunta com o resumo, os telefones (iframe de 260 × 572, `loading=lazy`),
+  por tema ao lado (fixa no desktop) e cada pergunta com o resumo, os telefones (`loading=lazy`; **o iframe abre com os
+  330 × 710 do desenho e é reduzido por inteiro, `scale(.9091)`, para o cartão de 300 × 646**: até 27/11/2026 era um
+  iframe de 260 px para uma tela desenhada em 330, e o texto se cruzava; Levi: "prints mal dimensionados, tela mais
+  estreita e palavras se cruzando". Mudou o `max-width` do `.fone` no `_fone.css` do pacote, muda a conta no
+  `guia-app.css`. No mesmo dia o Levi pediu prints novos ao chat do App, em PNG; quando chegarem, a tela passa a mostrar
+  a imagem),
   "Todas as regras (N)" fechado com a fonte apagada no fim da frase (`[fa:...; vNNN]` do pacote vira `.gu-fonte`) e os
   casos. A pergunta sem tela diz que elas vêm na próxima leva. Acima de cada pergunta e nos grupos da lista, só o nome
   do setor (o tema), em verde Grid (21/11/2026, Levi: "só quero o nome do setor em verde grid"): o público saiu. O `incerto` ("Para conferir") só para o administrador e o

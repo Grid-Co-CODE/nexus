@@ -61,7 +61,8 @@
         <div class="gu-fones">
           {% for t in p.telas %}
           <figure class="gu-fone">
-            <iframe src="{{ url_for('static', filename='guia-app/' ~ t.arquivo, tema=tema) }}" title="{{ t.legenda or p.titulo }}" loading="lazy" data-guia-fone></iframe>
+            {# o telefone no tamanho do desenho, reduzido por inteiro (27/11/2026: "tela mais estreita e palavras se cruzando") #}
+            <div class="gu-fone-caixa"><iframe src="{{ url_for('static', filename='guia-app/' ~ t.arquivo, tema=tema) }}" title="{{ t.legenda or p.titulo }}" loading="lazy" data-guia-fone></iframe></div>
             {% if t.legenda %}<figcaption>{{ t.legenda }}</figcaption>{% endif %}
           </figure>
           {% endfor %}

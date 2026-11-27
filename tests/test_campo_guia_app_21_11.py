@@ -153,3 +153,20 @@ def test_acima_da_pergunta_so_o_nome_do_setor(app, guia):
     from pathlib import Path
     css = (Path(__file__).resolve().parents[1] / "nexus" / "static" / "guia-app.css").read_text(encoding="utf-8")
     assert ".gu-nav-tema{" in css and "color:var(--verde-texto)" in css.split(".gu-nav-tema{", 1)[1].split("}", 1)[0]
+
+
+def test_o_telefone_abre_no_tamanho_em_que_a_tela_foi_desenhada(app, guia):
+    """27/11/2026, Levi: "esse guia do app de campo está com os prints mal dimensionados, tela mais estreita e palavras se
+    cruzando". As telas do App são desenhadas com o telefone de 330 px (`_fone.css`: `body.guia-tela .fone{max-width:330px}`)
+    e o Nexus as abria num iframe de 260 px: o telefone encolhia e o texto se cruzava. Agora o iframe abre com os 330 px do
+    desenho e é reduzido por inteiro (a escala) para caber no cartão de 300 px: a tela fica igual, só menor."""
+    from pathlib import Path
+    html = _cliente(app, admin=True).get(URL).get_data(as_text=True)
+    p = html.split('id="p-pontos"', 1)[1].split('id="p-', 1)[0]
+    assert '<div class="gu-fone-caixa"><iframe' in p
+    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "guia-app.css").read_text(encoding="utf-8")
+    assert ".gu-fone{flex:none;width:300px;margin:0}" in css
+    assert ".gu-fone-caixa{width:300px;height:646px;overflow:hidden}" in css
+    assert ".gu-fone iframe{display:block;width:330px;height:710px;border:0;background:transparent;transform:scale(.9091);transform-origin:0 0}" in css
+    fone = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "guia-app" / "telas" / "_fone.css").read_text(encoding="utf-8")
+    assert "body.guia-tela .fone{width:100%;max-width:330px" in fone
