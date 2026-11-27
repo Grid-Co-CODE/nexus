@@ -1965,7 +1965,10 @@ equipes"; "pode até clicar e dar um zoom automático. Mas é importante ter um 
   repassa outra coisa); a lista fica 2 min e cada bloco 15 min em memória (no máximo 3.000). Fonte fora = 503 e o mapa
   segue. Na tela, o botão **Chuva agora** liga e desliga (começa ligado; a escolha fica no navegador), com a barra de
   reprodução no pé do mapa; só o quadro da vez fica visível (o oculto não pede bloco), mais transparente de perto (o radar
-  vai só até o zoom 7). Prova: `tests/test_equipe_radar_26_11.py`.
+  vai só até o zoom 7). **O endereço do bloco** (`blocoDoRadar`) monta o molde `{z}/{x}/{y}` FORA do `new URL()`: até
+  27/11/2026 ele passava por dentro, o URL() codificava as chaves (`%7Bz%7D`), todo bloco dava 404 e a chuva nunca
+  apareceu (só a escala); achado na bancada. Prova: `tests/test_equipe_radar_26_11.py` e
+  `test_o_bloco_do_radar_leva_o_molde_sem_codificar`.
 - **O percurso aparece inteiro na hora**: a câmera vai em 0,5 s e o traço já vem desenhado (até ali, 1,8 s de voo e ~8 s
   de traço se desenhando, a prévia de 12/11); a reprodução segue na barra, para quem quiser tocar.
 - **Técnicos | Usinas e os botões do mapa em pílulas arredondadas**; a gaveta do técnico escolhido mais larga
@@ -1977,7 +1980,9 @@ equipes"; "pode até clicar e dar um zoom automático. Mas é importante ter um 
     prevista da última saída;
   - **meio:** o mapa com o **Brasil inteiro fixo** (sem arrastar nem zoom de mão; reenquadra quando a tela muda), a
     contagem pelo Agora de Comando > Usinas (`contagem`: críticas, em atenção, sem comunicação, normais), o tipo que **gira
-    a cada 20 s** (`GIRO_TV_S`: **Usinas**, onde abre, com a usina em bolinha na cor do Agora e o técnico menor; Chuva, o radar animado e os avisos do INMET, por isso o
+    a cada 20 s** (`GIRO_TV_S`: **Usinas**, onde abre, com a usina em bolinha na cor do Agora e o técnico menor; Chuva, o **último quadro
+    do radar, parado** (27/11/2026, Levi: "esse GIF aí do clima, não precisa não, deixa sempre no último": só ele é pedido,
+    sem o tocar e sem a barra do tempo; fica a hora e a escala) e os avisos do INMET, por isso o
     vídeo wall lê o clima sempre, sem levar o `clima=1` aos links; Equipes, o foco no técnico), a barrinha do giro, as
     **Equipes em deslocamento** (`deslocamentos`) com a rota tracejada até a usina de destino; o **clique** numa usina, num
     cartão ou num evento dá o zoom com o resumo (o estado, o motivo e o técnico na usina ou a caminho), para o giro, e o
@@ -2042,11 +2047,12 @@ parâmetro): **todas as ocorrências abertas, agrupadas**; a tela se atualiza **
   de quem abriu (`moldura._prazo_da_tv`) e as letras pela ALTURA da tela (`--eqtv-f`, o mesmo desenho em 1080p e em 4K).
   À esquerda o painel do COS; à direita o mapa de verdade inteiro (o mesmo parcial da tela, `campo/_equipe_mapa_ml.html`).
   O Sair, o zoom, os focos e o fundo aparecem ao mexer o mouse e somem em 4 s. O foco começa em **Foco usina** (o painel
-  é das usinas; a escolha do vídeo wall fica à parte, `nexus.equipe.foco.tv`). **O Satélite vale só até a próxima
-  recarga (15/11/2026**, Levi, a opção A): o vídeo wall abre sempre no Mapa e não grava a troca (`!D.tv` no
-  `campo-mapa.js`). O satélite gasta a cota grátis da Esri (2 milhões de imagens por mês): preso nele 24 h, recarregando
-  a cada 2 min, a TV Full HD gastaria ~760 mil e a 4K ~2,2 milhões, e o satélite pararia para todos até o mês seguinte
-  (a conta está sem cartão: não cobra, para).
+  é das usinas; a escolha do vídeo wall fica à parte, `nexus.equipe.foco.tv`). **O satélite é fixo no vídeo wall (27/11/2026**, Levi: "Deixa fixo em
+  modo satélite"; sem o botão Mapa | Satélite, `fundoBase` no `campo-mapa.js`). Até ali valia a opção A de 15/11/2026 (o
+  satélite só até a próxima recarga), porque a cota grátis da Esri é de 2 milhões de imagens por mês e a TV recarregava a
+  página a cada 2 min: presa no satélite, a Full HD gastaria ~760 mil e a 4K ~2,2 milhões, e o satélite pararia para
+  todos até o mês seguinte (a conta está sem cartão: não cobra, para). Agora a TV se relê no lugar e recarrega a página
+  uma vez por hora (ver "A releitura"): o satélite do Brasil inteiro baixa ~24 vezes por dia, mais o zoom dos cliques.
 - **O painel** (`parede.montar`): a MESMA fotografia da Ronda COS que pinta as usinas (`_cos_por_usina`), na régua de
   Comando > Usinas (`classificar`), em cinco grupos, na ordem do mockup: **Usina parada** (o crítico), **Inversores
   desligados**, **Rede concessionária** (o crítico com o problema `rede` do placar da própria Ronda COS, ou a falha de
@@ -2059,9 +2065,15 @@ parâmetro): **todas as ocorrências abertas, agrupadas**; a tela se atualiza **
   Em cima: Abertas e um número por grupo; embaixo: as usinas sem ocorrência aberta e as sem leitura do COS. Só as
   usinas do mapa (com coordenada) entram, para os números baterem com ele. O PR médio de hoje do mockup ficou FORA: o
   Nexus não tem o PR do dia (sem dado não se inventa). Sem a fotografia, o painel diz "Sem a leitura do COS" e o mapa segue.
-- **A releitura**: a cada 2 minutos (`RECARREGA_TV_S`) a página confere o `/saude` e se recarrega; com o Nexus fora, fica
-  com o que tem e diz desde quando. Sem JavaScript, o `<meta refresh>`. **Cada releitura é um "abriu_mapa"** no registro da
-  LGPD (~30 por hora com a TV ligada): a tela mostra técnicos. A sessão que cai leva ao Entrar (`_confere_sessao_js`).
+- **A releitura, no lugar desde 27/11/2026**: a cada 2 minutos (`RECARREGA_TV_S`) o `campo-videowall.js` pede a mesma
+  página por trás e troca só os dados: a coluna do COS (números, cartões e rodapé), a contagem e as equipes em
+  deslocamento do mapa, o prazo da sessão e as duas listas da direita (a visão escolhida e a rolagem da mão ficam); os
+  dados do mapa (usinas, técnicos, rotas, o zoom de cada usina, o clima) vão ao `campo-mapa.js` pelo evento
+  `eqtv:dados`, e a chuva só troca se veio um quadro mais novo. O mapa, o satélite, o zoom e a vez do giro ficam. **A
+  recarga inteira é uma por hora** (`RELEITURAS_ATE_RECARREGAR`, depois de conferir o `/saude`), e pega o JS e o CSS de uma
+  subida; a troca que quebra recarrega na hora. Com o Nexus fora, fica com o que tem e diz desde quando. Sem JavaScript, o
+  `<meta refresh>`. **Cada releitura continua um "abriu_mapa"** no registro da LGPD (~30 por hora com a TV ligada: é a
+  mesma rota). A sessão que cai leva ao Entrar (`_confere_sessao_js`).
 - **A lista rola** (`campo-videowall.js`): uma altura da caixa a cada 25 s, parando 5 s em cima e embaixo; roda também
   com os efeitos de animação do Windows desligados (sem ela, a lista ficaria cortada).
 - **Prova:** `tests/test_equipe_parede.py` (os grupos, a duração, o cartão da pior, a ordem, sem o COS; a rota sem a
@@ -2094,6 +2106,15 @@ etiqueta, tirar pela etiqueta).
 ### O ponto exato e o percurso (10/11/2026)
 
 Pedido do Levi pela sessão Nexus Field (ver a 1ª regra acima). **Ver percurso**, na gaveta do técnico escolhido:
+- **Abre no lugar, sem recarregar a página (27/11/2026**, Levi: "Quando eu clico no técnico, ele atualiza o link para
+  depois atualizar o percurso, não, ele atualiza o percurso direto"): o clique no técnico (no mapa, na lista, nos eventos,
+  no "Ver todos os técnicos" e no Ver percurso com outro período) pede a MESMA rota por trás (`abrirNoLugar`; o registro
+  da LGPD é o de sempre, no servidor) e troca só o painel ao lado, a barra do zoom e o percurso no mapa, com a câmera
+  direto nele; o endereço muda (`pushState`) e o Voltar do navegador volta no lugar. Só quando o endereço novo é o mesmo
+  mapa com outro técnico, período ou painel (`trocaNoLugar`); outro filtro, o clima, o Usinas e o vídeo wall seguem pelo
+  link de sempre, e a resposta sem o painel (a sessão que caiu, um erro) também. **A lista dos técnicos abre o percurso
+  do dia** (o mesmo `q_ponto` do ponto do mapa; até ali abria só a ficha); quem não tem posição abre só a ficha. Prova:
+  `tests/test_equipe_tv_e_percurso_27_11.py`.
 - **O período em dias e horas de Brasília** (`?tecnico=<id>&de=AAAA-MM-DDTHH:MM&ate=...`, os dois `datetime-local` do
   formulário, lado a lado desde 12/11/2026, Levi: "podem facilmente ficar lado a lado, assim evitaria gastar mais
   espaço"; o filtro vai junto). O formulário já vem com o dia da última posição do técnico, das 6h às 22h (ou até agora),

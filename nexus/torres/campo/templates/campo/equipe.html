@@ -387,7 +387,9 @@
         <h2>{{ titulo }} <span>{{ lista|length }}</span></h2>
         <ul class="eq-lista">
           {% for l in lista %}
-          <li><a href="{{ url_for('torre_campo.equipe', tecnico=l.pid, **filtro.q) }}">
+          {# o clique abre o percurso do dia, como o ponto do mapa (27/11/2026, Levi: "quando eu clicar no técnico, eu
+             gostaria de ver o percurso que ele fez"); sem posição, só a ficha #}
+          <li><a href="{{ url_for('torre_campo.equipe', **l.q_ponto) }}">
             <span class="eq-lin"><b>{{ l.nome }}{% if l.teste %} <span class="eq-teste">teste</span>{% endif %}</b><small>{{ l.equipe or 'sem equipe' }}{% if l.onde %} · {{ l.onde }}{% endif %}{% if l.perto %} · {{ l.perto }}{% endif %}{% if l.hora %} · {{ l.hora }}{% endif %}</small></span>
             <span class="cn-pill cn-{{ l.s.tom }}">{{ l.s.rotulo }}</span></a></li>
           {% endfor %}

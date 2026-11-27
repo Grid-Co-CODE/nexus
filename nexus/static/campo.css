@@ -2593,6 +2593,8 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eqtv-visao{display:flex;flex-direction:column;gap:1vh;flex:1;min-height:0}
 .eqtv-visao[hidden],[data-tv-visao-so][hidden]{display:none}
 .eqtv-tecv{cursor:pointer}
+/* a chuva do vídeo wall é o último quadro, parado (27/11/2026): sem o tocar e sem a barra do tempo; ficam a hora e a escala */
+.eqtv .eq-radar [data-eq-radar-tocar],.eqtv .eq-radar [data-eq-radar-quadro]{display:none}
 .eq-tvpop .maplibregl-popup-content{background:var(--superficie);color:var(--tinta);border:1px solid var(--linha);border-radius:10px;
   padding:10px 14px;font:400 14px/1.4 var(--font-sans);box-shadow:0 8px 24px rgba(0,0,0,.4)}
 .eq-tvpop .maplibregl-popup-tip{border-top-color:var(--superficie);border-bottom-color:var(--superficie)}

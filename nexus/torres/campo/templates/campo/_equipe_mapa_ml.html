@@ -21,8 +21,11 @@
   {% if mapa_js.modo == 'tecnicos' %}<div class="cn-seg eq-seg-mapa" role="group" aria-label="Foco"><button type="button" data-eq-foco="tecnico" aria-pressed="true">Foco técnico</button><button type="button" data-eq-foco="usina" aria-pressed="false">Foco usina</button></div>{% endif %}
   {# o Mapa | Satélite fica sempre à vista (Levi, 12/11/2026: "CADÊ A OPÇÃO MAPA/SATÉLITE??"); sem a chave da Esri, o
      Satélite diz o que falta, e o administrador ganha o link para Base > Chaves #}
+  {# no vídeo wall o satélite é fixo (27/11/2026, Levi: "Deixa fixo em modo satélite"): sem o botão #}
+  {% if not mapa_js.tv %}
   <div class="cn-seg eq-seg-mapa" role="group" aria-label="Fundo do mapa"><button type="button" data-eq-base="mapa" aria-pressed="true">Mapa</button><button type="button" data-eq-base="satelite" aria-pressed="false"{% if not mapa_js.satelite %} data-eq-sem-chave aria-expanded="false" aria-controls="eq-sat-falta"{% endif %}>Satélite</button></div>
   {% if not mapa_js.satelite %}<p class="eq-sat-falta" id="eq-sat-falta" hidden>O satélite precisa da chave da Esri (a conta é gratuita), que ainda não foi cadastrada. Um administrador cola a chave em Base &gt; Chaves, na linha "Mapa de equipe: satélite".{% if link_chaves %} <a href="{{ url_for('torre_base.chaves_nexus') }}">Cadastrar a chave</a>{% endif %}</p>{% endif %}
+  {% endif %}
 </div>
 </div>
 <div class="eq-palco eq-palco--ml">

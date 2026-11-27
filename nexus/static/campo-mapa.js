@@ -56,8 +56,30 @@
     if (foco !== "tecnico" || cor === "a_critico") return cor;
     return /^a_|^sem_leitura$|^neutra$|^dest$/.test(cor) ? "cinza" : cor;
   }
+  // o percurso no lugar (27/11/2026, Levi: "Quando eu clico no técnico, ele atualiza o link para depois atualizar o
+  // percurso, não, ele atualiza o percurso direto"): o endereço novo abre sem recarregar a página só quando é o MESMO
+  // mapa com outro técnico, período ou painel; outro filtro, o clima, o Usinas, o vídeo wall ou outra tela seguem pelo
+  // link de sempre (eles mudam a página inteira)
+  function trocaNoLugar(alvo, atual) {
+    var a, b;
+    try { b = new URL(atual); a = new URL(alvo, b.href); } catch (e) { return false; }
+    if (a.origin !== b.origin || a.pathname !== b.pathname) return false;
+    if (a.searchParams.get("tv") === "1" || b.searchParams.get("tv") === "1") return false;
+    var LIVRES = { tecnico: 1, de: 1, ate: 1, painel: 1 }, chaves = {};
+    a.searchParams.forEach(function (_v, k) { chaves[k] = 1; });
+    b.searchParams.forEach(function (_v, k) { chaves[k] = 1; });
+    return Object.keys(chaves).every(function (k) {
+      return LIVRES[k] || a.searchParams.getAll(k).join("\u0001") === b.searchParams.getAll(k).join("\u0001");
+    });
+  }
+  // o endereço dos blocos de um quadro do radar: o molde {z}/{x}/{y} fica FORA do URL(), que codifica as chaves (%7Bz%7D)
+  // e o MapLibre não troca mais nada (27/11/2026, achado na bancada: todo bloco dava 404 e a chuva nunca aparecia)
+  function blocoDoRadar(bloco, path, aqui) {
+    return new URL(bloco + String(path).replace(/^\//, "") + "/", aqui).href + "256/{z}/{x}/{y}/8/1_1.png";
+  }
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { mistura: mistura, mascara: mascara, rgb: rgb, corNoFoco: corNoFoco };
+    module.exports = { mistura: mistura, mascara: mascara, rgb: rgb, corNoFoco: corNoFoco, trocaNoLugar: trocaNoLugar,
+                       blocoDoRadar: blocoDoRadar };
     return;
   }
 
@@ -289,6 +311,11 @@
     for (var i = 0; i < p.length - 1; i++) if (!p[i].mov) k = i;
     return p.slice(k).map(function (q) { return q.c; });
   }
+  function rotasGeo() {
+    return fc((D.rotas || []).map(function (r) {
+      return { type: "Feature", geometry: { type: "LineString", coordinates: [r.de, r.para] }, properties: { rot: r.rot || "" } };
+    }));
+  }
   function percursoGeo() {
     var p = D.percurso;
     if (!p) return { linha: fc([]), pontos: fc([]), marcos: fc([]), atual: fc([]) };
@@ -354,9 +381,10 @@
   // no vídeo wall (12/11/2026) o foco começa na usina: o painel ao lado é das usinas com problema, e a cor delas é a dele
   var foco = D.modo === "tecnicos" ? guardado(D.tv ? "nexus.equipe.foco.tv" : "nexus.equipe.foco", D.tv ? "usina" : "tecnico")
                                    : "usina";
-  // no vídeo wall o Satélite vale só até a próxima recarga (Levi, 15/11/2026, a opção A): preso nele 24 h, a TV gastaria
-  // a cota grátis da Esri (2 milhões de imagens por mês) e pararia o satélite de todo mundo até o mês seguinte
-  var fundoBase = D.satelite && !D.tv ? guardado("nexus.equipe.base", "mapa") : "mapa";
+  // no vídeo wall o satélite é fixo (27/11/2026, Levi: "Deixa fixo em modo satélite"; até ali valia só até a próxima
+  // recarga, a opção A de 15/11). A cota grátis da Esri (2 milhões de imagens por mês) aguenta porque a TV não recarrega
+  // mais a página a cada 2 min: ela se relê no lugar (campo-videowall.js) e o satélite baixa uma vez por hora
+  var fundoBase = D.satelite ? (D.tv ? "satelite" : guardado("nexus.equipe.base", "mapa")) : "mapa";
 
   var brasilGeo = null;
   function nossas() {
@@ -378,9 +406,7 @@
     add("perc-marcos", pg.marcos);
     add("perc-agora", vazio);
     // as rotas do vídeo wall (26/11/2026): do técnico em deslocamento até a usina de destino, com a chegada prevista
-    add("rotas", fc((D.rotas || []).map(function (r) {
-      return { type: "Feature", geometry: { type: "LineString", coordinates: [r.de, r.para] }, properties: { rot: r.rot || "" } };
-    })));
+    add("rotas", rotasGeo());
     var nv = { 1: P.t["--alerta-cheio"], 2: P.t["--severo"], 3: P.t["--critico"] };
     var corAviso = ["match", ["get", "nivel"], 1, nv[1], 2, nv[2], nv[3]];
     var L = [
@@ -501,8 +527,8 @@
   var FORMIGAS = [[0, 4, 3], [0.5, 4, 2.5], [1, 4, 2], [1.5, 4, 1.5], [2, 4, 1], [2.5, 4, 0.5], [3, 4, 0], [0, 0.5, 3, 3.5],
                   [0, 1, 3, 3], [0, 1.5, 3, 2.5], [0, 2, 3, 2], [0, 2.5, 3, 1.5], [0, 3, 3, 1], [0, 3.5, 3, 0.5]];
   var passoFormiga = 0;
-  if (D.percurso) setInterval(function () {
-    if (!mapa.getLayer("perc-formigas")) return;
+  setInterval(function () {
+    if (!D.percurso || !mapa.getLayer("perc-formigas")) return;
     passoFormiga = (passoFormiga + 1) % FORMIGAS.length;
     mapa.setPaintProperty("perc-formigas", "line-dasharray", FORMIGAS[passoFormiga]);
   }, 60);
@@ -643,7 +669,7 @@
   mapa.on("click", "tecnicos", function (e) {
     var t = porPid[e.features[0].properties.pid];
     if (D.tv) { if (t) tvZoom(t.c, "<b>" + esc(t.nome) + "</b><small>" + esc(t.rotulo + (t.hora ? " · " + t.hora : "")) + "</small>"); return; }
-    if (t && t.url) location.href = t.url;
+    if (t && t.url) abrirNoLugar(new URL(t.url, location.href).href, true);
   });
   mapa.on("click", "usinas-bola", function (e) { if (D.tv) tvZoomUsina(e.features[0].properties.id); });
   mapa.on("click", "usinas", function (e) {
@@ -697,7 +723,7 @@
     RAD.q.forEach(function (q, k) {
       var id = "radar" + k;
       if (!mapa.getSource(id)) mapa.addSource(id, { type: "raster", tileSize: 256, maxzoom: 7, attribution: "Radar: RainViewer",
-        tiles: [new URL(D.radar.bloco + String(q.path).replace(/^\//, "") + "/256/{z}/{x}/{y}/8/1_1.png", location.href).href] });
+        tiles: [blocoDoRadar(D.radar.bloco, q.path, location.href)] });
       if (!mapa.getLayer(id)) mapa.addLayer({ id: id, type: "raster", source: id, layout: { visibility: "none" },
         paint: { "raster-opacity": ["interpolate", ["linear"], ["zoom"], 7, 0.8, 12, 0.35], "raster-fade-duration": 0 } }, antes);
     });
@@ -713,19 +739,33 @@
       barraRadar.querySelector("[data-eq-radar-hora]").textContent = horaRadar(RAD.q[i].time);
     }
   }
-  function radarCarregar() {
-    if (RAD.pedido || !D.radar) return;
+  function radarTirar() {
+    RAD.q.forEach(function (_q, k) {
+      if (mapa.getLayer("radar" + k)) mapa.removeLayer("radar" + k);
+      if (mapa.getSource("radar" + k)) mapa.removeSource("radar" + k);
+    });
+  }
+  // `renovar` (a releitura do vídeo wall): pede a lista de novo e só troca as camadas se veio um quadro mais novo
+  function radarCarregar(renovar) {
+    if ((RAD.pedido && !renovar) || !D.radar) return;
     RAD.pedido = true;
     fetch(new URL(D.radar.lista, location.href).href, { credentials: "same-origin" })
       .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
       .then(function (j) {
-        RAD.q = j.quadros || [];
+        var q = j.quadros || [];
+        // no vídeo wall a chuva é o último quadro, parado (27/11/2026, Levi: "esse GIF aí do clima, não precisa não, deixa
+        // sempre no último"): só ele é pedido, sem tocar e sem a barra do tempo (campo.css)
+        if (D.tv) q = q.slice(-1);
+        var ultimo = function (l) { return l.length ? l[l.length - 1].path : ""; };
+        if (renovar && RAD.q.length && ultimo(q) === ultimo(RAD.q)) return;
+        radarTirar();
+        RAD.q = q;
         RAD.i = Math.max(0, RAD.q.length - 1);
         if (barraRadar) barraRadar.querySelector("[data-eq-radar-quadro]").max = String(RAD.i);
         radarCamadas();
-        if (D.tv && RAD.ligado) radarTocar();
       })
       .catch(function () {
+        if (renovar && RAD.q.length) return;          // a renovação que falha deixa o quadro que já está
         RAD.pedido = false;
         if (barraRadar) barraRadar.querySelector("[data-eq-radar-hora]").textContent = "O radar da chuva não respondeu agora.";
       });
@@ -752,6 +792,103 @@
     radarLigar(RAD.ligado);
   }
 
+  // ── a releitura do vídeo wall no lugar (27/11/2026) ─────────────────────────────────────────────────────────────
+  // O campo-videowall.js relê a página de 2 em 2 min sem recarregá-la e manda aqui os dados novos do mapa: as usinas (a
+  // cor de agora), os técnicos, as rotas, o que dizer de cada usina no zoom e o clima. O mapa, o satélite, o zoom e a vez
+  // do giro ficam como estão; a chuva pede a lista de novo e troca só se veio um quadro mais novo
+  document.addEventListener("eqtv:dados", function (e) {
+    var N = e.detail || {};
+    ["usinas", "tecnicos", "rotas", "tv_usinas", "clima"].forEach(function (k) { if (k in N) D[k] = N[k]; });
+    porPid = {}; porUsina = {};
+    D.tecnicos.forEach(function (t) { porPid[t.pid] = t; });
+    D.usinas.forEach(function (u) { porUsina[u.id] = u; });
+    if (!mapa.getSource("usinas")) return;
+    mapa.getSource("usinas").setData(usinasGeo());
+    mapa.getSource("tecnicos").setData(tecnicosGeo());
+    mapa.getSource("rotas").setData(rotasGeo());
+    if (D.clima) {
+      mapa.getSource("avisos").setData(D.clima.avisos);
+      mapa.getSource("focos").setData(fc(D.clima.focos.map(function (c) { return ponto(c); })));
+      mapa.getSource("aneis").setData(fc(D.clima.aneis.map(function (c) { return ponto(c); })));
+    }
+    if (D.radar) radarCarregar(true);
+  });
+
+  // ── o percurso no lugar (27/11/2026) ────────────────────────────────────────────────────────────────────────────
+  // Levi: "quando eu clicar no técnico, eu gostaria de ver o percurso [...] Quando eu clico no técnico, ele atualiza o
+  // link para depois atualizar o percurso, não, ele atualiza o percurso direto". O clique no técnico (no mapa, na lista,
+  // nos eventos, no "Ver todos os técnicos" e no Ver percurso com outro período) pede a MESMA rota por trás (o registro
+  // da LGPD do percurso é o de sempre, no servidor) e troca só o painel ao lado e o percurso no mapa, sem recarregar a
+  // página: o mapa não pisca, o fundo não baixa de novo e a câmera vai direto ao percurso. Sem o painel na resposta (a
+  // sessão que caiu, um erro), o link de sempre
+  var trocando = null;
+  function abrirNoLugar(url, empurrar) {
+    if (D.tv || !trocaNoLugar(url, location.href)) { location.href = url; return; }
+    if (trocando) trocando.abort();
+    var ctl = window.AbortController ? new AbortController() : null;
+    trocando = ctl;
+    var lado = document.querySelector(".eq-lado");
+    if (lado) lado.setAttribute("aria-busy", "true");
+    fetch(url, { credentials: "same-origin", signal: ctl ? ctl.signal : undefined })
+      .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.text(); })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, "text/html");
+        var dados = doc.getElementById("eq-dados"), novoLado = doc.querySelector(".eq-lado"), novoCorpo = doc.querySelector(".eq-corpo");
+        var velhoLado = document.querySelector(".eq-lado"), velhoCorpo = document.querySelector(".eq-corpo");
+        if (!dados || !novoLado || !novoCorpo || !velhoLado || !velhoCorpo) throw new Error("sem o painel");
+        var N = JSON.parse(dados.textContent);
+        if (R) R.tocando = false;
+        velhoLado.replaceWith(document.adoptNode(novoLado));
+        velhoCorpo.className = novoCorpo.className;
+        var z0 = quadro.querySelector(".eq-zoom"), z1 = doc.querySelector(".eq-zoom");
+        if (z0 && z1) z0.replaceWith(document.adoptNode(z1));
+        D.percurso = N.percurso; D.tecnicos = N.tecnicos;
+        porPid = {};
+        D.tecnicos.forEach(function (t) { porPid[t.pid] = t; });
+        if (empurrar) history.pushState({ eq: 1 }, "", url);
+        if (!mapa.getSource("tecnicos")) return;
+        mapa.getSource("tecnicos").setData(tecnicosGeo());
+        var pg = percursoGeo();
+        mapa.getSource("perc-linha").setData(pg.linha);
+        mapa.getSource("perc-atual").setData(pg.atual);
+        mapa.getSource("perc-pontos").setData(pg.pontos);
+        mapa.getSource("perc-marcos").setData(pg.marcos);
+        mapa.getSource("perc-agora").setData(fc([]));
+        R = null; rp = null;
+        // a gaveta do escolhido é mais larga (eq-corpo--sel): o mapa acompanha a caixa antes de enquadrar
+        requestAnimationFrame(function () {
+          mapa.resize();
+          if (D.percurso && D.percurso.pontos.length > 1) {
+            prepararReplay();
+            var cx = D.percurso.caixa;
+            mapa.fitBounds([[cx[0], cx[1]], [cx[2], cx[3]]], { padding: 90, maxZoom: 15, duration: REDUZIDO ? 0 : 500 });
+          }
+        });
+      })
+      .catch(function (err) { if (!(err && err.name === "AbortError")) location.href = url; })
+      .then(function () { var l = document.querySelector(".eq-lado"); if (l) l.removeAttribute("aria-busy"); });
+  }
+  if (!D.tv) {
+    document.addEventListener("click", function (e) {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      var a = e.target.closest("a[href]");
+      if (!a || !a.closest(".eq-lado") || a.target || a.hasAttribute("download") || !trocaNoLugar(a.href, location.href)) return;
+      e.preventDefault();
+      abrirNoLugar(a.href, true);
+    });
+    document.addEventListener("submit", function (e) {
+      var f = e.target;
+      if (!f.closest || !f.closest(".eq-lado") || String(f.method || "get").toLowerCase() !== "get") return;
+      var u = new URL(f.getAttribute("action") || location.href, location.href);
+      u.search = new URLSearchParams(new FormData(f)).toString();
+      if (!trocaNoLugar(u.href, location.href)) return;
+      e.preventDefault();
+      abrirNoLugar(u.href, true);
+    });
+    // o Voltar do navegador volta ao painel e ao percurso de antes, também no lugar
+    window.addEventListener("popstate", function () { abrirNoLugar(location.href, false); });
+  }
+
   // ── o vídeo wall (26/11/2026) ─────────────────────────────────────────────────────────────────────────────────────
   // O protótipo aprovado ("ok sobe") e a referência do COS: o Brasil inteiro fixo na caixa do meio ("tem que ser que caiba
   // exatamente a figura do Brasil e não vai ficar sendo necessário dar zoom, mudar"), o tipo que gira a cada 20 s ("a cada
@@ -769,7 +906,7 @@
     document.querySelectorAll("[data-tv-tipo]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-tv-tipo") === t)); });
     if (TV.raiz) TV.raiz.classList.toggle("eqtv--chuva", t === "chuva");
     radarLigar(t === "chuva");
-    if (t === "chuva" && RAD.q.length) radarTocar();
+    if (t === "chuva" && RAD.q.length) radarMostrar(RAD.q.length - 1);
     ["avisos", "avisos-futuro", "focos", "aneis"].forEach(function (id) {
       if (mapa.getLayer(id)) mapa.setLayoutProperty(id, "visibility", t === "chuva" ? "visible" : "none");
     });
