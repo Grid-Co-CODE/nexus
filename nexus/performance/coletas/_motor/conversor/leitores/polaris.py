@@ -545,6 +545,13 @@ def _canal_logger(h, tipo):
     for c in conhecidos:
         if c in h:
             return h.index(c)
+    # o datalogger da ETMs_1 (27/11/2026) chama o instantâneo de "Rad. POA" / "Rad. GHI", sem sufixo; o "Irrad. POA
+    # Acum." e o "Rad. POARI" (traseira) ao lado não são o canal
+    exato = {"poa": ("radpoa", "irradpoa", "radiacaopoa", "irradiacaopoa"),
+             "ghi": ("radghi", "irradghi", "radiacaoghi", "irradiacaoghi")}[tipo]
+    for j, x in enumerate(h):
+        if re.sub(r"[^a-z0-9]", "", x) in exato:
+            return j
     cand = [j for j, x in enumerate(h) if tipo in x and "rear" not in x and "kwh" not in x
             and x.endswith(("_med", "_act", "_avg", "_mean"))]
     return cand[0] if len(cand) == 1 else None
@@ -555,7 +562,12 @@ def _canal_temp(h):
     interessante IPOA, GHI e temperatura dos módulos, o que não tem fica nulo mesmo"."""
     for j, x in enumerate(h):
         if "temp" in x and any(k in x for k in ("pv", "mod", "painel", "placa", "celula")) and \
-                not any(k in x for k in ("_ar", "amb", "max", "min")) and                 x.endswith(("_med", "_act", "_avg", "_mean", "_atual", "_actual")):
+                not any(k in x for k in ("_ar", "amb", "max", "min")) and \
+                x.endswith(("_med", "_act", "_avg", "_mean", "_atual", "_actual")):
+            return j
+    # "Term. Contato" (ETMs_1, 27/11/2026): o termômetro de contato, colado no fundo do módulo
+    for j, x in enumerate(h):
+        if "contato" in x and ("term" in x or "temp" in x):
             return j
     return None
 
@@ -571,6 +583,11 @@ def _canal_chuva(h):
     for j, x in enumerate(h):
         if "chuva" in x and x.endswith("_min"):
             return j, "incremento"
+    # sem o do dia nem o do minuto: o TOTAL do pluviômetro ("Chuva Acumulada" da ETMs_1, 27/11/2026: 370,4 a 468,6 mm
+    # de 06 a 26/11, nunca zera) — o dia é o quanto ele subiu no dia
+    for j, x in enumerate(h):
+        if "chuva" in x and "hora" not in x:
+            return j, "total"
     return None
 
 
@@ -609,7 +626,7 @@ def _formato_etm(linhas):
     sep = ";" if cab.count(";") >= 3 else ("," if cab.count(",") >= 3 else None)
     if not sep:
         return None
-    h = [norm(x) for x in cab.strip().split(sep)]
+    h = [norm(x).strip().strip('"').strip() for x in cab.strip().split(sep)]     # "DATE";"TIME" (ETMs_1, 27/11)
     if "date" not in h or "time" not in h:
         return None
     poa, ghi = _canal_logger(h, "poa"), _canal_logger(h, "ghi")
@@ -638,7 +655,7 @@ def _data_linha(linha, fmt):
         r = next(csv.reader([linha]), [])
         t = _hora(r[1]) if len(r) > 1 else None
         return t.date() if t else None
-    r = linha.split(fmt["sep"])
+    r = [c.strip().strip('"') for c in linha.split(fmt["sep"])]
     return data_de(r[fmt["date"]]) if fmt["date"] < len(r) else None
 
 
@@ -675,7 +692,7 @@ def _pontos_logger(texto, fmt):
     for i, l in enumerate(texto.splitlines()):
         if i == 0 or not l.strip():
             continue
-        r = l.split(fmt["sep"])
+        r = [c.strip().strip('"') for c in l.split(fmt["sep"])]           # valor entre aspas: "1164,7"
         if max(jd, jt) >= len(r):
             continue
         t = _hora("%s %s" % (r[jd].strip(), r[jt].split(",")[0].strip()))

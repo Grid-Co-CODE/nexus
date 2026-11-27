@@ -440,6 +440,10 @@ def _chuva_do_dia(pts, modo="acumulado"):
         return None, "o arquivo não cobre o dia inteiro (%s a %s)" % (_hm(pts[0][0]), _hm(pts[-1][0]))
     if modo == "incremento":
         return round(sum(v for _, v in pts), 1), None
+    if modo == "total":
+        # contador que nunca zera (ETMs_1, 27/11/2026): a soma dos passos para cima no dia; degrau > 50 mm de uma
+        # leitura para a outra é o contador reiniciando, não chuva
+        return round(sum(b - a for (_, a), (_, b) in zip(pts, pts[1:]) if 0 < b - a <= 50), 1), None
     k = next((i for i, (_, v) in enumerate(pts) if v <= 0), None)
     if k is None:
         return None, "o acumulado da chuva não zerou na virada do dia"
