@@ -159,9 +159,15 @@ def test_tela_liga_e_desliga_o_computador(app, logado, config):
     assert "Gerar no PC" in html and "entregue pelo administrador" in html
     app.config["NEXUS_PCM_APP_URL"] = "https://exemplo.test/NexusPCM.exe"
     assert 'href="https://exemplo.test/NexusPCM.exe"' in logado.get("/t/pcm/gerar").get_data(as_text=True)
-    r = logado.post("/t/pcm/gerar/pc/ligar", data={"nome": "PC do PCM"})
+    # o endereço do código é o de fora (o Origin da tela), e não o de dentro do servidor atrás do proxy (a prova de 27/11)
+    r = logado.post("/t/pcm/gerar/pc/ligar", data={"nome": "PC do PCM"}, headers={"Origin": "http://localhost"})
     html = r.get_data(as_text=True)
     assert r.status_code == 200 and P.PREFIXO in html and "não aparece de novo" in html
+    import re as _re
+    cod = _re.search(r'id="pc-codigo"[^>]*value="([^"]+)"', html).group(1)
+    import base64 as _b64
+    b = cod[len(P.PREFIXO):]
+    assert json.loads(_b64.urlsafe_b64decode(b + "=" * (-len(b) % 4)))["u"] == "http://localhost"
     assert r.headers.get("Cache-Control") == "no-store"
     comp = P.computadores(app.config)[0]
     assert P.PREFIXO not in logado.get("/t/pcm/gerar").get_data(as_text=True)       # o código não aparece de novo
@@ -252,3 +258,14 @@ def test_a_vigia_so_anota_longe_do_teto(config, monkeypatch):
     r = G.iniciar(config, "2026-W41")
     st = G.aguardar(config, r["id"], 60)
     assert st["estado"] == "ok"
+
+
+def test_o_endereco_do_codigo_e_o_de_fora(app):
+    """Atrás do proxy, o Nexus se vê pelo endereço de dentro (a prova de 27/11/2026: https://10.32.28.19:5070); o código
+    leva o Origin da tela, o endereço que a pessoa usa."""
+    from nexus.pcm import telas as T
+    with app.test_request_context("/t/pcm/gerar/pc/ligar", base_url="https://10.0.0.9:5070",
+                                  headers={"Origin": "https://nexus.exemplo.test"}):
+        assert T._endereco_publico() == "https://nexus.exemplo.test"
+    with app.test_request_context("/t/pcm/gerar/pc/ligar", base_url="https://10.0.0.9:5070"):
+        assert T._endereco_publico() == "https://10.0.0.9:5070"

@@ -850,13 +850,21 @@ def tecnicos_historico():
 # o 1º foi mandado à pessoa do PCM pelo Levi). Link direto, e não um redirecionamento do Nexus para fora
 
 
+def _endereco_publico() -> str:
+    """O endereço do Nexus como a pessoa o vê, para o código do aplicativo. Atrás do proxy o `host_url` é o endereço de
+    dentro do servidor (a prova de 27/11/2026: o código saiu com https://10.32.28.19:5070, e o aplicativo não conectava);
+    o `Origin` do POST da própria tela é o de fora (o `_de_outro_site` já o confere)."""
+    origem = (request.headers.get("Origin") or "").strip().rstrip("/")
+    return origem if origem.startswith(("https://", "http://")) else request.host_url.rstrip("/")
+
+
 def gerar_pc_ligar():
     """Liga um computador ao "Gerar no PC": o código aparece uma vez, na própria tela. Quem programa (PCM, admin)."""
     cfg = current_app.config
     if _de_outro_site() or not pode_programar():
         abort(403)
     try:
-        cod = GPC.ligar(cfg, request.form.get("nome"), _quem(), request.host_url.rstrip("/") + na_raiz(""))
+        cod = GPC.ligar(cfg, request.form.get("nome"), _quem(), _endereco_publico() + na_raiz(""))
     except GPC.Recusado as ex:
         return render_template("pcm/gerar.html", **_ctx_gerar(cfg, erro=str(ex))), 400
     resp = render_template("pcm/gerar.html", **_ctx_gerar(cfg, ok="Computador ligado. Copie o código agora: ele não "

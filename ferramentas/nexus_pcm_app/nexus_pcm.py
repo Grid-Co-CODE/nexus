@@ -247,7 +247,9 @@ def rodar(nexus: Nexus, semana: str, avisar) -> dict:
     pasta_motor = base / "pcm" / "motor"
     relato: dict = {"maquina": os.environ.get("COMPUTERNAME", "")}
     avisar("etapa", ("preparar", "ok"))
-    avisar("rodada", r)
+    # o link da rodada pelo endereço do código (o que o servidor diria de si, atrás do proxy, é o de dentro)
+    tela = f"{nexus.url}/t/pcm/gerar?rodada={rid}" if getattr(nexus, "url", "") else r.get("tela", "")
+    avisar("rodada", dict(r, tela=tela))
 
     codigo = 1
     with open(log, "wb") as f:
@@ -307,7 +309,7 @@ def rodar(nexus: Nexus, semana: str, avisar) -> dict:
     relato.update(codigo=codigo, duracao_s=int(time.monotonic() - t0))
     if codigo != 0:
         relato["erro"] = _cauda(log, 12)
-    v = nexus.entregar(rid, saida if saida.exists() else None, log, relato)
+    v = dict(nexus.entregar(rid, saida if saida.exists() else None, log, relato), tela=tela)
     avisar("etapa", ("devolver", "ok"))
     shutil.rmtree(base, ignore_errors=True)           # a planilha e o log já estão no Nexus
     return v
