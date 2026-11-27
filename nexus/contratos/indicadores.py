@@ -380,7 +380,7 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
                 continue
             if mid not in meses_com_dado:
                 for k in kpis:
-                    cels_k[k][mid] = {"txt": "s/d", "tom": "", "dica": "sem dado no banco: o PR e a disponibilidade por mês começam em 10/2026"}
+                    cels_k[k][mid] = {"txt": "s/d", "tom": "", "dica": "sem dado: nem a Performance (desde 10/2026) nem o histórico das BDs têm este mês da usina"}
                 continue
             mm, ex = um.get(mid) or {}, ue.get(mid) or {}
             pr_lido = mm.get("pr")
@@ -408,6 +408,11 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
                     extra += f"; sem o expurgo {_br(pr_b)}%"
                 if k == "disp_exp" and disp_b is not None and round(v, 2) != round(disp_b, 2):
                     extra += f"; sem o expurgo {_br(disp_b)}%"
+                historico = mm.get("fonte") == "historico bd"
+                if historico and k.endswith("_exp") and not ex.get(k[:-4]):
+                    extra += "; antes de 10/2026 o expurgo não tem registro: é o número sem o expurgo"
+                if historico:
+                    extra += "; do histórico das BDs (a geração, a irradiação e a disponibilidade do dia)"
                 cels_k[k][mid] = {"txt": _br(v), "tom": tom_kpi(v, meta), "dica": f"{rot}: {_br(v)}%{extra}{parcial}"}
                 vals_k[k].append(v)
                 kpi_mes[k][mid].append((v, mwp))

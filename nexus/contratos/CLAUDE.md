@@ -157,8 +157,15 @@ visão gerencial para o CEO, para os heads darem uma olhada, vai ser muito impor
     quando ela está pronta; sem a conta (o Nexus acabou de subir), as usinas e os números saem só do livro e a aba abre
     na hora, sem o "montando" (a conta fria levou 29 s no PC em 27/11). Sem o livro nem a conta, volta `montando` e a
     página pede de novo a cada 3 s. O banco de performance só tem os meses desde 10/2026 (`diagnostico_mes.
-    PRIMEIRO_MES`); antes, "s/d". Medido em 27/11: 266 linhas (133 usinas × out e nov/26); o expurgo mudou o PR em 26 e
-    a disponibilidade em 193;
+    PRIMEIRO_MES`). **Antes de 10/2026, o histórico das BDs** (Levi, 27/11/2026: "por que não temos dados antes do livro.
+    Tem muitos que a gente tem esse dado"): o livro traz o mês antigo do `nexus_geracao` (`kpi_mes.linhas_do_historico`,
+    `fonte = historico bd`, a regra no cabeçalho do módulo): o PR só nas usinas em que a conta da BD bate com a da
+    Performance nos meses em comum, a disponibilidade da BD (a da Thopen bateu 74 de 74 em 09/2026), sem expurgo (a
+    célula expurgada repete o número e a dica diz que não há registro). Medido em 27/11: 986 linhas de 01/2025 a 09/2026,
+    o PR em 75 usinas e a disponibilidade em 79; sem o PR antigo ficam 26 usinas em que a conta não bate (quase todas da
+    Thopen: a irradiação da BD não é a da Performance) e 45 sem mês em comum para conferir. O que nem o livro nem a conta
+    têm é "s/d". Medido em 27/11 (a conta): 266 linhas (133 usinas × out e nov/26); o expurgo mudou o PR em 26 e a
+    disponibilidade em 193;
   - MPM, MPS e MPA: as tarefas do ano do PCM (`pcm.fonte.ler_gestao_sem_esperar` e `pcm.gestao.classificar`: a sigla no
     nome, o mês da Data Programada, feita = Finalizada), ligadas à usina pelo nome (`responsaveis.Nomes`);
   - supressão vegetal (roçagem e poda química) e lavagem (limpeza de módulos), de duas fontes juntas

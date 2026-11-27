@@ -16,6 +16,20 @@ também, mesma lógica do PR expurgado"; "Pense que a gente está fazendo uma vi
   última gravação tiver mais de 50 min e se as linhas mudaram (o sha na `atualizacao`). `NEXUS_KPI_PUBLICAR=0` desliga.
 - **Quem lê:** a aba Indicadores (`ler`), pela cópia de 10 min; sem o livro, a aba faz a conta como antes.
 - **Sem nome, sem texto livre:** só IDs, o cliente (código) e números (regra 8). O texto do expurgo fica na conta viva.
+- **O histórico antes de 10/2026** (Levi, 27/11/2026: "por que não temos dados antes do livro. Tem muitos que a gente tem
+  esse dado [...] faz o cálculo, bota lá no livro"): o banco de performance publicado pela Plataforma só tem os meses
+  desde 10/2026 (a disponibilidade, desde 09/2026), mas o `nexus_geracao · fato_geracao_usina_dia` (a geração, a
+  irradiação e a disponibilidade de cada usina e dia, das BDs) vai até 01/2025. `linhas_do_historico` faz o mês dali,
+  marcado `fonte = historico bd`, uma vez (o mês fica congelado):
+  - o PR = a energia do mês ÷ (a irradiação ÷ 1 kW/m² × a potência que a Performance usa, a `pot_kwp` da conta), com a
+    irradiação do DIA pela média das abas (a usina de duas abas, "Coração 1 e 2", somava as duas e o PR caía à metade) e
+    20 dias ou mais com irradiação. SÓ na usina em que a mesma conta bate com o PR da Performance nos meses em comum
+    (`CONFERE_PR`, 3 pontos): medido em 27/11/2026, 77 de 97 usinas em 10/2026 e 64 de 78 em 11/2026; as que não batem
+    são quase todas da Thopen, cuja irradiação na BD não é a que a Performance usa, e ficam sem o histórico (não se chuta);
+  - a disponibilidade = a média do dia da BD (em fração: 0,98 = 98%), com 20 dias ou mais, e o mês todo zerado fica fora
+    (a BD da Thopen tem out e nov/26 zerados: ainda não lançados). Conferida em 09/2026 contra a disponibilidade da
+    Performance: 74 de 74 usinas da Thopen iguais;
+  - o expurgo não tem registro antes de 10/2026 (o COS começa em 01/10/2026): as colunas expurgadas ficam vazias.
 """
 from __future__ import annotations
 
@@ -37,11 +51,16 @@ FATO, TIPO = "kpi_usina_mes", "snapshot_periodico"
 GRAO = "1 linha = 1 usina × 1 mês (o PR e a disponibilidade do mês, com e sem o expurgo do contrato)"
 CHAVE = ("kpi_id",)
 FONTES = (("nexus_performance", "fato_meta_usina_mes"), ("falhas_performance", "disponibilidade_dia"),
-          ("nexus_cos_normalizacoes", "fato_normalizacao"))
-JANELA_ORIGEM = "desde 10/2026 (o banco de performance); este livro guarda o mês fechado como foi"
+          ("nexus_cos_normalizacoes", "fato_normalizacao"), ("nexus_geracao", "fato_geracao_usina_dia"))
+JANELA_ORIGEM = "desde 10/2026 pela Visão gerencial e antes disso pelo histórico das BDs (nexus_geracao, desde 01/2025)"
 LIGADA_POR = "visao gerencial"   # a usina já vem ligada na conta (o cadastro), regra 5
+LIGADA_POR_HIST = "nexus_geracao"
+FONTE_CONTA, FONTE_HIST = "visao gerencial", "historico bd"
+INICIO_CONTA = "2026-10"         # o 1º mês do banco de performance (`diagnostico_mes.PRIMEIRO_MES`)
+CONFERE_PR = 3.0                 # pontos de PR entre a conta da BD e a da Performance nos meses em comum
+DIAS_MIN = 20
 CAB = ["kpi_id", "data_id_mes", "usina_id", "usina_ligada_por", "cliente", "potencia_kwp", "pr_pct", "pr_exp_pct", "disp_pct",
-       "disp_exp_pct", "prod_kwh", "meta_kwh", "mes_fechado", "calculado_em"]
+       "disp_exp_pct", "prod_kwh", "meta_kwh", "mes_fechado", "calculado_em", "fonte"]
 # (coluna, unidade, soma). Nenhuma soma entre usinas: o PR e a disponibilidade do contrato são a média pela potência.
 # a potencia_kwp é atributo da linha (o peso da média do contrato), não medida: o kWp não é unidade da regra 3
 MEDIDAS = (("pr_pct", "%", "nao"), ("pr_exp_pct", "%", "nao"), ("disp_pct", "%", "nao"),
@@ -95,11 +114,12 @@ def linhas_do_portfolio(g: dict, agora: datetime) -> list[list]:
             uid = u.get("uid")
             if uid in (None, ""):
                 continue
-            kwp = _num((u.get("mwp") or 0) * 1000, 0) if u.get("mwp") else ""
+            kwp_cad = _num((u.get("mwp") or 0) * 1000, 0) if u.get("mwp") else ""
             for mid, mm in sorted((u.get("meses") or {}).items()):
                 if mid > mes_hoje:
                     continue
                 mm = mm or {}
+                kwp = _num(mm.get("pot_kwp"), 0) if mm.get("pot_kwp") else kwp_cad
                 ex = (u.get("com_expurgo") or {}).get(mid) or {}
                 pr, disp = _pct(mm.get("pr")), _pct(mm.get("disp"))
                 pr_e, disp_e = _pct(ex.get("pr")), _pct(ex.get("disp"))
@@ -108,8 +128,97 @@ def linhas_do_portfolio(g: dict, agora: datetime) -> list[list]:
                 out.append([f"{uid}-{mid.replace('-', '')}", int(mid.replace("-", "") + "01"), int(uid), LIGADA_POR,
                             str(c.get("cliente") or ""), kwp, pr, pr_e if pr_e != "" else pr, disp,
                             disp_e if disp_e != "" else disp, _num(mm.get("prod_kwh"), 0), _num(mm.get("meta_kwh"), 0),
-                            1 if mid < mes_hoje else 0, iso])
+                            1 if mid < mes_hoje else 0, iso, FONTE_CONTA])
     return sorted(out, key=lambda l: (l[1], l[2]))
+
+
+def _f(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def linhas_do_historico(geracao: list[dict], g: dict, agora: datetime) -> tuple[list[list], dict]:
+    """(as linhas dos meses antes de `INICIO_CONTA`, o relatório só com contagens) a partir do `fato_geracao_usina_dia`
+    e da conta da Visão gerencial (a potência, o cliente e o PR da Performance para conferir). Ver o cabeçalho."""
+    iso = agora.isoformat(timespec="seconds")
+    info = {}                                    # uid: (cliente, kWp da Performance, {mês: PR da Performance})
+    for c in g.get("clientes") or []:
+        for u in c.get("usinas") or []:
+            try:
+                uid = int(u.get("uid"))
+            except (TypeError, ValueError):
+                continue
+            meses = u.get("meses") or {}
+            kwp = next((_f(mm.get("pot_kwp")) for _m, mm in sorted(meses.items(), reverse=True) if (mm or {}).get("pot_kwp")), None)
+            kwp = kwp or ((_f(u.get("mwp")) or 0) * 1000 or None)
+            info[uid] = (str(c.get("cliente") or ""), kwp,
+                         {mid: _f(mm.get("pr")) for mid, mm in meses.items() if _f((mm or {}).get("pr")) and 0 < _f(mm.get("pr")) <= PR_MAX})
+    dia: dict = {}
+    for r in geracao or []:
+        try:
+            uid, d = int(r.get("usina_id")), str(int(r.get("data_id")))
+        except (TypeError, ValueError):
+            continue
+        x = dia.setdefault((uid, d), {"e": None, "h": [], "disp": []})
+        e = _f(r.get("energia_medidor_kwh"))
+        e = e if e is not None else _f(r.get("energia_inversores_kwh"))
+        if e is not None:
+            x["e"] = (x["e"] or 0) + e
+        h = _f(r.get("ipoa_kwh_m2"))
+        if h and h > 0:
+            x["h"].append(h)
+        v = _f(r.get("disponibilidade_pct"))
+        if v is not None:
+            x["disp"].append(v * 100 if v <= 1.5 else v)
+    mes: dict = {}
+    for (uid, d), x in dia.items():
+        m = mes.setdefault((uid, f"{d[:4]}-{d[4:6]}"), {"e": 0.0, "h": 0.0, "dias_h": 0, "e_tot": 0.0, "disp": []})
+        if x["e"] is not None:
+            m["e_tot"] += x["e"]
+            if x["h"]:
+                m["e"] += x["e"]
+                m["h"] += sum(x["h"]) / len(x["h"])        # a irradiação do dia: a média das abas, não a soma
+                m["dias_h"] += 1
+        if x["disp"]:
+            m["disp"].append(sum(x["disp"]) / len(x["disp"]))
+
+    def pr_de(uid, m):
+        kwp = (info.get(uid) or (None, None))[1]
+        if not kwp or m["dias_h"] < DIAS_MIN or m["h"] <= 0:
+            return None
+        v = m["e"] / (m["h"] * kwp) * 100
+        return round(v, 2) if 0 < v <= PR_MAX else None
+    # a conferência: a mesma conta contra o PR da Performance nos meses em comum
+    confere: dict = {}
+    for (uid, mid), m in mes.items():
+        if mid < INICIO_CONTA or uid not in info or mid not in info[uid][2]:
+            continue
+        v = pr_de(uid, m)
+        if v is not None:
+            confere.setdefault(uid, []).append(abs(v - info[uid][2][mid]) <= CONFERE_PR)
+    validas = {uid for uid, oks in confere.items() if oks and all(oks)}
+    out, rel = [], {"usinas_pr": set(), "usinas_disp": set(), "pr_sem_conferir": len({u for u in info} - set(confere)),
+                    "pr_nao_bate": len(set(confere) - validas)}
+    for (uid, mid), m in sorted(mes.items(), key=lambda kv: (kv[0][1], kv[0][0])):
+        if mid >= INICIO_CONTA or uid not in info:
+            continue
+        pr = pr_de(uid, m) if uid in validas else None
+        disp = None
+        if len(m["disp"]) >= DIAS_MIN and any(v > 0 for v in m["disp"]):        # o mês todo zerado não foi lançado
+            disp = round(sum(m["disp"]) / len(m["disp"]), 2)
+        if pr is None and disp is None:
+            continue
+        rel["usinas_pr"].update([uid] if pr is not None else [])
+        rel["usinas_disp"].update([uid] if disp is not None else [])
+        kwp = info[uid][1]
+        out.append([f"{uid}-{mid.replace('-', '')}", int(mid.replace("-", "") + "01"), uid, LIGADA_POR_HIST, info[uid][0],
+                    _num(kwp, 0) if kwp else "", pr if pr is not None else "", "", disp if disp is not None else "", "",
+                    _num(m["e_tot"], 0) if m["e_tot"] else "", "", 1, iso, FONTE_HIST])
+    rel = {k: (len(v) if isinstance(v, set) else v) for k, v in rel.items()}
+    rel["meses"] = sorted({l[1] // 100 for l in out})
+    return out, rel
 
 
 def mesclar(banco: list[dict], novas: list[list], hoje: date) -> tuple[list[list], int]:
@@ -150,7 +259,7 @@ def por_usina(linhas: list[dict]) -> dict:
         out.setdefault(uid, {})[f"{mes[:4]}-{mes[4:6]}"] = {
             "pr": f("pr_pct"), "pr_exp": f("pr_exp_pct"), "disp": f("disp_pct"), "disp_exp": f("disp_exp_pct"),
             "kwp": f("potencia_kwp"), "prod_kwh": f("prod_kwh"), "meta_kwh": f("meta_kwh"),
-            "cliente": str(r.get("cliente") or "")}
+            "cliente": str(r.get("cliente") or ""), "fonte": str(r.get("fonte") or FONTE_CONTA)}
     return out
 
 
@@ -169,7 +278,8 @@ def _ultima(base, sessao) -> datetime | None:
     return d if d is None or d.tzinfo else d.replace(tzinfo=timezone.utc)
 
 
-def publicar(config, portfolio: dict | None = None, *, sessao=None, agora=None, forcar=False) -> dict:
+def publicar(config, portfolio: dict | None = None, *, sessao=None, agora=None, forcar=False, historico=False,
+             geracao: list[dict] | None = None) -> dict:
     """Uma volta: confere a última gravação, faz a conta (ou usa o `portfolio` dado, nos testes), mescla com o banco e
     grava se mudou. Devolve só contagens."""
     import requests
@@ -189,12 +299,19 @@ def publicar(config, portfolio: dict | None = None, *, sessao=None, agora=None, 
     if not novas:
         return {"recusou": "a conta da Visão gerencial saiu sem nenhum mês: o livro fica como está"}
     banco = livros.ler(base, s, LIVRO, ABA)
+    rel_hist = {}
+    if historico or not any(str(r.get("fonte") or "") == FONTE_HIST for r in banco):
+        # o histórico das BDs entra uma vez (o mês dele já está congelado); `historico=True` refaz
+        hist, rel_hist = linhas_do_historico(geracao if geracao is not None else livros.ler(base, s, "nexus_geracao", "fato_geracao_usina_dia"),
+                                             portfolio, agora)
+        chaves = {l[0] for l in novas}
+        novas = novas + [l for l in hist if l[0] not in chaves]
     todas, congeladas = mesclar(banco, novas, agora.date())
     if len({l[0] for l in todas}) != len(todas):
         return {"recusou": "usina e mês repetidos: o grão quebrou; o livro fica como está"}
     h = sha(todas)
     antes = next((str(r.get("sha_linhas") or "") for r in livros.ler(base, s, LIVRO, "atualizacao")), "")
-    rel = {"linhas": len(todas), "da_conta": len(novas), "congeladas": congeladas}
+    rel = {"linhas": len(todas), "da_conta": len(novas), "congeladas": congeladas, **({"historico": rel_hist} if rel_hist else {})}
     if h == antes and not forcar:
         return dict(rel, pulou="as linhas não mudaram")
     atu = [agora.isoformat(timespec="seconds"), len(todas), h, congeladas, COMO_LER]

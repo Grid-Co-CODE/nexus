@@ -342,8 +342,8 @@ def _usinas_kpi(cliente: str):
             com_dado.add(mid)
             if g is not None and mid >= mes_hoje and (meses.get(mid) or {}).get("pr") is not None:
                 continue                         # o mês em curso: a conta de agora, mais nova que o livro
-            meses[mid] = {**(meses.get(mid) or {}), "pr": v["pr"], "disp": v["disp"]}
-            exp[mid] = {"pr": v["pr_exp"], "disp": v["disp_exp"]}
+            meses[mid] = {**(meses.get(mid) or {}), "pr": v["pr"], "disp": v["disp"], "fonte": v.get("fonte") or ""}
+            exp[mid] = {k: x for k, x in (("pr", v["pr_exp"]), ("disp", v["disp_exp"])) if x is not None}
         u["meses"], u["com_expurgo"] = meses, exp
     return usinas, com_dado, avisos
 

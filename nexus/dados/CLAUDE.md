@@ -431,7 +431,11 @@ medida: kWp não é unidade da regra 3), a produção e a meta. Sai da conta da 
 Comando), de hora em hora no :47, uma máquina por vez (50 min) e só quando o sha das linhas muda. O mês fechado congela
 no dia 11 do seguinte (o Thopen fecha no dia 10); a linha do banco que não veio na conta fica (`so_cresce`). A usina já
 vem ligada (`usina_ligada_por = visao gerencial`); sem texto do expurgo (regra 8). Quem lê: a aba Indicadores dos
-contratos. Medido em 27/11/2026 (ensaio, sem gravar): 266 linhas, 133 usinas, out e nov/26.
+contratos. Medido em 27/11/2026 (ensaio, sem gravar): 266 linhas, 133 usinas, out e nov/26. **O mês antes de 10/2026**
+vem uma vez do `nexus_geracao · fato_geracao_usina_dia` (`fonte = historico bd`): o PR pela energia ÷ (irradiação × a
+potência da Performance), com a irradiação do dia pela média das abas, só na usina em que essa conta bate com o PR da
+Performance nos meses em comum (3 pontos); a disponibilidade da BD (em fração no fato: 0,98), sem o mês todo zerado (não
+lançado); o expurgo vazio. Ensaio de 27/11: 986 linhas, 01/2025 a 09/2026.
 
 ## Os textos reservados (19/11/2026; `textos_reservados.py`, `ferramentas/textos_reservados.py`)
 

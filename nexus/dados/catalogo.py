@@ -1356,8 +1356,9 @@ FATOS = (
                      ("disp_pct", "%", "nao"), ("disp_exp_pct", "%", "nao"), ("prod_kwh", "kWh", "aditiva"),
                      ("meta_kwh", "kWh", "aditiva"), ("mes_fechado", "1/0", "nao"))),
          fontes=("nexus_performance · fato_meta_usina_mes", "falhas_performance · disponibilidade_dia",
-                 "nexus_cos_normalizacoes · fato_normalizacao"),
-         janela_origem="desde 10/2026 (o banco de performance); o mês fechado fica como foi gravado",
+                 "nexus_cos_normalizacoes · fato_normalizacao", "nexus_geracao · fato_geracao_usina_dia"),
+         janela_origem="desde 10/2026 pela Visão gerencial e, antes disso, pelo histórico das BDs (desde 01/2025); o mês "
+                       "fechado fica como foi gravado",
          estado="conformado", conformado_em="nexus_kpi_usina_mes · fato_kpi_usina_mes",
          observacao="a mesma conta da Visão gerencial e do Comando (o com_expurgo: a queda da rede e a limitação imposta "
                     "saem da conta; o PR expurgado = pr × (prod + E) ÷ prod). Sem expurgo no mês, o expurgado repete o "
@@ -1366,7 +1367,10 @@ FATOS = (
                     "somar PR nem disponibilidade entre usinas). O mês fechado congela no dia 11 do seguinte (o Thopen "
                     "fecha no dia 10): depois disso a linha do banco não muda; antes, cada volta a troca. A linha do "
                     "banco que não veio na conta fica (o livro não encolhe). O texto do expurgo fica na conta viva "
-                    "(regra 8). kpi_id = <usina_id>-<AAAAMM>"),
+                    "(regra 8). kpi_id = <usina_id>-<AAAAMM>. fonte = visao gerencial ou historico bd: o mês antes de "
+                    "10/2026 vem do fato_geracao_usina_dia (o PR pela energia ÷ irradiação × a potência da Performance, só "
+                    "na usina em que essa conta bate com o PR da Performance nos meses em comum; a disponibilidade da BD; "
+                    "o expurgo vazio, sem registro antes de 10/2026), gravado uma vez"),
     # As janelas da Visão do responsável (12/10/2026, Levi: "PR ao clicar aparece um card (...) essa mesma visão do PAINEL
     # NOC > HISTÓRICO > PR > PR DIÁRIO EXPANDIDO"; a meta "com uma tabelinha de dia do mês, geração meta, geração real"):
     # o dia a dia do Gerencial (a geração que fecha no atingimento, 13/10/2026) com o POA e o PR do PR diário do Painel

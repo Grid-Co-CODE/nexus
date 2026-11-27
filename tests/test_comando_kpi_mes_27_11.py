@@ -55,7 +55,7 @@ def test_a_leitura_aceita_numero_como_texto():
                                 "1000", "1200", "1", "x"]))]
     d = KM.por_usina(linhas)
     assert d == {7: {"2026-10": {"pr": 80.0, "pr_exp": 81.2, "disp": None, "disp_exp": 98.5, "kwp": 2500.0,
-                                 "prod_kwh": 1000.0, "meta_kwh": 1200.0, "cliente": "SOLAR ALFA"}}}
+                                 "prod_kwh": 1000.0, "meta_kwh": 1200.0, "cliente": "SOLAR ALFA", "fonte": KM.FONTE_CONTA}}}
 
 
 def test_publicar_grava_so_quando_muda_e_uma_vez_por_hora(monkeypatch):
@@ -75,15 +75,15 @@ def test_publicar_grava_so_quando_muda_e_uma_vez_por_hora(monkeypatch):
         return {"ok": True}
     monkeypatch.setattr(KM.livros, "publicar", publicar)
     cfg = {"GRIDCO_SQL_TOKEN": "t"}
-    assert "erro" in KM.publicar({}, G, sessao=SimpleNamespace(), agora=AGORA)
-    r = KM.publicar(cfg, G, sessao=SimpleNamespace(), agora=AGORA)
+    assert "erro" in KM.publicar({}, G, sessao=SimpleNamespace(), agora=AGORA, geracao=[])
+    r = KM.publicar(cfg, G, sessao=SimpleNamespace(), agora=AGORA, geracao=[])
     assert r["gravado"] and r["linhas"] == 2 and len(gravado) == 1
     banco["quando"] = (AGORA - timedelta(minutes=10)).isoformat()
-    assert "pulou" in KM.publicar(cfg, G, sessao=SimpleNamespace(), agora=AGORA)              # gravou há 10 min
+    assert "pulou" in KM.publicar(cfg, G, sessao=SimpleNamespace(), agora=AGORA, geracao=[])              # gravou há 10 min
     banco["quando"] = (AGORA - timedelta(hours=2)).isoformat()
-    r = KM.publicar(cfg, G, sessao=SimpleNamespace(), agora=AGORA + timedelta(hours=1))
+    r = KM.publicar(cfg, G, sessao=SimpleNamespace(), agora=AGORA + timedelta(hours=1), geracao=[])
     assert r.get("pulou") == "as linhas não mudaram" and len(gravado) == 1                   # o mesmo número não regrava
-    assert "recusou" in KM.publicar(cfg, {"clientes": []}, sessao=SimpleNamespace(), agora=AGORA, forcar=True)
+    assert "recusou" in KM.publicar(cfg, {"clientes": []}, sessao=SimpleNamespace(), agora=AGORA, forcar=True, geracao=[])
 
 
 def test_a_aba_abre_pelo_livro_sem_esperar_a_conta(carga, cliente, monkeypatch):  # noqa: F811
@@ -108,3 +108,33 @@ def test_a_aba_abre_pelo_livro_sem_esperar_a_conta(carga, cliente, monkeypatch):
     linhas = {l["id"]: l for l in d["usinas"][0]["linhas"]}
     assert linhas["pr"]["cels"]["2026-10"]["txt"] == "80,0" and linhas["pr_exp"]["cels"]["2026-10"]["txt"] == "81,2"
     assert linhas["disp_exp"]["cels"]["2026-10"]["txt"] == "98,5"
+
+
+def test_o_historico_das_bds_entra_conferido():
+    """Levi, 27/11/2026: "por que não temos dados antes do livro [...] faz o cálculo, bota lá no livro". O mês antes de
+    10/2026 vem do `fato_geracao_usina_dia`: o PR só na usina em que a mesma conta bate com o PR da Performance nos meses
+    em comum (3 pontos); a irradiação do dia é a média das abas; a disponibilidade da BD em fração vira %; o mês todo
+    zerado fica fora (não lançado); o expurgo fica vazio."""
+    g = {"clientes": [{"cliente": "SOLAR ALFA", "usinas": [
+        {"uid": 7, "mwp": 1.0, "meses": {"2026-10": {"pr": 80.0, "pot_kwp": 1000}}},       # a conta bate: 80 = 80
+        {"uid": 8, "mwp": 1.0, "meses": {"2026-10": {"pr": 60.0, "pot_kwp": 1000}}}]}]}    # não bate: fica sem o PR
+    ger = []
+    for d in range(1, 22):                       # 21 dias de set e de out/26: 4 kWh/m² e 3.200 kWh por dia = PR 80%
+        for m in ("09", "10"):
+            for uid in (7, 8):
+                # a usina 7 tem duas abas no mesmo dia: a energia soma, a irradiação não
+                partes = 2 if uid == 7 else 1
+                for _ in range(partes):
+                    ger.append({"usina_id": uid, "data_id": int(f"2026{m}{d:02d}"), "energia_medidor_kwh": 3200 / partes,
+                                "ipoa_kwh_m2": 4.0, "disponibilidade_pct": 0.98 if m == "09" else 0})
+    ls, rel = KM.linhas_do_historico(ger, g, AGORA)
+    por = {l[_i("kpi_id")]: l for l in ls}
+    assert set(por) == {"7-202609", "8-202609"}                        # só antes de 10/2026
+    s7, s8 = por["7-202609"], por["8-202609"]
+    assert s7[_i("pr_pct")] == 80.0 and s7[_i("disp_pct")] == 98.0 and s7[_i("pr_exp_pct")] == "" and s7[_i("fonte")] == KM.FONTE_HIST
+    assert s8[_i("pr_pct")] == "" and s8[_i("disp_pct")] == 98.0         # a 8 não confere: sem o PR, com a disponibilidade
+    assert rel["pr_nao_bate"] == 1 and rel["usinas_pr"] == 1 and rel["meses"] == [202609]
+    # o mês todo zerado (out/26 na BD) não vira 0% de disponibilidade
+    ger2 = [dict(r, data_id=int(str(r["data_id"]).replace("202609", "202608", 1))) for r in ger if str(r["data_id"]).startswith("202610")]
+    ls2, _ = KM.linhas_do_historico(ger2 + ger, g, AGORA)
+    assert all(l[_i("disp_pct")] == "" for l in ls2 if l[_i("data_id_mes")] == 20260801)
