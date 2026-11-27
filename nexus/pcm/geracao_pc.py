@@ -169,11 +169,11 @@ def abrir_rodada(config, semana: str, comp: dict) -> dict:
     origem = G.pasta_origem(config)
     try:
         insumos = G._preparar(config, semana, pasta, trabalho, origem)
-    except G.NaoPronto:
+        fama = G._fama(config, ler_o_fracttal=True)
+    except Exception:            # NaoPronto e qualquer outra (o disco cheio de 27/11): a pasta sem status não fica para trás
         import shutil
         shutil.rmtree(pasta, ignore_errors=True)
         raise
-    fama = G._fama(config, ler_o_fracttal=True)
     st = {"id": rid, "semana": semana, "estado": NO_PC, "inicio": _agora(), "credencial": "no PC",
           "insumos": insumos, "motor": "no PC", "limpeza": limpeza,
           "pc": {"computador": comp["id"], "nome": comp.get("nome") or "", "etapa": "preparando", "atualizado": _agora()}}

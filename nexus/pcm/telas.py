@@ -129,10 +129,15 @@ def _ctx_gerar(cfg, rodada=None, erro=None, semana=None, ok=None) -> dict:
     est_m = M.ler(cfg)
     aviso_m = session.pop("pcm_motivos_aviso", None) or {}
     ok, erro = ok or aviso_m.get("ok"), erro or aviso_m.get("erro")
-    ultimas = geracao.ultimas(cfg)
+    # o histórico das gerações (27/11/2026, uma pessoa do PCM: "deixar o histórico visível? todas as que foram geradas, como
+    # um botão de mostrar tudo"): as 8 mais novas, e todas com o `?historico=tudo`
+    todas_rodadas = geracao.ultimas(cfg, None)
+    historico_tudo = request.args.get("historico") == "tudo"
+    ultimas = todas_rodadas if historico_tudo else todas_rodadas[:8]
     # as rodadas que têm a planilha para baixar (19/10/2026: "tem que ter a opção de baixar!")
     com_planilha = {u["id"] for u in ultimas + ([sel] if sel else []) if geracao.planilha(cfg, u.get("id") or "")}
     return {"conf": geracao.conferir(cfg, semana), "ultimas": ultimas, "sel": sel, "com_planilha": com_planilha,
+            "historico_tudo": historico_tudo, "historico_total": len(todas_rodadas),
             # o motor daqui atrás do do PCM (24/11/2026): a semana gerada aqui pode sair diferente da do robô
             "copias_pcm": CP.diferentes(cfg, "motor"),
             "admin": bool(session.get("admin")), "pode": pode_programar(), "app_sel": app_sel,

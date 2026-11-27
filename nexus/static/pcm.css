@@ -2033,3 +2033,4 @@ details.inv-card:not([open])>summary{border-bottom:0}
 .pcm-pc-item form{margin-left:auto}
 .pcm-pc-item--desligado{opacity:.6}
 .pcm-pc-nome{font-weight:600}
+.pcm-historico-pe{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0 0}

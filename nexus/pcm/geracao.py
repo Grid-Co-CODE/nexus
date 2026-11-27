@@ -363,6 +363,15 @@ def limpar_rodadas(config) -> dict:
     if not base.is_dir():
         return out
     rodadas = sorted((p for p in base.iterdir() if p.is_dir() and RODADA_RE.match(p.name)), reverse=True)
+    for p in rodadas:
+        # a pasta sem status (a rodada que morreu antes de gravá-lo) com mais de 1 h: não é rodada, sai inteira
+        try:
+            if not (p / "status.json").exists() and time.time() - p.stat().st_mtime > 3600:
+                shutil.rmtree(p, ignore_errors=True)
+                out["vazias"] = out.get("vazias", 0) + 1
+        except OSError:
+            continue
+    rodadas = [p for p in rodadas if p.exists()]
     for p in rodadas[GUARDAR_INTEIRAS:]:
         st = ler_status(config, p.name) or {}
         if st.get("estado") in ("rodando", "no_pc") and ativa(config, p.name):
@@ -405,7 +414,7 @@ def iniciar(config, semana: str) -> dict:
         try:
             insumos = _preparar(config, semana, pasta, trabalho, origem)
             fama = _fama(config, ler_o_fracttal=True)
-        except NaoPronto:
+        except Exception:        # NaoPronto e qualquer outra (o disco cheio): a pasta sem status não fica para trás
             shutil.rmtree(pasta, ignore_errors=True)
             raise
         cred = credencial(config)
@@ -739,13 +748,18 @@ def aguardar(config, rid: str, timeout: float) -> dict | None:
     return ler_status(config, rid)
 
 
-def ultimas(config, n: int = 8) -> list[dict]:
+def ultimas(config, n: int | None = 8) -> list[dict]:
+    """As `n` rodadas mais novas QUE TÊM status (None = todas, o "Mostrar tudo" de 27/11/2026). A pasta sem status (a
+    rodada que morreu antes de gravá-lo: as tentativas de 27/11 na cota de disco cheia) não conta: antes ela entrava nas 8
+    e a lista encolhia para 4."""
     base = pasta_trabalho(config) / "geracoes"
     if not base.is_dir():
         return []
     out = []
-    for p in sorted((x for x in base.iterdir() if RODADA_RE.match(x.name)), reverse=True)[:n]:
+    for p in sorted((x for x in base.iterdir() if RODADA_RE.match(x.name)), reverse=True):
         st = ler_status(config, p.name)
         if st:
             out.append(st)
+            if n is not None and len(out) >= n:
+                break
     return out

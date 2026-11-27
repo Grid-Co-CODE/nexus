@@ -354,7 +354,7 @@
   <header class="pcm-passo-cab">
     <span class="pcm-passo-n">4</span>
     <div class="pcm-passo-txt"><h2 class="pcm-passo-tit">Últimas gerações</h2>
-      <p class="pcm-passo-sub">Clique no horário para abrir a rodada e a comparação com a semana oficial do PCM.</p></div>
+      <p class="pcm-passo-sub">Clique no horário para abrir a rodada e a comparação com a semana oficial do PCM.{% if not historico_tudo and historico_total > 8 %} Aqui as 8 mais novas.{% endif %}</p></div>
   </header>
 <div class="pcm-rolagem">
   <table class="pcm-tabela">
@@ -375,6 +375,17 @@
     </tbody>
   </table>
 </div>
+{# o "Mostrar tudo" (27/11/2026, pedido do PCM): as 8 mais novas de saída, todas as gerações com o botão #}
+{% if historico_total > 8 %}
+<p class="pcm-historico-pe">
+  {% if historico_tudo %}
+  <a class="gc-btn gc-btn--ui" href="?{% if sel %}rodada={{ sel.id }}{% endif %}#passo-historico"><i class="ph ph-caret-up"></i> Mostrar só as últimas</a>
+  <span class="gc-ajuda">Todas as {{ historico_total }} gerações.</span>
+  {% else %}
+  <a class="gc-btn gc-btn--ui" href="?{% if sel %}rodada={{ sel.id }}&amp;{% endif %}historico=tudo#passo-historico"><i class="ph ph-list"></i> Mostrar tudo ({{ historico_total }})</a>
+  {% endif %}
+</p>
+{% endif %}
 </section>
 {% endif %}
 {% endblock %}

@@ -312,3 +312,36 @@ def test_cota_de_disco_cheia_avisa_no_aplicativo(cliente, pc, monkeypatch):
     monkeypatch.setattr(P, "abrir_rodada", cheio)
     r = cliente.post("/t/pcm/pc/rodada", json={"semana": "2026-W49"}, headers=pc).get_json()
     assert "disco do servidor está cheio" in r["erro"]
+
+
+# ── o histórico das gerações: o "Mostrar tudo" e a pasta sem status (27/11/2026) ────────────────────────────────────────
+def _rodadas(config, n):
+    base = G.pasta_trabalho(config) / "geracoes"
+    ids = []
+    for i in range(n):
+        rid = f"202611{10 + i:02d}-080000-2026-W{40 + i:02d}"
+        (base / rid).mkdir(parents=True)
+        (base / rid / "status.json").write_text(json.dumps({"id": rid, "semana": rid[-8:], "estado": "ok",
+                                                             "inicio": "2026-11-10T08:00:00-03:00"}), encoding="utf-8")
+        ids.append(rid)
+    return base, ids
+
+
+def test_mostrar_tudo_e_a_pasta_sem_status(app, logado, config):
+    """Uma pessoa do PCM, 27/11/2026: "deixar o histórico visível? todas as que foram geradas, como um botão de mostrar
+    tudo". E as tentativas que morreram antes de gravar o status (a cota de disco cheia) contavam nas 8 e a lista encolhia."""
+    app.config.update({k: v for k, v in config.items() if k != "TESTING"})
+    base, ids = _rodadas(app.config, 10)
+    for i in range(3):                                       # 3 pastas sem status, as mais novas
+        (base / f"20261130-08000{i}-2026-W49").mkdir()
+    assert len(G.ultimas(app.config)) == 8 and len(G.ultimas(app.config, None)) == 10
+    html = logado.get("/t/pcm/gerar").get_data(as_text=True)
+    lista = html.split('id="passo-historico"')[1]
+    assert lista.count('class="linha"') == 8 and "Mostrar tudo (10)" in lista
+    tudo = logado.get("/t/pcm/gerar?historico=tudo").get_data(as_text=True).split('id="passo-historico"')[1]
+    assert tudo.count('class="linha"') == 10 and "Mostrar só as últimas" in tudo
+    # a limpeza tira a pasta sem status com mais de 1 h
+    import os, time
+    velha = base / "20261130-080000-2026-W49"
+    os.utime(velha, (time.time() - 7200, time.time() - 7200))
+    assert G.limpar_rodadas(app.config).get("vazias") == 1 and not velha.exists()
