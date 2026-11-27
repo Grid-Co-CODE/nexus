@@ -217,6 +217,33 @@ com asterisco no mês que teve expurgo, sem cor sem meta.
   ligado ao cadastro; o planejado do Radar (diarista), que não está nas tabelas copiadas; a ligação contrato × usina para o cliente com vários contratos.
 - Prova: `tests/test_contratos_indicadores_26_11.py`.
 
+## Quem cuida de quê: a visão reduzida por setor (26/11/2026; `setores.py`)
+
+Em Todos os contratos, a vista "Quem cuida de quê" (`#/quem`): as regras de Atendimento, Entregáveis, Metas e Financeiro de
+todos os contratos juntadas em ATIVIDADES, cada uma com um setor dono e quem também vê; o número da matriz setor × tema abre
+as atividades, a atividade abre os clientes e o cliente abre as regras com o prazo, o que vale hoje e a cláusula. Pedidos do
+Levi: "uma visão reduzida"; "um drill [...] clicar na atividade, ver quantas regras são, ver quais são as regras por cliente
+e ver quais são os prazos"; "no mesmo formato que estava o PDF [...] para eu ir só abrindo ali" (o protótipo foi um HTML
+fora do repositório, com as fichas de 18/11).
+- **A distribuição** (o setor não está escrito nos contratos, que dizem "a CONTRATADA"; sai do que a regra é, pelo nome e
+  pelo que vale hoje, sem acento): o **COS** fica com o tempo real (usina ou equipamento parado, perda de comunicação,
+  monitoramento 24 h, avisar a falha e abrir a OS), "acompanha, abre a OS e avisa a manutenção"; a **Performance**, com a
+  baixa geração, o desvio de produção, os alarmes e o evento menor sem perda de energia nem de comunicação ("essas coisas
+  pequenas são mais da performance hoje em dia"); a **Manutenção (Supervisão de Campo)**, com o sobreaviso, o plantão, o
+  horário da equipe e a chegada ao local ("esse setor de supervisão de campo é um setor de manutenção"), e "também vê" o
+  que é acompanhamento de manutenção; o **PCM**, com a resposta à falha, a correção e o reparo; a **Segurança**, com a
+  falha que ameaça bens e pessoas. Entregáveis, Metas e Financeiro são proposta (marcada "proposta" na tela); a do Levi,
+  "definida".
+- **A conta**: no servidor (`setores.montar`, puro), junto do `dados.json` (`quem_cuida`): só os ids das regras por
+  atividade e cliente; o texto vem das fichas que a página já tem. A mesma regra em mais de um contrato do cliente (mesma
+  categoria, nome e o que vale) conta uma vez. A 1ª atividade que casa vence, então a ordem da lista importa: o sobreaviso
+  vem antes do "avisar a falha" (a palavra "sobreaviso" contém "aviso" e caía no COS). Em 26/11 o `` de quatro regras
+  da zeladoria estava gravado como caractere de controle e "roçada" nunca casava (a zeladoria foi de 25 para 33 regras).
+- **Medido em 26/11/2026** (as fichas da tela): 963 regras de 15 clientes; no Atendimento, COS 53, Manutenção 54, PCM 67,
+  Performance 13.
+- **Falta**: os comentários da área sobre a distribuição (o Levi vai mandar o arquivo); confirmar as "propostas".
+- Prova: `tests/test_contratos_quem_cuida_26_11.py`.
+
 ## A planilha de controle de obrigações na visão do contrato (16/11/2026; `controle.py`)
 
 O pedido veio do retorno do supervisor de contratos na prévia: "Só não encontrei algum setor que fale sobre renovação

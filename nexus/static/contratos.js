@@ -61,6 +61,7 @@
   function irPara(ct) { var novo = rota(ct, ct === estado.ct ? estado.aba : "regras"); if (location.hash === novo) render(); else location.hash = novo; }
   function lerEndereco() {
     var r = (location.hash || "").replace(/^#\/?/, "").split("/"), ct = -1, aba = "regras";
+    estado.quem = r[0] === "quem";
     if (r[0] === "c") {
       var k = decodeURIComponent(r[1] || "");
       for (var i = 0; i < R.contratos.length; i++) if (R.contratos[i].cliente === k) { ct = i; break; }
@@ -203,7 +204,7 @@
       if (!iso) return '<span class="mudo">' + rot + "</span>";
       return '<span class="num' + (dias < 0 ? " c-critico" : "") + '">' + dBR(iso) + '</span><small class="mudo"> ' + quando(dias) + "</small>";
     }
-    return '<div class="ctr-topo">' + escolha(opcoes(), -1) + '<span class="ctr-resumo">' + R.contratos.length + " contratos; " + venc + " com a vigência vencida; " + comAtr + " com obrigação em atraso; " +
+    return '<div class="ctr-topo">' + escolha(opcoes(), -1) + vistas() + '<span class="ctr-resumo">' + R.contratos.length + " contratos; " + venc + " com a vigência vencida; " + comAtr + " com obrigação em atraso; " +
       R.contratos.filter(function (c) { return c.pontos_atencao || c.pontos_divergencia; }).length + " com ponto a resolver</span></div>" +
       '<div class="ctr-rol" style="margin-top:10px"><table class="ctr-tab"><thead><tr><th>Cliente</th><th>Gestor do contrato</th><th>Vigência até</th><th>Renovação: avisar até</th><th>Próximo reajuste</th>' +
       '<th class="r">Valor mensal</th><th class="r">Em atraso</th><th class="r">Pontos</th><th class="r">Regras</th><th class="ir"><span class="so-leitor">Abrir</span></th></tr></thead><tbody>' +
@@ -222,6 +223,80 @@
       }).join("") + "</tbody></table></div>" +
       ((R.radar_sem_contrato || []).length ? '<p class="ctr-nota">Pontos do Radar da Zeladoria sem contrato com o mesmo nome aqui: ' + R.radar_sem_contrato.map(esc).join(", ") +
         ". Acerte o nome do cliente no Radar ou nos dados do contrato para eles entrarem.</p>" : "");
+  }
+  /* ── Quem cuida de quê (26/11/2026): a visão reduzida no formato do PDF, abrindo a atividade e o cliente ─────────
+     Levi: "um drill [...] clicar na atividade, ver quantas regras são, ver quais são as regras por cliente e ver quais
+     são os prazos"; "no mesmo formato que estava o PDF [...] para eu ir só abrindo ali". A conta (o setor de cada
+     atividade) é do servidor (`contratos/setores.py`): aqui chegam os ids, e o texto vem das fichas que a página já tem. */
+  function vistas() {
+    return '<span class="ctr-seg" role="group" aria-label="Vista">' +
+      '<a href="#/"' + (estado.quem ? "" : ' aria-current="page"') + ">Contratos</a>" +
+      '<a href="#/quem"' + (estado.quem ? ' aria-current="page"' : "") + ">Quem cuida de quê</a></span>";
+  }
+  function limpo(v) { var t = String(v == null ? "" : v).replace(/\s+/g, " ").trim(); return /^(none|null|—|-)$/i.test(t) ? "" : t; }
+  function chipsPrazo(rs, max) {
+    var pz = {}, pe = {}, sem = 0;
+    rs.forEach(function (r) { var a = limpo(r.prazo), b = limpo(r.periodicidade); if (a) pz[a] = (pz[a] || 0) + 1; if (b) pe[b] = (pe[b] || 0) + 1; if (!a && !b) sem++; });
+    function top(o, n) { return Object.keys(o).sort(function (x, y) { return o[y] - o[x]; }).slice(0, n); }
+    var kz = top(pz, max), kp = top(pe, Math.max(1, max - kz.length));
+    return '<span class="qc-chips">' + kz.map(function (k) { return '<span class="qc-pz" title="prazo">' + esc(k) + (pz[k] > 1 ? " ×" + pz[k] : "") + "</span>"; }).join("") +
+      kp.map(function (k) { return '<span class="qc-pe" title="periodicidade">' + esc(k) + (pe[k] > 1 ? " ×" + pe[k] : "") + "</span>"; }).join("") +
+      (sem ? '<span class="qc-sem">' + sem + " sem prazo</span>" : "") + "</span>";
+  }
+  function qcId(t, s) { return "qc-" + String(t + "-" + s).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9]+/g, "-").toLowerCase(); }
+  function vQuem() {
+    var Q = R.quem_cuida || {temas: [], matriz: {}, ordem: []}, idx = {};
+    Object.keys(R.fichas || {}).forEach(function (cli) { (R.fichas[cli].contratos || []).forEach(function (k) { (k.regras || []).forEach(function (r) { idx[r._id] = r; }); }); });
+    var temas = Q.temas.map(function (t) { return t.nome; }), total = Q.temas.reduce(function (s, t) { return s + t.regras; }, 0);
+    var h = '<div class="ctr-topo">' + escolha(opcoes(), -1) + vistas() + "</div>";
+    if (!Q.temas.length || !total) return h + '<p class="mudo">Nenhum contrato com as regras lidas do PDF.</p>';
+    h += '<section class="qc-folha"><div class="gc-titulo-explica"><h2 class="qc-h">Quem cuida de quê</h2>' +
+      '<details class="gc-explica"><summary class="gc-explica-bt" title="Entenda esta tela" aria-label="Entenda esta tela">!</summary>' +
+      '<section class="gc-explica-caixa" aria-label="Entenda esta tela"><p class="gc-explica-t"><b>Entenda esta tela</b></p><div class="gc-explica-texto">' +
+      "<p>As regras de Atendimento, Entregáveis, Metas e Financeiro de todos os contratos, juntadas em <b>atividades</b>, cada uma com um setor dono. " +
+      "Clique no número para ir à atividade; na atividade, para ver os clientes; no cliente, para ver as regras com o prazo, o que vale hoje e a cláusula.</p>" +
+      "<p><b>O setor de cada atividade.</b> O COS fica com o tempo real (usina ou equipamento parado, perda de comunicação, monitoramento 24 h): acompanha, abre a OS e avisa a manutenção. " +
+      "A Performance fica com a baixa geração, o desvio de produção, os alarmes e o evento menor (queda de string). A Manutenção (Supervisão de Campo) fica com o sobreaviso, o plantão e a chegada ao local, " +
+      "e também vê o que é acompanhamento de manutenção. O PCM, com a resposta à falha, a correção e o reparo. <b>Definida</b> é a distribuição que a gestão deu; <b>proposta</b>, a que falta confirmar.</p>" +
+      "<p><b>De onde vem.</b> As regras lidas dos PDFs dos contratos, com as mudanças feitas nesta tela. O setor não está escrito nos contratos (eles dizem \"a CONTRATADA\"): sai do que a regra é. " +
+      "A mesma regra em mais de um contrato do cliente conta uma vez. Azul é o prazo; verde, a periodicidade; a regra sem os dois traz o tempo no texto.</p></div></section></details></div>";
+    h += '<table class="qc-mat"><thead><tr><th>Setor</th>' + temas.map(function (t) { return '<th class="r">' + esc(t) + "</th>"; }).join("") + '<th class="r">Total</th></tr></thead><tbody>' +
+      Q.ordem.map(function (s) {
+        var m = Q.matriz[s] || {}, n = 0;
+        return "<tr><td>" + esc(s) + "</td>" + temas.map(function (t) { var v = m[t] || 0; n += v;
+          return '<td class="r">' + (v ? '<button type="button" class="qc-num" data-qc-ir="' + esc(qcId(t, s)) + '" title="Abrir ' + esc(s) + " em " + esc(t) + '">' + v + "</button>" : "") + "</td>"; }).join("") +
+          '<td class="r"><b>' + n + "</b></td></tr>";
+      }).join("") + '<tr class="qc-tot"><td>Total</td>' + Q.temas.map(function (t) { return '<td class="r">' + t.regras + "</td>"; }).join("") + '<td class="r">' + total + "</td></tr></tbody></table></section>";
+    Q.temas.forEach(function (t) {
+      if (!t.regras) return;
+      h += '<section class="qc-folha"><h2 class="qc-h">' + esc(t.nome) + " <small>" + t.regras + " regras em " + t.clientes + " clientes · clique na atividade para abrir os clientes, e no cliente para ver as regras</small></h2>" +
+        '<div class="qc-cab"><span>Setor</span><span>Atividade</span><span class="r">Clientes</span><span class="r">Regras</span><span>Prazos mais comuns</span></div>';
+      var ult = null;
+      t.atividades.forEach(function (a) {
+        var novo = a.setor !== ult, todas = [];
+        ult = a.setor;
+        Object.keys(a.por_cliente).forEach(function (c) { a.por_cliente[c].forEach(function (i) { if (idx[i]) todas.push(idx[i]); }); });
+        h += '<details class="qc-ativ' + (novo ? " qc-novo" : "") + '"' + (novo ? ' id="' + esc(qcId(t.nome, a.setor)) + '"' : "") + "><summary>" +
+          '<span class="qc-setor">' + (novo ? esc(a.setor) : "") + "</span>" +
+          '<span class="qc-nome"><b>' + esc(a.nome) + "</b>" + (a.origem === "Levi" ? ' <span class="qc-tag">definida</span>' : ' <span class="qc-tag qc-prop">proposta</span>') +
+          ((a.tambem || []).length ? '<span class="qc-tb">também vê: ' + esc(a.tambem.join(", ")) + "</span>" : "") + "</span>" +
+          '<span class="r num">' + a.clientes + '</span><span class="r num"><b>' + a.regras + "</b></span>" + chipsPrazo(todas, 3) + '</summary><div class="qc-abre">' +
+          Object.keys(a.por_cliente).map(function (c) {
+            var rs = a.por_cliente[c].map(function (i) { return idx[i]; }).filter(Boolean)
+              .sort(function (x, y) { return String(x.nome || "").localeCompare(String(y.nome || ""), "pt-BR"); });
+            return '<details class="qc-cli"><summary><b>' + esc(c) + '</b><span class="r mudo">' + rs.length + " regra" + (rs.length > 1 ? "s" : "") + "</span>" + chipsPrazo(rs, 4) + "</summary>" +
+              '<table class="qc-regras"><thead><tr><th>Regra</th><th>Prazo</th><th>O que vale hoje</th><th>Cláusula</th></tr></thead><tbody>' +
+              rs.map(function (r) {
+                var pz = limpo(r.prazo), pe = limpo(r.periodicidade);
+                return '<tr><td class="qc-rn"><b>' + esc(r.nome || "(sem nome)") + '</b></td><td class="qc-rp">' + (pz ? '<span class="qc-pz">' + esc(pz) + "</span>" : "") +
+                  (pe ? '<span class="qc-pe">' + esc(pe) + "</span>" : "") + (!pz && !pe ? '<span class="mudo">no texto</span>' : "") +
+                  '</td><td class="qc-rv">' + esc(vale(r) || "") + '</td><td class="qc-rc">' + clTag(r.ref) + "</td></tr>";
+              }).join("") + "</tbody></table></details>";
+          }).join("") + "</div></details>";
+      });
+      h += "</section>";
+    });
+    return h;
   }
   // os pontos abertos de um contrato, em Todos os contratos: o número de cada tipo, e o clique leva à aba Pontos
   function pontosCel(i, c) {
@@ -1059,7 +1134,7 @@
     lerEndereco();
     if (estado.ct !== antes) { estado.soAditivo = false; estado.verRegras = "todas"; estado.mesCal = 0; estado.indAno = null; }
     raiz.innerHTML = (R.erro_edicoes ? '<p class="c-alerta" role="status" style="margin:0 0 8px">' + esc(R.erro_edicoes) + "</p>" : "") +
-      (estado.ct >= 0 ? vCliente(R.contratos[estado.ct]) : vTodos());
+      (estado.ct >= 0 ? vCliente(R.contratos[estado.ct]) : estado.quem ? vQuem() : vTodos());
   }
   window.addEventListener("hashchange", function () {
     render();
@@ -1073,6 +1148,12 @@
       leve(cAtual, "regra", b.getAttribute("data-prior").split(","), "alteracao", {prioritaria: on ? "sim" : "nao"}, on ? "Marcada como prioritária." : "Tirada das prioritárias."); return; }
     if ((b = e.target.closest("[data-subgrupo]"))) { var tk = b.getAttribute("data-subgrupo"); estado.temas[tk] = !estado.temas[tk]; render(); return; }
     if ((b = e.target.closest("[data-tirar-com]"))) { if (window.confirm("Tirar este comentário? Ele fica no histórico.")) leve(cAtual, "comentario", [b.getAttribute("data-tirar-com")], "retirada", {}, "Comentário tirado."); return; }
+    if ((b = e.target.closest("[data-qc-ir]"))) {
+      // o número da matriz abre as atividades do setor naquele tema e leva até elas
+      var d0 = document.getElementById(b.getAttribute("data-qc-ir")), x = d0;
+      while (x) { x.open = true; x = x.nextElementSibling; if (x && (!x.matches("details.qc-ativ") || x.matches(".qc-novo"))) break; }
+      if (d0) d0.scrollIntoView({behavior: "smooth", block: "start"});
+      return; }
     if ((b = e.target.closest("[data-cel]"))) { abrirGaveta(R.contratos[estado.ct], b.getAttribute("data-cel")); return; }
     if ((b = e.target.closest("[data-ind-ano-abrir]"))) { indAnoAberto = !indAnoAberto; render(); return; }
     if ((b = e.target.closest("[data-ind-ano]"))) { estado.indAno = +b.getAttribute("data-ind-ano") || null; indAnoAberto = false; render(); return; }

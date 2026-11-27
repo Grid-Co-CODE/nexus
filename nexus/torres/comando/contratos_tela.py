@@ -132,6 +132,9 @@ def contratos_dados():
             mud, erro = [], f"Não li as edições do banco ({type(e).__name__}): o que aparece pode estar sem as últimas mudanças"
         st = E.aplicar(base, mud)
         out = E.visao(base, st, visao._agora().date(), pessoas, _meu_hmac(), admin, radar=_radar())
+        # quem cuida de quê (a visão reduzida, `contratos/setores.py`): só os ids das regras, a página já tem o texto
+        from ...contratos import setores as S
+        out["quem_cuida"] = S.montar(out.get("fichas") or {})
         out.update(ok=True, erro_edicoes=erro, campos={t: [list(c[:3]) + [list(c[3]) if isinstance(c[3], tuple) else c[3]]
                                                            for c in E.CAMPOS[t]] for t in E.CAMPOS},
                    pessoas=pessoas if admin else [], eu=_usuario().get("nome") or "")
