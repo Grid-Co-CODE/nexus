@@ -1084,7 +1084,7 @@ def _tela_tv(b, coords, nomes_usina, mapa_js, filtro, agora, linhas=(), eventos=
     recentes = PA.ocorrencias_recentes(cos, list(coords), nome_de, ficha, tec, agora)
     # a visão dos técnicos (27/11/2026): a ocorrência da usina de cada um é a do cartão (a pior, pelo grupo)
     oc_de = {str(c["uid"]): g["nome"] for g in painel.get("grupos") or () for c in g["cartoes"]}
-    visao_tec = PA.visao_tecnicos(list(linhas), list(eventos), oc_de, nome_de)
+    visao_tec = PA.visao_tecnicos(list(linhas), list(eventos), oc_de, nome_de, agora)
     local = agora.astimezone(_BRT)
     r = current_app.make_response(render_template(
         "campo/equipe_tv.html", torre=TORRE, tela=TORRE.tela("equipe"), p=painel, mapa_js=mapa_js,

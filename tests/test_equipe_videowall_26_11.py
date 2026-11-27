@@ -156,6 +156,8 @@ def test_o_video_wall_em_tres_colunas(cliente, pontos, setor, com_mapa_base, mon
     assert 'data-tv-visao-bt="ocorrencias" aria-pressed="true"' in tl and 'data-tv-visao-bt="tecnicos"' in tl
     tec = tl.split('data-tv-visao-so="tecnicos" hidden>', 2)[-1]
     assert "Técnicos agora" in tl and "Naira Teste" in tec and "na Usina Alfa Teste desde" in tec
+    # uma lista só, pelo horário, com a hora na lateral como as ocorrências (27/11/2026: "Não separe por tema")
+    assert "eqtv-grupo-tit" not in tec and '<li class="eqtv-tl-item eqtv-tecv"' in tec and "<time>" in tec
     assert "ocorrência aberta: Usina parada" in tec and 'data-tv-pid="1"' in tec
     d = _dados(html)
     # o mapa do vídeo wall: o radar pelo Nexus, o que dizer de cada usina no zoom e o clima (avisos) para a vez da Chuva
@@ -165,8 +167,13 @@ def test_o_video_wall_em_tres_colunas(cliente, pontos, setor, com_mapa_base, mon
 
 def test_a_visao_dos_tecnicos():
     """A 2ª visão da coluna da direita (27/11/2026, Levi: "Visão técnico, visão ocorrências, do lado direito [...] para a
-    gente ter essas duas opções"): cada técnico do Nexus Field por situação, com onde está (a usina e desde quando, o
-    destino e a chegada prevista, a cidade) e a ocorrência aberta da usina dele, se houver."""
+    gente ter essas duas opções"): cada técnico do Nexus Field com onde está (a usina e desde quando, o destino e a
+    chegada prevista, a cidade) e a ocorrência aberta da usina dele, se houver.
+
+    Uma lista só, pelo horário, como as ocorrências (27/11/2026, Levi: "incluísse na dos técnicos o horário lateral, que
+    nem tem nas ocorrências [...] tem que mostrar junto o que está na usina e o que está em deslocamento, parado fora da
+    usina. Tem que ser de acordo com o horário mesmo [...] Não separe por tema"): a hora é a do último acontecimento do
+    dia (a chegada na usina, a saída, o início do dia); sem nenhum hoje, a última posição; sem posição, vai para o fim."""
     linhas = [{"pid": 1, "nome": "Ana Teste", "equipe": "Centro", "hora": "14:57", "onde": "", "perto": "", "desde": "",
                "s": {"chave": "na_usina", "usina_perto": (7, 0.3), "rotulo": "Na usina", "tom": "ok"}},
               {"pid": 2, "nome": "Bia Teste", "equipe": "Leste", "hora": "14:56", "onde": "", "perto": "", "desde": "",
@@ -175,15 +182,30 @@ def test_a_visao_dos_tecnicos():
                "perto": "a 4,2 km da Colorado 2", "desde": "",
                "s": {"chave": "fora_usina", "usina_perto": (12, 4.2), "rotulo": "Parado fora de usina", "tom": "neutro"}},
               {"pid": 4, "nome": "Duda Teste", "equipe": "Centro", "hora": "13:10", "onde": "", "perto": "a 0,3 km da Tanabi",
-               "desde": "", "s": {"chave": "sem_sinal", "usina_perto": (8, 0.3), "rotulo": "Sem sinal há 1 h 50", "tom": "alerta"}}]
-    v = PA.visao_tecnicos(linhas, EVENTOS, {"7": "Usina parada", "8": "Inversores desligados"}, NOMES.get)
-    assert [g["id"] for g in v] == ["na_usina", "deslocamento", "fora_usina", "sem_sinal"]
-    na, desl, fora, sinal = (g["itens"][0] for g in v)
-    assert (na["nome"], na["texto"], na["uid"], na["oc"], na["pid"]) == ("Ana Teste", "em Alto Paraná 1 desde 14:45", "7", "Usina parada", 1)
+               "desde": "", "s": {"chave": "sem_sinal", "usina_perto": (8, 0.3), "rotulo": "Sem sinal há 1 h 50",
+                                  "tom": "alerta", "ultima": datetime(2026, 11, 26, 13, 10, tzinfo=BRT)}},
+              {"pid": 5, "nome": "Eva Teste", "equipe": "Oeste", "hora": "", "onde": "", "perto": "", "desde": "",
+               "s": {"chave": "sem_posicao", "usina_perto": None, "rotulo": "Sem posição hoje", "tom": "neutro"}},
+              {"pid": 6, "nome": "Fábio Teste", "equipe": "Oeste", "hora": "24/11 às 17:02", "onde": "", "perto": "",
+               "desde": "", "s": {"chave": "sem_posicao", "usina_perto": None, "rotulo": "Sem posição hoje",
+                                  "tom": "neutro", "ultima": datetime(2026, 11, 24, 17, 2, tzinfo=BRT)}}]
+    # o "sem sinal" do dia sai meia hora depois do último ponto: a hora que vale para quem está sem sinal é a do último
+    # ponto (a lateral batendo com o "última posição" do texto), não a da marca do sinal perdido
+    sinal_perdido = {"pessoa_id": 4, "tipo": "sem_sinal", "hora": "13:40", "instante": _utc(13, 40), "usina_id": None,
+                     "destino_usina_id": None, "chegada_prevista": None, "nome": "Duda Teste"}
+    v = PA.visao_tecnicos(linhas, [sinal_perdido] + EVENTOS, {"7": "Usina parada", "8": "Inversores desligados"},
+                          NOMES.get, AGORA)
+    # pelo horário, misturando as situações: a chegada da Ana (14:45), a saída da Bia (14:19), a última posição da Duda
+    # (13:10, sem sinal), a chegada do Caio que hoje está parado fora (10:30), a posição velha do Fábio e a Eva sem nada
+    assert [(x["nome"], x["quando"]) for x in v] == [
+        ("Ana Teste", "14:45"), ("Bia Teste", "14:19"), ("Duda Teste", "13:10"), ("Caio Teste", "10:30"),
+        ("Fábio Teste", "24/11 17:02"), ("Eva Teste", "")]
+    na, desl, sinal, fora = v[:4]
+    assert (na["texto"], na["uid"], na["oc"], na["pid"], na["rotulo"]) == (
+        "em Alto Paraná 1 desde 14:45", "7", "Usina parada", 1, "Na usina")
     assert (desl["texto"], desl["uid"], desl["oc"]) == ("para Tanabi, chega 15:40", "8", "Inversores desligados")
     assert (fora["texto"], fora["uid"], fora["oc"]) == ("Tanabi/SP · a 4,2 km da Colorado 2", "", "")
     assert (sinal["texto"], sinal["rotulo"], sinal["tom"]) == ("última posição 13:10 · a 0,3 km da Tanabi", "Sem sinal há 1 h 50", "alerta")
-    assert v[0]["titulo"] == "Na usina" and v[1]["titulo"] == "Em deslocamento"
 
 
 def test_a_preposicao_antes_do_nome_da_usina():

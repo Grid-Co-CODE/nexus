@@ -2592,9 +2592,7 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eqtv-tl .eqtv-cos-cab{align-items:center}
 .eqtv-visao{display:flex;flex-direction:column;gap:1vh;flex:1;min-height:0}
 .eqtv-visao[hidden],[data-tv-visao-so][hidden]{display:none}
-.eqtv-visao .eqtv-grupo{margin-bottom:1.2vh}
-.eqtv-tecv{cursor:pointer;margin-bottom:.7vh}
-.eqtv-tecv:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.eqtv-tecv{cursor:pointer}
 .eq-tvpop .maplibregl-popup-content{background:var(--superficie);color:var(--tinta);border:1px solid var(--linha);border-radius:10px;
   padding:10px 14px;font:400 14px/1.4 var(--font-sans);box-shadow:0 8px 24px rgba(0,0,0,.4)}
 .eq-tvpop .maplibregl-popup-tip{border-top-color:var(--superficie);border-bottom-color:var(--superficie)}

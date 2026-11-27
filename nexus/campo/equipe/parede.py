@@ -216,43 +216,62 @@ def ocorrencias_recentes(cos: dict | None, uids, nome_de, ficha_de, tecnicos: di
     return [i for _a, i in itens]
 
 
-# os grupos da visão dos técnicos, na ordem de quem importa para a ocorrência (quem está na usina e quem está indo)
-GRUPOS_TEC = (("na_usina", "Na usina"), ("deslocamento", "Em deslocamento"), ("fora_usina", "Parados fora de usina"),
-              ("sem_sinal", "Sem sinal"), ("sem_permissao", "Sem permissão no celular"), ("sem_posicao", "Sem posição hoje"))
+def _no_brt(x):
+    q = x if isinstance(x, datetime) else AND.instante(x)
+    return q.astimezone(_BRT) if q else None
 
 
-def visao_tecnicos(linhas: list, eventos: list, ocorrencia_de: dict, nome_de) -> list:
+def visao_tecnicos(linhas: list, eventos: list, ocorrencia_de: dict, nome_de, agora: datetime) -> list:
     """A visão dos técnicos da coluna da direita (27/11/2026, Levi: "Visão técnico, visão ocorrências, do lado direito
-    [...] para a gente ter essas duas opções"): [{"id", "titulo", "itens": [{"pid", "nome", "equipe", "texto" (onde está:
-    a usina e desde quando, o destino e a chegada prevista, a cidade), "hora" (a última posição), "rotulo", "tom", "uid"
-    (a usina dele, para o zoom), "oc" (a ocorrência aberta dessa usina, pelo grupo)}]}], só os grupos com alguém.
-    `ocorrencia_de` = {usina_id: o grupo da pior ocorrência aberta}."""
+    [...] para a gente ter essas duas opções"): [{"pid", "nome", "equipe", "quando", "texto" (onde está: a usina e desde
+    quando, o destino e a chegada prevista, a cidade), "hora" (a última posição), "rotulo", "tom", "uid" (a usina dele,
+    para o zoom), "oc" (a ocorrência aberta dessa usina, pelo grupo)}]. `ocorrencia_de` = {usina_id: o grupo da pior
+    ocorrência aberta}.
+
+    Uma lista só, do mais novo para o mais velho, com a hora na lateral como as ocorrências (27/11/2026, Levi: "incluísse
+    na dos técnicos o horário lateral, que nem tem nas ocorrências [...] Tem que ser de acordo com o horário mesmo [...]
+    Não separe por tema"). `quando` = o último acontecimento do dia do técnico: a chegada na usina em que está, a saída
+    de quem está em deslocamento, e para os outros o evento mais novo (a saída da última usina, o início do dia); para
+    quem está sem sinal, o último ponto (o mesmo do texto); sem evento hoje, a última posição ("dd/mm HH:MM" de outro
+    dia); sem posição nenhuma, vai para o fim."""
     na = {it["nome"]: (uid, it) for uid, lst in tecnicos_nas_usinas(linhas, eventos).items() for it in lst
           if it["tipo"] == "na_usina"}
     indo = {d["nome"]: d for d in deslocamentos(linhas, eventos, nome_de)}
-    por: dict = {}
+    hoje = agora.astimezone(_BRT).date()
+    itens = []
     for l in linhas:
-        s = l.get("s") or {}
+        s, pid = l.get("s") or {}, l.get("pid")
         ch, uid, texto = s.get("chave"), "", ""
+        do_pid = [e for e in eventos if e.get("pessoa_id") == pid]
+        ev = do_pid[0] if do_pid else None
         if ch == "na_usina" and l["nome"] in na:
             uid = na[l["nome"]][0]
             desde = na[l["nome"]][1]["texto"].rsplit(" desde ", 1)
             texto = (SI.com_prep("em", nome_de(uid)) if nome_de(uid) else "na usina") + (f" desde {desde[1]}" if len(desde) == 2 else "")
+            ev = next((e for e in do_pid if e.get("tipo") in ("chegou", "inicio") and str(e.get("usina_id")) == uid), ev)
         elif ch == "deslocamento":
             d = indo.get(l["nome"]) or {}
             uid = d.get("uid") or ""
-            texto = (f"para {d['para']}" + (f", chega {d['chega']}" if d.get("chega") else "")) if d.get("para") \
-                else "em deslocamento, sem destino programado"
+            texto = (f"para {d['para']}" + (f", chega {d['chega']}" if d.get("chega") else "")) if d.get("para")                 else "em deslocamento, sem destino programado"
+            ev = next((e for e in do_pid if e.get("tipo") == "saiu"), ev)
         elif ch == "fora_usina":
             texto = " · ".join(x for x in (l.get("onde"), l.get("perto")) if x)
         elif ch == "sem_permissao":
             texto = "sem a localização no celular" + (f" desde {l['desde']}" if l.get("desde") else "")
         else:
             texto = " · ".join(x for x in ((f"última posição {l['hora']}" if l.get("hora") else ""), l.get("perto")) if x)
-        por.setdefault(ch, []).append({"pid": l.get("pid"), "nome": l["nome"], "equipe": l.get("equipe") or "",
-                                       "texto": texto, "hora": l.get("hora") or "", "rotulo": s.get("rotulo") or "",
-                                       "tom": s.get("tom") or "neutro", "uid": uid, "oc": ocorrencia_de.get(uid, "") if uid else ""})
-    return [{"id": gid, "titulo": tit, "itens": por[gid]} for gid, tit in GRUPOS_TEC if por.get(gid)]
+        if ch in ("sem_sinal", "sem_posicao"):
+            # a marca do sinal perdido sai meia hora depois do último ponto: a hora que vale é a do último ponto, a mesma
+            # do "última posição" do texto
+            ev = None
+        q = (_no_brt(ev.get("instante")) if ev else None) or _no_brt(s.get("ultima"))
+        quando = "" if q is None else q.strftime("%H:%M") if q.date() == hoje else q.strftime("%d/%m %H:%M")
+        itens.append((q, {"pid": pid, "nome": l["nome"], "equipe": l.get("equipe") or "", "quando": quando,
+                          "texto": texto, "hora": l.get("hora") or "", "rotulo": s.get("rotulo") or "",
+                          "tom": s.get("tom") or "neutro", "uid": uid, "oc": ocorrencia_de.get(uid, "") if uid else ""}))
+    # o mais novo primeiro; quem não tem hora nenhuma vai para o fim (a ordem estável mantém a do painel, pelo nome)
+    itens.sort(key=lambda x: x[0].timestamp() if x[0] else float("-inf"), reverse=True)
+    return [i for _q, i in itens]
 
 
 def contagem(agora_por_usina: dict) -> list:

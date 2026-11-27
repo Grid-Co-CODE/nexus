@@ -149,24 +149,24 @@
       <p class="eqtv-nota-tec">O técnico aparece quando o Nexus Field dele está na usina ou indo para ela.</p>
       </div>
       <div class="eqtv-visao" data-tv-visao-so="tecnicos" hidden>
+        {# uma lista só, pelo horário, com a hora na lateral como as ocorrências (27/11/2026, Levi: "Não separe por tema.
+           Faça que nem nas ocorrências") #}
         <div class="eqtv-lista eqtv-lista--mao">
-          {% for g in visao_tec %}
-          <section class="eqtv-grupo" aria-label="{{ g.titulo }}">
-            <h3 class="eqtv-grupo-tit"><span>{{ g.titulo }}</span><span class="eqtv-grupo-n">{{ g.itens|length }}</span></h3>
-            {% for x in g.itens %}
-            <div class="eqtv-ev eqtv-ev--{{ x.tom }} eqtv-tecv" data-tv-pid="{{ x.pid }}"{% if x.uid %} data-tv-uid="{{ x.uid }}"{% endif %} tabindex="0">
-              <div class="eqtv-ev-corpo">
-                <p><b>{{ x.nome }}</b>{% if x.equipe %} <span class="eqtv-ev-ha">{{ x.equipe }}</span>{% endif %}</p>
-                <p class="eqtv-ev-txt">{{ x.texto }}</p>
-                {% if x.oc %}<p class="eqtv-ev-nota">ocorrência aberta: {{ x.oc }}</p>{% endif %}
-              </div>
-              <span class="cn-pill cn-{{ x.tom }}">{{ x.rotulo }}</span>
-            </div>
+          <ol class="eqtv-tl-lista">
+            {% for x in visao_tec %}
+            <li class="eqtv-tl-item eqtv-tecv" data-tv-pid="{{ x.pid }}"{% if x.uid %} data-tv-uid="{{ x.uid }}"{% endif %} tabindex="0"><time>{{ x.quando or '—' }}</time>
+              <div class="eqtv-ev eqtv-ev--{{ x.tom }}">
+                <div class="eqtv-ev-corpo">
+                  <p><b>{{ x.nome }}</b>{% if x.equipe %} <span class="eqtv-ev-ha">{{ x.equipe }}</span>{% endif %}</p>
+                  <p class="eqtv-ev-txt">{{ x.texto }}</p>
+                  {% if x.oc %}<p class="eqtv-ev-nota">ocorrência aberta: {{ x.oc }}</p>{% endif %}
+                </div>
+                <span class="cn-pill cn-{{ x.tom }}">{{ x.rotulo }}</span>
+              </div></li>
+            {% else %}
+            <li class="eqtv-vazio">Nenhum técnico com o Nexus Field agora.</li>
             {% endfor %}
-          </section>
-          {% else %}
-          <p class="eqtv-vazio">Nenhum técnico com o Nexus Field agora.</p>
-          {% endfor %}
+          </ol>
         </div>
       </div>
     </section>

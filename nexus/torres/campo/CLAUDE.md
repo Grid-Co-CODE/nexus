@@ -1994,9 +1994,14 @@ equipes"; "pode até clicar e dar um zoom automático. Mas é importante ter um 
     **Duas visões** (27/11/2026, Levi: "Visão técnico, visão ocorrências, do lado direito [...] para a gente ter essas
     duas opções"): os botões **Ocorrências** (onde abre) e **Técnicos** no alto da coluna trocam sem recarregar, e a
     escolha fica no navegador (a tela se relê a cada 2 min). A dos técnicos (`visao_tecnicos`) é cada técnico do Nexus
-    Field por situação (na usina, em deslocamento, parado fora, sem sinal, sem permissão, sem posição), com onde está
-    (a usina e desde quando, o destino e a chegada prevista, a cidade) e a ocorrência aberta da usina dele (o grupo do
-    cartão); o clique dá o zoom na usina, ou na posição do técnico quando não há usina ligada.
+    Field numa lista só, **pelo horário**, com a hora na lateral como as ocorrências (27/11/2026, Levi: "Tem que ser de
+    acordo com o horário mesmo [...] Não separe por tema. Faça que nem nas ocorrências"): a hora é a do último
+    acontecimento do dia (a chegada na usina em que está, a saída de quem está em deslocamento, a saída da última usina
+    ou o início do dia de quem está parado fora); quem está sem sinal ou sem posição vale pelo último ponto (o mesmo do
+    texto: a marca do sinal perdido sai meia hora depois), "dd/mm HH:MM" quando é de outro dia; sem ponto nenhum, vai
+    para o fim com "—". Cada um traz a situação (o selo), onde está (a usina e desde quando, o destino e a chegada
+    prevista, a cidade) e a ocorrência aberta da usina dele (o grupo do cartão); o clique dá o zoom na usina, ou na
+    posição do técnico quando não há usina ligada.
     O cabeçalho da coluna é só o título com a fonte ("Ocorrências mais recentes COS", "Técnicos agora Nexus Field") e os
     dois botões: sem rótulo em cima, sem "da mais nova para a mais antiga", sem hora e sem resumo (27/11/2026, Levi: "não
     precisa explicar da mais nova para a mais antiga [...] Bote só ocorrências mais recentes COS. E os botões, acabou"). O
