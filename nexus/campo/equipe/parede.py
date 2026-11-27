@@ -215,6 +215,45 @@ def ocorrencias_recentes(cos: dict | None, uids, nome_de, ficha_de, tecnicos: di
     return [i for _a, i in itens]
 
 
+# os grupos da visão dos técnicos, na ordem de quem importa para a ocorrência (quem está na usina e quem está indo)
+GRUPOS_TEC = (("na_usina", "Na usina"), ("deslocamento", "Em deslocamento"), ("fora_usina", "Parados fora de usina"),
+              ("sem_sinal", "Sem sinal"), ("sem_permissao", "Sem permissão no celular"), ("sem_posicao", "Sem posição hoje"))
+
+
+def visao_tecnicos(linhas: list, eventos: list, ocorrencia_de: dict, nome_de) -> list:
+    """A visão dos técnicos da coluna da direita (27/11/2026, Levi: "Visão técnico, visão ocorrências, do lado direito
+    [...] para a gente ter essas duas opções"): [{"id", "titulo", "itens": [{"pid", "nome", "equipe", "texto" (onde está:
+    a usina e desde quando, o destino e a chegada prevista, a cidade), "hora" (a última posição), "rotulo", "tom", "uid"
+    (a usina dele, para o zoom), "oc" (a ocorrência aberta dessa usina, pelo grupo)}]}], só os grupos com alguém.
+    `ocorrencia_de` = {usina_id: o grupo da pior ocorrência aberta}."""
+    na = {it["nome"]: (uid, it) for uid, lst in tecnicos_nas_usinas(linhas, eventos).items() for it in lst
+          if it["tipo"] == "na_usina"}
+    indo = {d["nome"]: d for d in deslocamentos(linhas, eventos, nome_de)}
+    por: dict = {}
+    for l in linhas:
+        s = l.get("s") or {}
+        ch, uid, texto = s.get("chave"), "", ""
+        if ch == "na_usina" and l["nome"] in na:
+            uid = na[l["nome"]][0]
+            desde = na[l["nome"]][1]["texto"].rsplit(" desde ", 1)
+            texto = f"na {nome_de(uid) or 'usina'}" + (f" desde {desde[1]}" if len(desde) == 2 else "")
+        elif ch == "deslocamento":
+            d = indo.get(l["nome"]) or {}
+            uid = d.get("uid") or ""
+            texto = (f"para {d['para']}" + (f", chega {d['chega']}" if d.get("chega") else "")) if d.get("para") \
+                else "em deslocamento, sem destino programado"
+        elif ch == "fora_usina":
+            texto = " · ".join(x for x in (l.get("onde"), l.get("perto")) if x)
+        elif ch == "sem_permissao":
+            texto = "sem a localização no celular" + (f" desde {l['desde']}" if l.get("desde") else "")
+        else:
+            texto = " · ".join(x for x in ((f"última posição {l['hora']}" if l.get("hora") else ""), l.get("perto")) if x)
+        por.setdefault(ch, []).append({"pid": l.get("pid"), "nome": l["nome"], "equipe": l.get("equipe") or "",
+                                       "texto": texto, "hora": l.get("hora") or "", "rotulo": s.get("rotulo") or "",
+                                       "tom": s.get("tom") or "neutro", "uid": uid, "oc": ocorrencia_de.get(uid, "") if uid else ""})
+    return [{"id": gid, "titulo": tit, "itens": por[gid]} for gid, tit in GRUPOS_TEC if por.get(gid)]
+
+
 def contagem(agora_por_usina: dict) -> list:
     """[{"id", "n", "rotulo", "explica"}] das usinas do mapa por cor do Agora (crítico, atenção, sem comunicação, normal
     e sem leitura)."""

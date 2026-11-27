@@ -1082,10 +1082,13 @@ def _tela_tv(b, coords, nomes_usina, mapa_js, filtro, agora, linhas=(), eventos=
         mapa_js["rotas"] = rotas
     contagem = PA.contagem({u["id"]: u.get("agora") for u in (mapa_js or {}).get("usinas") or ()})
     recentes = PA.ocorrencias_recentes(cos, list(coords), nome_de, ficha, tec, agora)
+    # a visão dos técnicos (27/11/2026): a ocorrência da usina de cada um é a do cartão (a pior, pelo grupo)
+    oc_de = {str(c["uid"]): g["nome"] for g in painel.get("grupos") or () for c in g["cartoes"]}
+    visao_tec = PA.visao_tecnicos(list(linhas), list(eventos), oc_de, nome_de)
     local = agora.astimezone(_BRT)
     r = current_app.make_response(render_template(
         "campo/equipe_tv.html", torre=TORRE, tela=TORRE.tela("equipe"), p=painel, mapa_js=mapa_js,
-        contagem=contagem, deslocamentos=desloc, recentes=recentes, giro_s=GIRO_TV_S,
+        contagem=contagem, deslocamentos=desloc, recentes=recentes, visao_tec=visao_tec, giro_s=GIRO_TV_S,
         recarrega_s=RECARREGA_TV_S, hora=local.strftime("%H:%M"), data=f"{DIAS[local.weekday()]}, {local:%d/%m}",
         prazo=_prazo_da_tv(), q_sair=dict(filtro["q"]), link_chaves=bool(session.get("admin"))))
     r.headers["Cache-Control"] = "no-store"         # a posição de pessoas não fica na cópia do navegador nem de proxy

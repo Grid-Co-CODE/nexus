@@ -831,7 +831,9 @@
       if (tb) { tvTipo(tb.getAttribute("data-tv-tipo")); if (!TV.zoom) tvGirar(); return; }
       if (e.target.closest("[data-tv-brasil]")) { tvVoltar(); return; }
       var el = e.target.closest("[data-tv-uid]");
-      if (el) tvZoomUsina(el.getAttribute("data-tv-uid"));
+      if (el) { tvZoomUsina(el.getAttribute("data-tv-uid")); return; }
+      var tp = e.target.closest("[data-tv-pid]"), t = tp && porPid[tp.getAttribute("data-tv-pid")];
+      if (t) tvZoom(t.c, "<b>" + esc(t.nome) + "</b><small>" + esc(t.rotulo + (t.hora ? " · " + t.hora : "")) + "</small>");
     });
     document.addEventListener("keydown", function (e) {
       var el = e.target.closest && e.target.closest("[data-tv-uid]");

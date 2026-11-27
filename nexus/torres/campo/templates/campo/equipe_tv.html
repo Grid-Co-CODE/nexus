@@ -117,8 +117,16 @@
     {# à direita, as ocorrências mais recentes do COS e o técnico de cada uma (27/11/2026, Levi: "mostrar as ocorrências
        atuais, as que aconteceram agora, as ocorrências mais recentes do COS, e aí mostrar se o técnico chegou, se ele está
        chegando"): a mais nova em cima, e a coluna rola na mão ("não precisa ficar rolando automático não") #}
-    <section class="eqtv-tl" aria-label="Ocorrências mais recentes">
-      <header class="eqtv-cos-cab"><div><p class="gc-eyebrow">COS · Da mais nova para a mais antiga</p><h2>Ocorrências mais recentes</h2></div></header>
+    {# as duas visões (27/11/2026, Levi: "Visão técnico, visão ocorrências, do lado direito, sabe? Para a gente ter essas
+       duas opções"): abre nas Ocorrências; a troca fica no navegador (a tela se relê a cada 2 min) #}
+    <section class="eqtv-tl" aria-label="Ocorrências e técnicos" data-tv-visao="ocorrencias">
+      <header class="eqtv-cos-cab"><div><p class="gc-eyebrow" data-tv-visao-so="ocorrencias">COS · Da mais nova para a mais antiga</p><p class="gc-eyebrow" data-tv-visao-so="tecnicos" hidden>Nexus Field · Onde está cada técnico</p>
+        <h2 data-tv-visao-so="ocorrencias">Ocorrências mais recentes</h2><h2 data-tv-visao-so="tecnicos" hidden>Técnicos agora</h2></div>
+        <div class="cn-seg eqtv-tipo" role="group" aria-label="O que a coluna mostra">
+          <button type="button" data-tv-visao-bt="ocorrencias" aria-pressed="true">Ocorrências</button>
+          <button type="button" data-tv-visao-bt="tecnicos" aria-pressed="false">Técnicos</button>
+        </div></header>
+      <div class="eqtv-visao" data-tv-visao-so="ocorrencias">
       {% set na = recentes|selectattr('tecnicos')|list %}
       <p class="eqtv-agora"><span>Agora · {{ hora }}</span>{% if recentes %}<small>{{ recentes|length }} abertas · {{ na|length }} com técnico na usina ou a caminho</small>{% endif %}</p>
       <div class="eqtv-lista eqtv-lista--mao">
@@ -139,6 +147,28 @@
         </ol>
       </div>
       <p class="eqtv-nota-tec">O técnico aparece quando o Nexus Field dele está na usina ou indo para ela.</p>
+      </div>
+      <div class="eqtv-visao" data-tv-visao-so="tecnicos" hidden>
+        <div class="eqtv-lista eqtv-lista--mao">
+          {% for g in visao_tec %}
+          <section class="eqtv-grupo" aria-label="{{ g.titulo }}">
+            <h3 class="eqtv-grupo-tit"><span>{{ g.titulo }}</span><span class="eqtv-grupo-n">{{ g.itens|length }}</span></h3>
+            {% for x in g.itens %}
+            <div class="eqtv-ev eqtv-ev--{{ x.tom }} eqtv-tecv" data-tv-pid="{{ x.pid }}"{% if x.uid %} data-tv-uid="{{ x.uid }}"{% endif %} tabindex="0">
+              <div class="eqtv-ev-corpo">
+                <p><b>{{ x.nome }}</b>{% if x.equipe %} <span class="eqtv-ev-ha">{{ x.equipe }}</span>{% endif %}</p>
+                <p class="eqtv-ev-txt">{{ x.texto }}</p>
+                {% if x.oc %}<p class="eqtv-ev-nota">ocorrência aberta: {{ x.oc }}</p>{% endif %}
+              </div>
+              <span class="cn-pill cn-{{ x.tom }}">{{ x.rotulo }}</span>
+            </div>
+            {% endfor %}
+          </section>
+          {% else %}
+          <p class="eqtv-vazio">Nenhum técnico com o Nexus Field agora.</p>
+          {% endfor %}
+        </div>
+      </div>
     </section>
   </main>
 </div>

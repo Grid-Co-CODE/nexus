@@ -77,6 +77,25 @@
   var c1 = raiz.querySelector("[data-eqtv-rola]");
   rolar(c1, c1 && c1.querySelector(".eqtv-trilho"));
 
+  // ── as duas visões da coluna da direita (27/11/2026, Levi: "Visão técnico, visão ocorrências") ─────────────────
+  var colTl = raiz.querySelector("[data-tv-visao]");
+  function visao(v) {
+    if (!colTl) return;
+    colTl.setAttribute("data-tv-visao", v);
+    colTl.querySelectorAll("[data-tv-visao-so]").forEach(function (el) { el.hidden = el.getAttribute("data-tv-visao-so") !== v; });
+    colTl.querySelectorAll("[data-tv-visao-bt]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-tv-visao-bt") === v)); });
+    try { localStorage.setItem("nexus.equipe.tv.visao", v); } catch (e) { /* sem armazenamento */ }
+  }
+  if (colTl) {
+    var guardada = "ocorrencias";
+    try { guardada = localStorage.getItem("nexus.equipe.tv.visao") || "ocorrencias"; } catch (e) { /* sem armazenamento */ }
+    visao(guardada === "tecnicos" ? "tecnicos" : "ocorrencias");
+    colTl.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-tv-visao-bt]");
+      if (b) visao(b.getAttribute("data-tv-visao-bt"));
+    });
+  }
+
   // ── os controles só ao mexer ───────────────────────────────────────────────────────────────────────────────────
   var esconder = 0;
   function mexeu() {

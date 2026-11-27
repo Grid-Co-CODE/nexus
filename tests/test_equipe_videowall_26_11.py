@@ -146,7 +146,36 @@ def test_o_video_wall_em_tres_colunas(cliente, pontos, setor, com_mapa_base, mon
     # à direita, as ocorrências mais recentes do COS com o técnico de cada uma (27/11/2026): a Naira na Alfa
     assert "Ocorrências mais recentes" in tl and "Queda total" in tl and "Naira Teste na usina desde" in tl
     assert "Eventos de hoje" not in tl and "chegou na usina" not in tl
+    # as duas visões da coluna (27/11/2026, "Visão técnico, visão ocorrências"): abre nas Ocorrências; a dos técnicos traz
+    # a Naira na Usina Alfa, com a ocorrência aberta dela
+    assert 'data-tv-visao-bt="ocorrencias" aria-pressed="true"' in tl and 'data-tv-visao-bt="tecnicos"' in tl
+    tec = tl.split('data-tv-visao-so="tecnicos" hidden>', 2)[-1]
+    assert "Técnicos agora" in tl and "Naira Teste" in tec and "na Usina Alfa Teste desde" in tec
+    assert "ocorrência aberta: Usina parada" in tec and 'data-tv-pid="1"' in tec
     d = _dados(html)
     # o mapa do vídeo wall: o radar pelo Nexus, o que dizer de cada usina no zoom e o clima (avisos) para a vez da Chuva
     assert d["radar"]["lista"] == "/t/campo/equipe/radar.json" and d["radar"]["bloco"] == "/t/campo/equipe/radar/"
     assert any("Naira Teste na usina" in x for x in d["tv_usinas"]["7"])
+
+
+def test_a_visao_dos_tecnicos():
+    """A 2ª visão da coluna da direita (27/11/2026, Levi: "Visão técnico, visão ocorrências, do lado direito [...] para a
+    gente ter essas duas opções"): cada técnico do Nexus Field por situação, com onde está (a usina e desde quando, o
+    destino e a chegada prevista, a cidade) e a ocorrência aberta da usina dele, se houver."""
+    linhas = [{"pid": 1, "nome": "Ana Teste", "equipe": "Centro", "hora": "14:57", "onde": "", "perto": "", "desde": "",
+               "s": {"chave": "na_usina", "usina_perto": (7, 0.3), "rotulo": "Na usina", "tom": "ok"}},
+              {"pid": 2, "nome": "Bia Teste", "equipe": "Leste", "hora": "14:56", "onde": "", "perto": "", "desde": "",
+               "s": {"chave": "deslocamento", "usina_perto": None, "rotulo": "Em deslocamento", "tom": "info"}},
+              {"pid": 3, "nome": "Caio Teste", "equipe": "", "hora": "14:49", "onde": "Tanabi/SP",
+               "perto": "a 4,2 km da Colorado 2", "desde": "",
+               "s": {"chave": "fora_usina", "usina_perto": (12, 4.2), "rotulo": "Parado fora de usina", "tom": "neutro"}},
+              {"pid": 4, "nome": "Duda Teste", "equipe": "Centro", "hora": "13:10", "onde": "", "perto": "a 0,3 km da Tanabi",
+               "desde": "", "s": {"chave": "sem_sinal", "usina_perto": (8, 0.3), "rotulo": "Sem sinal há 1 h 50", "tom": "alerta"}}]
+    v = PA.visao_tecnicos(linhas, EVENTOS, {"7": "Usina parada", "8": "Inversores desligados"}, NOMES.get)
+    assert [g["id"] for g in v] == ["na_usina", "deslocamento", "fora_usina", "sem_sinal"]
+    na, desl, fora, sinal = (g["itens"][0] for g in v)
+    assert (na["nome"], na["texto"], na["uid"], na["oc"], na["pid"]) == ("Ana Teste", "na Alto Paraná 1 desde 14:45", "7", "Usina parada", 1)
+    assert (desl["texto"], desl["uid"], desl["oc"]) == ("para Tanabi, chega 15:40", "8", "Inversores desligados")
+    assert (fora["texto"], fora["uid"], fora["oc"]) == ("Tanabi/SP · a 4,2 km da Colorado 2", "", "")
+    assert (sinal["texto"], sinal["rotulo"], sinal["tom"]) == ("última posição 13:10 · a 0,3 km da Tanabi", "Sem sinal há 1 h 50", "alerta")
+    assert v[0]["titulo"] == "Na usina" and v[1]["titulo"] == "Em deslocamento"

@@ -1991,6 +1991,12 @@ equipes"; "pode até clicar e dar um zoom automático. Mas é importante ter um 
     versão (26/11) era uma linha do tempo de eventos (abertura, nota, técnico chegou e saiu) e saiu: "está mostrando
     quem chegou, quem não chegou, quem deixou de chegar". **Não rola sozinha** ("não precisa ficar rolando automático
     não [...] pode até scrollar com um scroll invisível"): a mais nova fica em cima e o resto rola na mão.
+    **Duas visões** (27/11/2026, Levi: "Visão técnico, visão ocorrências, do lado direito [...] para a gente ter essas
+    duas opções"): os botões **Ocorrências** (onde abre) e **Técnicos** no alto da coluna trocam sem recarregar, e a
+    escolha fica no navegador (a tela se relê a cada 2 min). A dos técnicos (`visao_tecnicos`) é cada técnico do Nexus
+    Field por situação (na usina, em deslocamento, parado fora, sem sinal, sem permissão, sem posição), com onde está
+    (a usina e desde quando, o destino e a chegada prevista, a cidade) e a ocorrência aberta da usina dele (o grupo do
+    cartão); o clique dá o zoom na usina, ou na posição do técnico quando não há usina ligada.
   - **27/11/2026, os ajustes do Levi:** abre com o foco nas usinas ("Eu quero que abra focado nas usinas [...] as usinas
     poderiam ficar com bolinha redonda, né? E as equipes um pouquinho menores"): o tipo Alarmes virou **Usinas**, a usina
     é a bolinha (`usinas-bola`, maior quanto mais grave; o losango fica para a tela) e o título é "Usinas, alarmes e
