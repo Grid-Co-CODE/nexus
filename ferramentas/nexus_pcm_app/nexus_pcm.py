@@ -160,7 +160,9 @@ class Nexus:
         return self._pedir("GET", "/t/pcm/pc/ola").json()
 
     def rodada(self, semana: str) -> dict:
-        return self._pedir("POST", "/t/pcm/pc/rodada", json={"semana": semana}, timeout=300).json()
+        # a preparação lê o banco (histórico, cadastro, FAMA): logo depois de o Nexus reiniciar ela passou de 5 min (a prova
+        # de 27/11/2026, às 13:09, com o servidor recém-subido); 15 min de espera
+        return self._pedir("POST", "/t/pcm/pc/rodada", json={"semana": semana}, timeout=900).json()
 
     def pacote(self, rid: str) -> bytes:
         return self._pedir("GET", f"/t/pcm/pc/rodada/{rid}/pacote", timeout=300).content
