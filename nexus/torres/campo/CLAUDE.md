@@ -2237,7 +2237,7 @@ O Levi viu a tela na bancada: "Gostei bastante! ... inclua também essas melhori
   dele abre aqui com `?ver=usinas&clima=1`). `?ver=tecnicos` (o padrão; qualquer outro valor também)
   é a tela de sempre. **Nada de técnico no Usinas**: o serviço das posições nem sobe, o filtro de supervisor e equipe e
   o piloto somem, e a abertura **não grava "abriu_mapa"** na trilha da LGPD: não há dado pessoal ali. Sem o clima pedido
-  a página nem vai às fontes do clima. Quem vê é o mesmo `_quem_ve` dos cinco setores e dos administradores, conferido
+  a página nem vai às fontes do clima. Quem vê é o mesmo `_quem_ve` do mapa (todo setor da Grid e os administradores), conferido
   antes do botão. A usina é um **losango** nos três desenhos e o técnico é o círculo: com o clima os dois usam as cores
   do semáforo, e a forma é que os separa.
 - **O Incluir clima** (Levi, 11/11/2026: 'poderia ter um botão "incluir clima" se apertar vai recolher a barra lateral
@@ -2306,9 +2306,13 @@ videowall do COS pode ler os mesmos (`eventos.da_equipe`), pela área dele.
 
 ### Quem vê
 
-Os setores **PCM, COS, Performance, Supervisão Campo e Responsáveis UFV** e os administradores. É conferido **dentro de
-cada rota** (`_quem_ve`), além do portão por setor da Tela: o portão fica desligado sem a `NEXUS_PESSOA_HMAC`, e a marca de
-outro setor em Base → Acessos abriria a tela. Sessão de cliente: 403. Quem põe o técnico no piloto é só o administrador
+**Todo setor da Grid e os administradores, desde 27/11/2026** (Levi: "Quero o mapa de equipe liberado para todo mundo";
+a Tela é `de_todos`, como a Caixa de entrada; até ali eram só os setores **PCM, COS, Performance, Supervisão Campo e
+Responsáveis UFV**, que seguem como os donos da tela em Base → Acessos). Quem está sem setor no Nexus, ou cujo setor não
+se lê, não vê; sem a `NEXUS_PESSOA_HMAC`, só o administrador. É conferido **dentro de cada rota** (`_quem_ve`), além do
+portão por setor da Tela. Sessão de cliente: 403 (o cliente nunca vê a posição de técnico). **O aviso ao técnico** (quem
+vê a posição dele, no App e no Nexus Field) dizia os cinco setores: com a liberação, o texto de lá tem de dizer "todos os
+setores da Grid" (é do chat do App e do Nexus Field). Quem põe o técnico no piloto é só o administrador
 (`POST /t/campo/equipe/piloto`, na própria tela). Cada abertura do mapa, de cada rota e de cada percurso (com o período) vai ao registro da LGPD
 (`nexus_equipe_acessos`, quem abriu só pelo código HMAC do e-mail). O nome do técnico aparece na tela e nunca vai ao banco
 nem ao log.

@@ -41,6 +41,7 @@ def busca(monkeypatch):
 
 
 def test_a_lista_dos_quadros_so_para_quem_ve_o_mapa(cliente, pontos, setor, busca):  # noqa: F811
+    setor.pop(OUTRO)                                  # sem setor no Nexus (desde 27/11/2026 todo setor da Grid vê o mapa)
     _entrar(cliente, OUTRO)
     assert cliente.get("/t/campo/equipe/radar.json").status_code == 403 and busca.pedidos == []
     _entrar(cliente, EMAIL[PCM])
@@ -69,6 +70,7 @@ def test_o_bloco_vem_pelo_nexus_e_o_caminho_e_conferido(cliente, pontos, setor, 
                  "/t/campo/equipe/radar/v2/radar/zz/256/6/22/36/8/1_1.png", "/t/campo/equipe/radar/qualquer.png"):
         assert cliente.get(ruim).status_code == 404, ruim
     assert len(busca.pedidos) == 1
+    setor.pop(OUTRO)                                  # sem setor no Nexus (desde 27/11/2026 todo setor da Grid vê o mapa)
     _entrar(cliente, OUTRO)
     assert cliente.get(BLOCO).status_code == 403
 

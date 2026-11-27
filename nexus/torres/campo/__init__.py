@@ -75,11 +75,12 @@ TORRE = Torre(
              "Como está cada usina agora, e o que cada setor diz dela?",
              "Visão do responsável, tempo real, Nexus Insights, extintores e luvas das rondas + cadastro do Nexus"),
         # o Mapa de equipe (08/11/2026; o pedido do Levi: "identificar onde o técnico está e qual seria a melhor rota para
-        # ele"): a posição dos técnicos do piloto do Nexus Field, nas rotas de equipe_tela.py. Os donos são a regra escrita
-        # no aviso ao técnico (quem vê), e a rota a confere de novo: a marca de outro setor em Base → Acessos não abre o mapa
+        # ele"): a posição dos técnicos do piloto do Nexus Field, nas rotas de equipe_tela.py. De TODO setor da Grid desde
+        # 27/11/2026 (Levi: "Quero o mapa de equipe liberado para todo mundo"; até ali, só os cinco donos abaixo): a rota
+        # confere de novo (`_quem_ve`), e o cliente nunca vê. Os donos seguem como o lugar da tela em Base → Acessos
         Tela("equipe", "Mapa de equipe", "Onde está cada técnico de campo agora, e qual a rota dele até uma usina?",
              "Posições do Nexus Field (o diário do dia e os livros nexus_equipe_*) + cadastro do Nexus",
-             do_setor=(SID.PCM, SID.COS, SID.PERFORMANCE, SID.SUPERVISAO_CAMPO, SID.RESPONSAVEL_UFV)),
+             do_setor=(SID.PCM, SID.COS, SID.PERFORMANCE, SID.SUPERVISAO_CAMPO, SID.RESPONSAVEL_UFV), de_todos=True),
         # o Clima e risco veio da Performance em 24/11/2026 (Levi: "clima e risco vai para usinas 360. Mapa de risco pode
         # tirar. Já está tudo lá na parte de mapa de equipe"): a lista e a página da usina, em clima_tela.py; o mapa das
         # usinas com os alertas é o do Mapa de equipe, no botão Usinas. O nome de cada fonte por extenso, de fontes.NOMES

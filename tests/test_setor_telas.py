@@ -173,8 +173,9 @@ def test_setor_sem_nenhuma_tela_ve_o_inicio_com_o_aviso(app, setores):
     assert r.status_code == 200
     html = r.get_data(as_text=True)
     assert "ainda não tem telas liberadas" not in html
-    # a Caixa e os Temas do setor (Comando) e a Prévia do contrato (no Comando desde 12/11/2026) são de todos
-    assert set(re.findall(r'data-torre="([^"]+)"', html)) <= {"comando", "contratos"}
+    # a Caixa e os Temas do setor (Comando), a Prévia do contrato (no Comando desde 12/11/2026) e o Mapa de equipe (na
+    # Usinas 360° desde 27/11/2026, Levi: "Quero o mapa de equipe liberado para todo mundo") são de todos
+    assert set(re.findall(r'data-torre="([^"]+)"', html)) <= {"comando", "contratos", "campo"}
     assert c.get("/t/comando/caixa-de-entrada").status_code == 200 and c.get("/t/comando/insights").status_code == 403
 
 

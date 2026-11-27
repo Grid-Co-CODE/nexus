@@ -320,6 +320,9 @@ def _setores_que_veem() -> tuple:
 
 
 def _regra() -> str:
+    # de todo setor da Grid desde 27/11/2026 (Levi: "Quero o mapa de equipe liberado para todo mundo")
+    if TORRE.tela("equipe").de_todos:
+        return "O Mapa de equipe é visto por todos os setores da Grid e pelos administradores do Nexus; o cliente não vê."
     nomes = [NOME_DO_SETOR.get(s, f"setor {s}") for s in _setores_que_veem()]
     return f"O Mapa de equipe é visto só pelos setores {_juntar(nomes)} e pelos administradores do Nexus."
 
@@ -332,7 +335,8 @@ def _usuario() -> tuple[str, str]:
 
 
 def _quem_ve() -> dict:
-    """{"pode", "aviso"}: o administrador, ou quem é de um dos setores donos da tela. É a regra escrita no aviso ao
+    """{"pode", "aviso"}: o administrador, ou quem tem setor na Grid (a tela é `de_todos` desde 27/11/2026; até ali, só
+    os setores donos). Era a regra escrita no aviso ao
     técnico (quem vê a posição dele), conferida aqui também, e não só no portão: o portão fica desligado sem a
     NEXUS_PESSOA_HMAC (e nos testes), e a marca de OUTRO setor em Base → Acessos abriria a tela. Sem saber o setor (sem
     a chave HMAC, o banco que não respondeu), só o administrador; o cliente, nunca."""
@@ -352,7 +356,7 @@ def _quem_ve() -> dict:
     except Exception as e:      # noqa: BLE001 — sem saber o setor, fecha (e diz que é leitura, não falta de setor)
         _log.warning("equipe: não consegui ler o setor de quem abriu o mapa (%s)", type(e).__name__)
         return {"pode": False, "aviso": regra + " Não consegui ler o seu setor agora; tente de novo em instantes."}
-    if setor and setor.get("id") in _setores_que_veem():
+    if setor and setor.get("id") and (TORRE.tela("equipe").de_todos or setor.get("id") in _setores_que_veem()):
         return {"pode": True, "aviso": ""}
     onde = f"Você está no setor {setor['nome']}." if setor else "Você está sem setor no Nexus."
     return {"pode": False, "aviso": f"{regra} {onde}"}

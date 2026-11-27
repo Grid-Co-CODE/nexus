@@ -177,37 +177,38 @@ def _acessos(srv):
 
 
 # ── quem vê ────────────────────────────────────────────────────────────────────────────────────────────────────────
-def test_a_tela_esta_logo_depois_da_visao_do_cliente_e_e_dos_cinco_setores():
+def test_a_tela_esta_logo_depois_da_visao_do_cliente_e_e_de_todos():
+    """Até 27/11/2026 o mapa era dos cinco setores (PCM, COS, Performance, Supervisão Campo e Responsáveis UFV); desde
+    então é de todo setor da Grid (Levi: "Quero o mapa de equipe liberado para todo mundo"), `de_todos`, como a Caixa de
+    entrada. Os cinco seguem como donos (o lugar dela em Base → Acessos)."""
     from nexus.torres.campo import TORRE
     ids = [t.id for t in TORRE.telas]
     # a Usinas veio do Comando em 16/11/2026 e entra entre as duas (no menu da Grid, logo abaixo da Visão do responsável)
     assert ids.index("equipe") == ids.index("usinas") + 1 == ids.index("cliente") + 2
     t = TORRE.tela("equipe")
-    assert t.nome == "Mapa de equipe" and set(t.do_setor) == {SID.PCM, SID.COS, SID.PERFORMANCE,
-                                                               SID.SUPERVISAO_CAMPO, SID.RESPONSAVEL_UFV}
+    assert t.nome == "Mapa de equipe" and t.de_todos is True
+    assert set(t.do_setor) == {SID.PCM, SID.COS, SID.PERFORMANCE, SID.SUPERVISAO_CAMPO, SID.RESPONSAVEL_UFV}
 
 
-def test_so_os_cinco_setores_e_o_admin_veem(app, cliente, pontos, setor, monkeypatch):
+def test_todo_setor_da_grid_e_o_admin_veem(app, cliente, pontos, setor, monkeypatch):
+    """27/11/2026, Levi: "Quero o mapa de equipe liberado para todo mundo". Todo setor da Grid vê o mapa e a rota; o
+    piloto segue só do administrador; quem está sem setor no Nexus, o setor que não se lê e o cliente, não."""
     assert not setor_telas.ligado(app.config)                         # o portão por setor desligado, como no teste
-    for sid in (SID.PCM, SID.COS, SID.PERFORMANCE, SID.SUPERVISAO_CAMPO, SID.RESPONSAVEL_UFV):
+    for sid in (SID.PCM, SID.COS, SID.PERFORMANCE, SID.SUPERVISAO_CAMPO, SID.RESPONSAVEL_UFV, SID.ENGENHARIA,
+                SID.ZELADORIA, SID.SEGURANCA, SID.CHAMADOS):
         setor[EMAIL[PCM]] = {"id": sid, "nome": f"Setor {sid}"}
         st, html = _html(_entrar(cliente, EMAIL[PCM]))
         assert st == 200 and NOME[NA_USINA] in html, sid
-    for sid in (SID.ENGENHARIA, SID.ZELADORIA, SID.SEGURANCA, SID.CHAMADOS):
-        setor[EMAIL[PCM]] = {"id": sid, "nome": f"Setor {sid}"}
-        st, html = _html(_entrar(cliente, EMAIL[PCM]))
-        assert st == 403 and NOME[NA_USINA] not in html, sid
-        assert "PCM, COS, Performance, Supervisão Campo e Responsáveis UFV" in html
-    pontos.registro.novos()
-    # de outro setor, nem a rota nem o piloto
+    # de outro setor (Engenharia): o mapa e a rota, sim; o piloto, não (é do administrador)
     _entrar(cliente, OUTRO)
-    assert _html(cliente)[0] == 403
-    assert cliente.get(URL_ROTA, query_string={"tecnico": NA_USINA, "usina": USINA_B}).status_code == 403
+    assert _html(cliente)[0] == 200
+    rota = cliente.get(URL_ROTA, query_string={"tecnico": NA_USINA, "usina": USINA_B})      # o Abrir rota leva ao mapa
+    assert rota.status_code == 302 and "google" in rota.headers["Location"]
     assert cliente.post(URL_PILOTO, data={"pessoa_id": FORA_DO_PILOTO, "no_piloto": "sim"}).status_code == 403
-    assert _acessos(pontos) == []                                     # a recusa não conta como acesso
     # sem setor, e com o setor que não se lê
     setor.pop(EMAIL[PCM])
-    assert _html(_entrar(cliente, EMAIL[PCM]))[0] == 403
+    st, html = _html(_entrar(cliente, EMAIL[PCM]))
+    assert st == 403 and "todos os setores da Grid" in html and "sem setor no Nexus" in html
 
     def ilegivel(cfg, email, base, sessao):
         raise RuntimeError("setores ilegíveis")
@@ -1202,7 +1203,9 @@ def test_o_modo_usinas_nao_grava_na_trilha_nem_sobe_o_servico_da_equipe(cliente,
 
 
 def test_quem_nao_ve_o_mapa_de_equipe_nao_ve_as_usinas_dele(app, cliente, banco, setor, risco):
-    _entrar(cliente, OUTRO)                                                        # Engenharia
+    # sem setor no Nexus, não vê (desde 27/11/2026 todo setor da Grid vê o mapa)
+    setor.pop(OUTRO)
+    _entrar(cliente, OUTRO)
     st, html = _html(cliente, query_string={"ver": "usinas"})
     assert st == 403 and "data-mapa" not in html and "Usina Alfa" not in html
     # a sessão de cliente nem chega à rota (o portão a manda embora antes), e o mapa não sai
