@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+{% from "_explica.html" import explica %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
+<noscript><meta http-equiv="refresh" content="60"></noscript>
+{# Relógios de prazo (23/11/2026, o dono: "Andamento calcula, Nexus mostra"). O Andamento da Ronda COS abre um relógio
+   para cada condição que pede ação, escala por WhatsApp quando o prazo vence e o para quando a ação é feita; aqui só lê
+   (nexus/cos/prazos.py). #}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+      {% call explica('Entenda esta tela') %}<p><b>Três relógios.</b> <b>Alarme sem ocorrência</b>: o SCADA alarma a usina e
+    nenhuma ocorrência aberta cobre o alarme; para quando a ocorrência é aberta ou o alarme some. <b>Voltou e não foi
+    normalizada</b>: o supervisório já mostra o equipamento de volta e ninguém normalizou; para na normalização.
+    <b>Registrada sem card ao cliente</b>: a ocorrência que manda card foi registrada e o card não saiu, quase sempre por
+    falta de OS; para quando o card é gerado.</p>
+    <p><b>O prazo</b> é de {{ p.prazo_min if p else 15 }} min. Quando vence, o Andamento manda UMA mensagem ao supervisor do
+    COS e ao celular da bancada, com tudo o que venceu naquele minuto. O relógio do alarme só existe nas usinas com logger
+    (SCADA Grid).</p>{% endcall %}</div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor">Andamento da Ronda COS{% if p and p.gerado_em %}<br>leitura das <b>{{ p.gerado_em.strftime('%H:%M') }}</b>{% endif %}{% if lido %} · lido às {{ lido }}{% endif %}</div>
+  </div>
+
+  {% if not ligada %}
+  <div class="cn-vazio cos-aviso">A fonte do Andamento ainda não está ligada neste servidor: faltam o endereço e a chave
+    (<code>NEXUS_COS_ANDAMENTO_URL</code> e <code>NEXUS_COS_ANDAMENTO_CHAVE</code>), que um administrador grava em Base →
+    Chaves do Nexus. O resto do Nexus segue igual.</div>
+  {% else %}
+  {% if clientes|length > 1 %}
+  <nav class="cn-abas" aria-label="Clientes">
+    {% for c in clientes %}<a href="{{ url(cliente=c) }}"{% if c == cliente %} aria-current="page"{% endif %}>{{ c }}</a>{% endfor %}
+  </nav>
+  {% endif %}
+
+  {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro[:1]|upper }}{{ leitura.erro[1:] }}.</b>
+    {% if leitura.velha %}A tela mostra a última leitura boa, das {{ lido }}.{% endif %}</div>{% endif %}
+
+  {% if p %}
+  {% if not p.ligado %}
+  <div class="cn-erro cn-aviso" role="status"><b>Os relógios não estão ligados para {{ cliente }}.</b> O Andamento só os
+    roda nos clientes de <code>ANDAMENTO_PRAZO_CLIENTES</code>, a partir de <code>ANDAMENTO_PRAZO_DESDE</code>.</div>
+  {% elif p.envio != 'ligado' %}
+  <div class="cn-erro cn-aviso" role="status"><b>Ensaio.</b> Os relógios rodam e o vencido fica registrado, mas o
+    escalonamento ainda não sai por WhatsApp.</div>
+  {% endif %}
+
+  <div class="cn-filtros">
+    <div class="cn-seg" aria-label="Período">
+      {% for d in dias_opcoes %}<a href="{{ url(dias=d) }}"{% if d == dias %} aria-current="page"{% endif %}>{% if d == 1 %}Últimas 24 h{% else %}Últimos {{ d }} dias{% endif %}</a>{% endfor %}
+    </div>
+  </div>
+
+  <div class="cn-numeros">
+    <span><span class="gc-rotulo">Correndo agora</span><span class="v">{{ p.abertos|length }}</span>
+      <span class="d">relógios abertos</span></span>
+    <span><span class="gc-rotulo">Vencidos agora</span><span class="v{% if p.vencidos_agora %} cn-t-critico{% endif %}">{{ p.vencidos_agora }}</span>
+      <span class="d">passaram dos {{ p.prazo_min }} min</span></span>
+    <span><span class="gc-rotulo">No prazo</span><span class="v">{% if p.pct_no_prazo is none %}—{% else %}{{ p.pct_no_prazo }}%{% endif %}</span>
+      <span class="d">{{ p.total.dentro or 0 }} no prazo, {{ p.total.fora or 0 }} fora, no período</span></span>
+  </div>
+
+  <div class="cn-tab cos-tab-curta"><table>
+    <thead><tr><th class="cos-esq">Relógio</th><th>No período</th><th>No prazo</th><th>Fora do prazo</th><th>Abertos</th></tr></thead>
+    <tbody>
+    {% for rot, r in p.resumo %}
+      <tr><td class="cos-esq">{{ rot }}</td><td>{{ r.total or 0 }}</td>
+        <td><span class="{{ 'cn-t-ok' if r.dentro else 'mudo' }}">{{ r.dentro or 0 }}</span></td>
+        <td><span class="{{ 'cn-t-critico' if r.fora else 'mudo' }}">{{ r.fora or 0 }}</span></td>
+        <td>{{ r.abertos or 0 }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+
+  <h2 class="cos-sub">Correndo agora</h2>
+  {% if p.abertos %}
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th class="cos-esq">Relógio</th><th class="cos-esq">Usina</th><th class="cos-esq">O que está pendente</th><th>Começou</th><th>Prazo</th><th>Escalado</th></tr></thead>
+    <tbody>
+    {% for l in p.abertos %}
+      <tr><td class="cos-esq">{{ l.rotulo }}</td>
+        <td class="cos-esq cos-usina"><b>{{ l.nome }}</b>{% if l.os %}<span class="det">OS {{ l.os }}</span>{% endif %}</td>
+        <td class="cos-esq">{{ l.o_que }}</td>
+        <td class="m">{{ l.inicio.strftime('%d/%m %H:%M') if l.inicio else '—' }}</td>
+        <td><span class="cn-st cn-t-{{ l.tom }}">{{ l.prazo }}</span></td>
+        <td>{% if l.escalado %}<span class="cn-tag">sim</span>{% else %}<span class="mudo">—</span>{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="cn-vazio">Nenhum relógio correndo agora.</p>{% endif %}
+
+  <h2 class="cos-sub">Parados no período</h2>
+  {% if p.recentes %}
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th class="cos-esq">Relógio</th><th class="cos-esq">Usina</th><th class="cos-esq">O que estava pendente</th><th>Começou</th><th>Resultado</th><th>Escalado</th></tr></thead>
+    <tbody>
+    {% for l in p.recentes %}
+      <tr><td class="cos-esq">{{ l.rotulo }}</td>
+        <td class="cos-esq cos-usina"><b>{{ l.nome }}</b>{% if l.os %}<span class="det">OS {{ l.os }}</span>{% endif %}</td>
+        <td class="cos-esq">{{ l.o_que }}</td>
+        <td class="m">{{ l.inicio.strftime('%d/%m %H:%M') if l.inicio else '—' }}</td>
+        <td><span class="cn-st cn-t-{{ l.tom }}">{{ l.prazo }}</span></td>
+        <td>{% if l.escalado %}<span class="cn-tag">sim</span>{% else %}<span class="mudo">—</span>{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="cn-vazio">Nenhum relógio parado no período.</p>{% endif %}
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

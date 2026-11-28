@@ -161,6 +161,23 @@ O desfecho e a repetição são daqui (`nexus/cos/religamentos.py`).
   "pedem ação" saem como "—". O Andamento de antes da rota responde 404, e a tela diz por cliente.
 - Testes: `tests/test_cos_acionamentos.py` (controle positivo: sem o telefone pessoal como reserva, vermelho).
 
+## Relógios de prazo: o que está com o prazo de 15 min correndo ou vencido (23/11/2026)
+
+*"O que está com o prazo de 15 min correndo ou vencido agora, e quanto saiu no prazo?"* Decisão do dono: *"Pode seguir
+com os relógios. Prazos de 15 minutos"* e *"Andamento calcula, Nexus mostra"*. O Andamento da Ronda COS abre um relógio
+para cada condição que pede ação — o alarme do SCADA sem ocorrência, o equipamento que voltou no supervisório e não foi
+normalizado, a ocorrência registrada sem o card ao cliente —, escala por WhatsApp (o supervisor do COS e o celular da
+bancada) quando o prazo vence e o para quando a ação é feita. **Esta tela só lê** (`nexus/cos/prazos.py`).
+
+- **A fonte:** `GET <Andamento>/api/nexus/<cliente>/prazos?dias=1|7|30` (`ler_prazos`, `versao: 1`, 20 s de cópia): os
+  abertos (quanto passou, se venceu, se foi escalado), os parados no período (dentro ou fora do prazo) e o resumo por
+  relógio. Sem nome de pessoa.
+- **A tela:** o vencido primeiro; a coluna Prazo diz "faltam N min" ou "vencido há N min" (aberto) e "no prazo" ou "fora
+  do prazo" (parado). Com os relógios desligados para o cliente, ou em ENSAIO (o escalonamento registrado e não enviado),
+  a faixa diz.
+- Na ordem do menu, logo depois da Conferência de OS (as quatro primeiras são fixas desde 12/11): é tela de turno. Do setor COS sem marca em Base → Acessos.
+- Testes: `tests/test_cos_prazos.py`.
+
 ## Passagem de turno: a R12 no banco do Nexus (26/10/2026)
 
 *"O que o próximo turno precisa saber e quem assumiu?"* — R12: a passagem é registrada no sistema; sem registro, ela não

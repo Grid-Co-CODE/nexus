@@ -464,6 +464,37 @@ def ler_distribuidoras(config, cliente: str) -> Leitura:
         _pedir(f, f"/api/nexus/{urllib.parse.quote(cliente, safe='')}/distribuidoras")), cliente)
 
 
+# A tela Relógios de prazo (23/11/2026, o dono: "Andamento calcula, Nexus mostra") lê os relógios de 15 min do Andamento
+# (`GET /api/nexus/<cliente>/prazos?dias=`): o alarme do SCADA sem ocorrência, o equipamento que voltou e não foi
+# normalizado e a ocorrência registrada sem o card ao cliente. Muda a cada minuto: 20 s de cópia.
+VERSAO_DOS_PRAZOS = 1
+DIAS_DOS_PRAZOS = (1, 7, 30)
+TTL_PRAZOS_S = 20
+
+
+def validar_prazos(d) -> dict:
+    if not isinstance(d, dict):
+        raise FonteErro("a resposta do Andamento não é um objeto")
+    if d.get("versao") != VERSAO_DOS_PRAZOS:
+        raise FonteErro(f"o Andamento fala a versão {d.get('versao')!r} dos prazos, e o Nexus entende a "
+                        f"{VERSAO_DOS_PRAZOS}")
+    if not isinstance(d.get("abertos"), list) or not isinstance(d.get("recentes"), list) or not isinstance(d.get("resumo"), dict):
+        raise FonteErro("a resposta do Andamento não tem os relógios de prazo")
+    return d
+
+
+def ler_prazos(config, cliente: str, dias: int) -> Leitura:
+    """Os relógios de prazo de um cliente: os abertos agora e os dos últimos `dias` (a tela Relógios de prazo). Na
+    falha, a última cópia boa continua, dita velha; o Andamento de antes da rota responde 404."""
+    f = fonte(config)
+    if not f.ligada:
+        return Leitura(cliente, None, erro="a fonte do Andamento não está ligada neste servidor")
+    dias = dias if dias in DIAS_DOS_PRAZOS else 1
+    chave = (f.url, f"{cliente}|prazos|{dias}")
+    return _com_copia(config, chave, TTL_PRAZOS_S, lambda: validar_prazos(
+        _pedir(f, f"/api/nexus/{urllib.parse.quote(cliente, safe='')}/prazos?dias={dias}")), cliente)
+
+
 # A tela OS em aberto (27/10/2026) lê a quarta rota, com contrato próprio: o Panorama da Ronda COS, de TODOS os clientes
 # numa resposta só (`GET /api/nexus/os-abertas`). A varredura do Fracttal lá roda de 30 em 30 min: 60 s de cópia.
 VERSAO_DAS_OS_ABERTAS = 1
