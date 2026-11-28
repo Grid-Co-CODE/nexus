@@ -1493,6 +1493,15 @@ def _disco() -> dict | None:
         return _DISCO["medida"]
 
 
+def _resumo_tmp() -> dict | None:
+    """O /tmp do usuário do serviço por grupo e a última faxina (`faxina_tmp`); None se não der para ler."""
+    try:
+        from . import faxina_tmp
+        return faxina_tmp.resumo()
+    except Exception:      # noqa: BLE001 — o Raio-X nunca cai por isso
+        return None
+
+
 ABAS = (("agora", "Agora"), ("memoria", "Memória"), ("pedidos", "Pedidos e tarefas"), ("uso", "Uso do OS Creator"),
         ("canto", "Canto central"))
 
@@ -1551,6 +1560,7 @@ def registrar_raio_x(bp) -> None:
                                # nos testes a medida não dispara (a thread dela, andando pelo disco, entrava na conta do
                                # processador por thread dos outros testes)
                                disco=_DISCO["medida"] if app.config.get("TESTING") else _disco(),
+                               tmp=_resumo_tmp(),
                                parecer=parecer(pedidos, threads, teto, cpu.get("maquina"), travamentos,
                                                (("Nexus", nexus), ("worker", worker), ("web", web))),
                                quando=time.strftime("%d/%m/%Y %H:%M:%S"))

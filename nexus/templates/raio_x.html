@@ -186,6 +186,17 @@
     <tbody>{% for x in disco.por_arquivos %}<tr><td>{{ x.pasta }}</td><td class="num gc-num">{{ x.arquivos }}</td><td class="num gc-num">{{ x.mb }}</td></tr>{% endfor %}</tbody>
   </table></div>
   {% endif %}
+  {% if tmp %}
+  <h3>O /tmp do usuário do serviço</h3>
+  <p class="gc-ajuda">De 6 em 6 horas sai do {{ tmp.pasta }} o arquivo deste usuário parado há mais de {{ tmp.dias }} dias.
+    {% if tmp.ultima %}Última faxina: {{ tmp.ultima.quando }}, {{ tmp.ultima.arquivos }} arquivos, {{ tmp.ultima.mb }} MB{% if tmp.ultima.erros %}, {{ tmp.ultima.erros }} que não saíram{% endif %}.{% else %}Ainda não rodou desde que o Nexus subiu.{% endif %}</p>
+  {% if tmp.grupos %}
+  <div class="cad-rolagem"><table class="cad-tabela">
+    <thead><tr><th>Arquivo (o nome sem a parte que muda)</th><th class="num">Arquivos</th><th class="num">MB</th><th class="num">Com mais de {{ tmp.dias }} dias</th></tr></thead>
+    <tbody>{% for g in tmp.grupos %}<tr><td>{{ g.grupo }}</td><td class="num gc-num">{{ g.arquivos }}</td><td class="num gc-num">{{ g.mb }}</td><td class="num gc-num">{{ g.velhos }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% endif %}
+  {% endif %}
 </section>
 </div>
 

@@ -62,6 +62,8 @@ if __name__ == "__main__":
     # roda em toda máquina servida, mas só envia onde a chave NEXUS_EMAIL_ENVIAR é 1 (o servidor)
     from nexus.emails import fila as emails_fila
     emails_fila.ligar(app)
+    from nexus.casca import faxina_tmp
+    faxina_tmp.ligar(app)          # o /tmp do usuário do serviço (a cota de disco estourada de 27-28/11/2026)
     # as telas quentes depois de cada deploy (13/10/2026: a 1ª abertura do servidor recém-subido levou 27 s; 5 min)
     from nexus.auth import pre_carga
     pre_carga.aquecer_ao_subir(app)
